@@ -6,6 +6,11 @@
 #
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
 # solver bump worth reflecting) — decoupled from code releases.
+#
+# Fan-out/fan-in: one runner per DGGS builds that system's tables (keep the
+# matrix in sync with src/dggs_compare/systems/), the full-globe enumeration
+# runs alongside on its own runner, and the publish job merges the artifacts,
+# gates on the DNC invariants, derives the viewer data, and uploads.
 name: data-release
 
 on:
@@ -20,23 +25,61 @@ permissions:
   contents: write
 
 jobs:
-  build-and-publish:
+  gen:
+    strategy:
+      matrix:
+        system: [a5, h3, isea7h, ivea7h, rhealpix, s2]
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
       - uses: extractions/setup-just@v4
-      - name: sync (builds skar from the pinned git tag)
-        run: just sync
-      - name: generate the tables (geometry + stats, all systems)
-        run: just gen
+      - run: just sync
+      - run: just gen ${{ matrix.system }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: tables-${{ matrix.system }}
+          path: data/cells/
+          if-no-files-found: error
+
+  full-globe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: extractions/setup-just@v4
+      - run: just sync
+      - run: just web-full
+      - uses: actions/upload-artifact@v6
+        with:
+          name: full-globe
+          path: web/out/full/
+          if-no-files-found: error
+
+  publish:
+    needs: [gen, full-globe]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: extractions/setup-just@v4
+      - run: just sync
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: tables-*
+          path: data/cells/
+          merge-multiple: true
+      - uses: actions/download-artifact@v6
+        with:
+          name: full-globe
+          path: web/out/full/
       - name: gate — DNC invariants must hold before anything ships
         run: just dnc-check
-      - name: build the web viewer data
+      - name: derive the web viewer data
         run: just web-data
-      - name: build the full-globe binaries (enumerate + solve)
-        run: just web-full
       - name: stage + publish
         env:
           GH_TOKEN: ${{ github.token }}
