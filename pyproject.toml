@@ -1,0 +1,37 @@
+[project]
+name = "dggs_compare"
+version = "0.1.0"
+description = "Comparing DGGS grids (H3, S2, A5, ISEA7H, IVEA7H, rHEALPix) by per-cell shape and area stats, via skar + sparea."
+readme = "readme.md"
+requires-python = ">=3.11"
+dependencies = ["skar"]
+
+[dependency-groups]
+# dggs_cache analyses — read the pre-generated Parquet cell sets (pyarrow) +
+# plot (matplotlib). The analysis side imports no DGGS library, so survey.py,
+# dnc_check.py, the web builders etc. run natively (no Rosetta) against this
+# group; the cells are produced separately by the per-DGGS gen_*.py scripts
+# (standalone PEP 723 / uv-run, each carrying its own DGGS library).
+cells = ["matplotlib>=3", "pyarrow>=15"]
+# dggs_old live-engine analyses + area calibration.
+# sparea: spherical-polygon areas, used to match cell sizes across systems.
+# a5_fast: Rust/PyO3 A5 binding (~30x faster than pure-Python pya5).
+# dggal: Ecere's DGGS Abstraction Library, the binding for the ISEA/IVEA hex +
+# rHEALPix systems. dggal/ecrt only publish an arch-broken macOS arm64 wheel
+# (it bundles x86_64 dylibs) and no native arm64 eC toolchain exists, so on
+# Apple Silicon the live-engine scripts run under an x86_64 (Rosetta) Python
+# 3.13 in a separate env (.venv-dggs) — see `just dggs-sync`. The x86_64
+# marker keeps dggal out of the native arm64 resolution.
+dggs = ["matplotlib>=3", "h3>=4", "s2sphere", "a5_fast", "sparea>=0.4",
+        "dggal; platform_machine == 'x86_64'"]
+lab = ["jupyterlab>=4", "matplotlib>=3", "pyarrow>=15"]
+
+[tool.uv]
+# A scripts repo, not a package — nothing to build or install from here.
+package = false
+
+[tool.uv.sources]
+# skar isn't on PyPI yet; pin the released tag (uv builds it from source —
+# the zig/meson toolchain is fetched automatically via build isolation).
+# Bump the tag when skar_py cuts a release.
+skar = { git = "https://github.com/ajfriend/skar_py", tag = "v0.6.0" }

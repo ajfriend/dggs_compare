@@ -1,0 +1,14 @@
+# Python
+.venv/
+.venv-dggs/   # x86_64 (Rosetta) env for the dggal-backed scripts — see justfile
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+
+# uv lockfile — opt in if you want it tracked
+uv.lock
+
+# Generated data + plots, at any depth: the Parquet cell cache
+# (dggs_cache/cells/out/), analysis PNGs, and the web viewer's built data.
+**/out/
