@@ -5,9 +5,12 @@ rHEALPix** — by per-cell statistics: shape (aspect ratio via
 [skar](https://github.com/ajfriend/skar_py)'s enclosing-cone solver) and area
 (via [sparea](https://pypi.org/project/sparea/)), at area-matched resolutions.
 
-Extracted from [skar_py](https://github.com/ajfriend/skar_py) (see its history
-through PR #16 for how this pipeline evolved); split out so the library repo
-stays a library and the investigation can grow freely.
+**The products of this repo are data artifacts and web pages.** The Parquet
+tables — one row per cell, with the computed `ar` and `area` bundled next to
+the geometry — are published as GitHub data releases; downstream consumers
+(the analyses here, the web viewer, or anyone with pyarrow/DuckDB) just read
+columns. The code is organized as an internal library (`src/dggs_compare/`)
+with thin scripts on top; it is never published to PyPI.
 
 **Aspect ratio (AR)** throughout means the major/minor semi-axis ratio (a/b,
 a≥b) of a cell's enclosing-cone ellipse — the discrete per-cell analogue of
@@ -18,34 +21,67 @@ surfaces.
 ## Layout
 
 ```
-dggs_cache/     the Parquet-cache pipeline: generate random cells per DGGS
-                once, then run every analysis off those files — natively,
-                with no DGGS library in the analysis env. Survey plots,
-                resolution calibration, DNC invariants, explorations, and an
-                interactive web viewer (ajglobe globes + dynamic histograms).
-dggs_old/       live-engine analyses that can't run off a cell snapshot
-                (point->cell scans, neighbors, edge refinement); dggal under
-                a dedicated x86_64/Rosetta env on Apple Silicon.
-notebooks/      interactive companions (dggs_survey.ipynb).
+src/dggs_compare/     the internal library (organization only, not for PyPI)
+  config.py             pipeline constants — the single source of truth
+  systems/              ONE FILE PER DGGS, nothing else; the folder is the
+                        registry, adding a grid = dropping in one file
+  registry.py           folder discovery + lazy imports
+  dggal_engine.py       shared DGGAL glue + the live-engine Adapter
+  stats.py              per-cell AR (skar) + area (sparea)
+  cache.py              the Parquet tables: build + read (data/cells/)
+  checks.py             DNC invariants (cached-ar or re-solve modes)
+  webdata.py            web-viewer artifacts from the tables
+scripts/              thin callers: gen, survey, calibrate, dnc_check,
+                      validate_corners, web_*, explorations/
+web/                  the interactive explorer (ajglobe globes + dynamic
+                      histograms); static page, data from web/out/
+data/cells/           the tables (gitignored; published as data releases)
+notebooks/            interactive companions
 ```
+
+Everything runs in **one env** (`just sync`) — no per-script envs, no re-exec
+tricks; the registry imports a system's module on first use, so table-reading
+consumers never load a DGGS binding. One platform wrinkle: dggal 0.0.6's
+macOS arm64 wheel still bundles x86_64 dylibs, so on Apple Silicon the env
+runs x86_64 under Rosetta (one justfile line); Linux is native (CI generates
+the canonical data there).
 
 ## Use
 
 ```sh
-just gen-cells   # generate the Parquet cell sets (once; ~2 min, dggal under Rosetta)
-just survey      # aspect-ratio survey -> dggs_cache/out/*.png
-just calibrate   # area-match resolutions across systems
-just dnc-check   # assert the DNC invariants (pass/fail)
-just web         # interactive explorer (histograms + synced globes) at :8000
+just gen               # build all tables: geometry + stats, one pass (~min)
+just survey            # AR comparison plots -> out/
+just calibrate         # area-match resolutions across systems
+just dnc-check         # assert the DNC invariants (pass/fail)
+just web               # interactive explorer at :8000
+just validate-corners  # corners-only exactness check (per new DGGAL grid)
 ```
 
-See `dggs_cache/README.md` and `dggs_old/README.md` for the full tour.
+## Table schema
+
+One Parquet file per `(system, resolution)` at `data/cells/{sys}_r{res}.parquet`:
+
+| column | type | |
+|---|---|---|
+| `dggs` | string | system name (constant per file) |
+| `res` | int32 | resolution/level (constant per file) |
+| `cid` | string | cell id text |
+| `verts` | list<[lat, lng] f64> | corner ring, degrees, open |
+| `ar` | float64 | enclosing-cone aspect ratio; NaN = did-not-certify |
+| `area` | float64 | spherical area, steradians |
+
+Provenance (seed policy, budgets, solver settings, library versions) rides in
+each file's Parquet metadata. Coarse resolutions are enumerated in full;
+finer ones hold up to 100k sampled cells (25k past the working resolution).
 
 ## Relationship to skar_py
 
 skar comes from the released tag pinned in `pyproject.toml`
-(`[tool.uv.sources]`); bump it when skar_py cuts a release. This repo also
-serves as **skar's pre-release regression gate**: before tagging a skar
-release, point the pin at the candidate, `uv sync`, and run `just dnc-check`
-(and ideally `just survey` for a numeric eyeball) — it exercises ~5.7M real
-DGGS cells against invariants that have caught real solver differences.
+(`[tool.uv.sources]`). This repo is also **skar's pre-release regression
+gate**: point the pin at a candidate, `uv sync`, set `RESOLVE=True` in
+`scripts/dnc_check.py`, and run it — that re-solves ~5.7M real cells with the
+installed skar against invariants that have caught real solver differences.
+
+Extracted from [skar_py](https://github.com/ajfriend/skar_py) (history through
+its PR #16); restructured for native dggal 0.0.6 (no more Rosetta) with stats
+bundled into the tables.
