@@ -39,23 +39,20 @@ export async function fetchBin(path, Ctor) {
   return new Ctor(await r.arrayBuffer());
 }
 
-// Ascending finite values of an AR array (NaN = did-not-converge dropped).
-export function sortedFinite(ar) {
-  return Float64Array.from(ar).filter(Number.isFinite).sort();
-}
-
-// Per-cell quantile position in [0, 1] (NaN where the cell DNC'd), computed
-// once per load so fill callbacks are lookups. Rank is bisect-right into the
-// sorted values — equal ARs get equal color, ties never split.
-export function quantileT(ar, sorted = sortedFinite(ar)) {
-  const t = new Float32Array(ar.length).fill(NaN);
-  const m = sorted.length;
-  for (let i = 0; i < ar.length; i++) {
-    const a = ar[i];
-    if (!Number.isFinite(a)) continue;
-    let lo = 0, hi = m;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] <= a) lo = mid + 1; else hi = mid; }
-    t[i] = m > 1 ? Math.min(1, lo / (m - 1)) : 0.5;
+// Min/max/span of the finite values, for linear value->color scales
+// (value-based, never rank: equal AR ⇒ equal color). A span that is
+// near-zero relative to the values is float noise (e.g. a level of congruent
+// cells, AR all equal) — return span Infinity so the caller's
+// (a - min) / span collapses to one color instead of amplifying the noise.
+export function finiteRange(values) {
+  let min = Infinity, max = -Infinity;
+  for (const v of values) {
+    if (Number.isFinite(v)) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
   }
-  return t;
+  const span = max - min;
+  const noise = 1e-4 * Math.max(Math.abs(min), Math.abs(max), 1);
+  return { min, max, span: span > noise ? span : Infinity };
 }
