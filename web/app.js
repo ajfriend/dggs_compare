@@ -3,7 +3,7 @@
 // Two views: dynamic overlaid histograms (Observable Plot) and two synced
 // orthographic globes (ajglobe), cells colored by aspect ratio.
 import { Orb, lnglatToQuat, quatToLngLat } from './vendor/ajglobe.min.js';
-import { DNC_GREY, dataURL, viridis, lut, fetchBin, sortedFinite, quantileT } from './_shared.js';
+import { DNC_GREY, dataURL, viridis, lut, fetchBin, finiteRange } from './_shared.js';
 
 const fmt = (x, d = 4) => (x == null ? '—' : x.toFixed(d));
 const $ = (sel) => document.querySelector(sel);
@@ -224,12 +224,13 @@ const globe = (() => {
   const panels = {};                 // id -> {orb, layer, label, ar, ids, qt, arMax, epoch}
   let spinning = false, spinReq = null, lastT = 0;
 
-  // Two coloring modes:
+  // Two coloring modes, both VALUE-based (equal AR ⇒ equal color; rank/
+  // quantile coloring would amplify float-level differences and distort the
+  // field):
   //   shared    — absolute AR over [1, global max] with a sub-linear (gamma)
   //               stretch, so the two globes are directly comparable.
-  //   per-globe — color by the cell's quantile within its own globe, spreading
-  //               colors evenly however the distribution is shaped (maximizes
-  //               visible structure; not cross-comparable).
+  //   per-globe — linear over the globe's own [min, max], to show
+  //               within-system structure (not cross-comparable).
   function fillFn(p) {
     if (domainMode === 'shared') {
       const hi = M.globe_ar_max;
@@ -239,9 +240,10 @@ const globe = (() => {
         return lut(Math.pow((Math.min(a, hi) - 1) / (hi - 1), gamma));
       };
     }
+    const { min, span } = p.range;
     return (i) => {
-      const t = p.qt[i];
-      return Number.isNaN(t) ? DNC_GREY : lut(t);
+      const a = p.ar[i];
+      return Number.isFinite(a) ? lut((a - min) / span) : DNC_GREY;
     };
   }
 
@@ -315,11 +317,10 @@ const globe = (() => {
     const e = ++p.epoch;                 // ignore a stale load after a quick re-select
     const [pos, starts, ar, ids] = await cache.get(key);
     if (e !== p.epoch) return;
-    const sorted = sortedFinite(ar);
     p.ar = ar;
     p.ids = ids;
-    p.qt = quantileT(ar, sorted);
-    p.arMax = sorted.length ? sorted[sorted.length - 1] : M.globe_ar_max;
+    p.range = finiteRange(ar);
+    p.arMax = Number.isFinite(p.range.max) ? p.range.max : M.globe_ar_max;
     p.label.textContent = `${ids.length.toLocaleString()} cells · max AR ${fmt(p.arMax, 3)}`;
     if (p.layer) p.layer.remove();
     p.layer = p.orb.polygons({ lnglat: pos, starts, fill: fillFn(p) });

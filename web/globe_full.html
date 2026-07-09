@@ -33,7 +33,7 @@
 
 <script type="module">
 import { Orb } from './vendor/ajglobe.min.js';
-import { DNC_GREY, lut, fetchBin, sortedFinite, quantileT } from './_shared.js';
+import { DNC_GREY, lut, fetchBin, finiteRange } from './_shared.js';
 
 // The system + levels the full-enumeration pipeline generated (see
 // dggs_compare.config.FULL_RES — keep RES_LIST in sync with that entry (the
@@ -64,10 +64,13 @@ const cache = new Map();
 let layer = null, cur = null;
 let epoch = 0;                             // ignore stale async switches
 
-// Color by the cell's quantile within the level (precomputed at load — the
-// fill callback runs once per cell, up to 1.18M), matching the explorer's
-// per-globe mode.
-const paint = (i) => (Number.isNaN(cur.qt[i]) ? DNC_GREY : lut(cur.qt[i]));
+// Color by AR value, linear over the level's [min, max] — value-based so
+// equal AR ⇒ equal color (rank coloring would amplify float-level
+// differences), matching the explorer's per-globe mode.
+const paint = (i) => {
+  const a = cur.ar[i];
+  return Number.isFinite(a) ? lut((a - cur.range.min) / cur.range.span) : DNC_GREY;
+};
 
 async function show(res) {
   const e = ++epoch;
@@ -78,8 +81,8 @@ async function show(res) {
       fetchBin(`out/full/${SYSTEM}_r${res}_idx.u32`, Uint32Array),
       fetchBin(`out/full/${SYSTEM}_r${res}_ar.f32`, Float32Array),
     ]).then(([pos, starts, ar]) => {
-      const sorted = sortedFinite(ar);
-      return { pos, starts, ar, qt: quantileT(ar, sorted), arMax: sorted[sorted.length - 1] };
+      const range = finiteRange(ar);
+      return { pos, starts, ar, range, arMax: range.max };
     }));
   }
   let d;
