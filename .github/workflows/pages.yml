@@ -1,0 +1,54 @@
+# Deploy the web explorer to GitHub Pages, serving a data release's viewer
+# data SAME-ORIGIN next to the page (release assets themselves send no CORS
+# headers, so the browser can't fetch them cross-origin — Pages is the
+# hosted path). Data never enters git: the site ships as an Actions artifact.
+#
+#   gh workflow run pages.yml -f tag=data-vN
+name: deploy-pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Data release to serve (e.g. data-v1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: false
+      - uses: extractions/setup-just@v4
+      - run: just sync
+      - name: pull the data release and derive the viewer data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          just fetch-data '${{ inputs.tag }}'
+          just web-data
+      - name: stage the site (page + same-origin data)
+        run: |
+          mkdir -p _site
+          cp -R web/* _site/
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
