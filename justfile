@@ -11,12 +11,13 @@ python := if os() == "macos" { "cpython-3.13-macos-x86_64-none" } else { "3.13" 
 sync:
     uv sync --python {{python}}
 
-# Build every (system, resolution) Parquet table: geometry + per-cell stats
+# Build the (system, resolution) Parquet tables: geometry + per-cell stats
 # (skar AR, sparea area) in one pass. Systems come from the library registry
 # (src/dggs_compare/systems/ — one file per DGGS). Output -> data/cells/
-# (gitignored; published as GitHub data releases).
-gen:
-    uv run scripts/gen.py
+# (gitignored; published as GitHub data releases). Pass a system name to
+# build just that one (how CI parallelizes: one runner per system).
+gen system="all":
+    DGGS_COMPARE_GEN={{system}} uv run scripts/gen.py
 
 # Aspect-ratio survey: reads the ar column (no solving) -> out/histograms.png,
 # extremes.png, by_res_<system>.png.
