@@ -16,9 +16,8 @@ columns — no solver in the read path. Provenance (seed policy, budgets,
 solver settings, library versions) travels in each file's Parquet metadata.
 
 Files: data/cells/{dggs}_r{res}.parquet at the repo root (gitignored;
-published as GitHub data releases). Each holds up to N_BIG cells at/below the
-system's target resolution and N_SMALL above it, enumerated in full where the
-resolution has fewer cells.
+published as GitHub data releases, one asset per table). Each holds exactly
+N_CELLS cells, enumerated in full where the resolution has fewer.
 """
 
 import os
@@ -54,8 +53,7 @@ def _provenance():
     meta = {
         'seed': hex(config.SEED),
         'per_res_seed': str(config.PER_RES_SEED),
-        'n_big': str(config.N_BIG),
-        'n_small': str(config.N_SMALL),
+        'n_cells': str(config.N_CELLS),
         'gap_tol': repr(config.GAP_TOL),
         'skar_method': config.SKAR_METHOD,
     }
@@ -88,63 +86,65 @@ def _existing_path(dggs, res):
     return path
 
 
-def build_table(dggs, res):
-    """Build the `(dggs, res)` table — geometry + stats in one pass — and
-    write it to Parquet.
+BATCH = 50_000        # cells per streamed row group (bounds build memory)
+MAX_DRAW_FACTOR = 60  # safety cap on point draws in the sample regime
 
-    Draws up to `n` cells (N_BIG at/below the system's target resolution,
-    N_SMALL above). If the resolution has `num_cells(res) <= n` — or is
-    listed in config.FULL_RES (complete coverage for the full-globe page) —
-    every cell is enumerated; otherwise `n` uniform-on-sphere points are
-    drawn (module SEED policy) and deduped to distinct cells.
-    """
-    sysmod = registry.get(dggs)
-    n = config.N_BIG if res <= config.TARGET_RES[dggs] else config.N_SMALL
-    full = res in config.FULL_RES.get(dggs, ())
-    if full or sysmod.num_cells(res) <= n:
+
+def _select_zones(sysmod, dggs, res):
+    """The resolution's cell set: exactly N_CELLS cells (or every cell where
+    fewer exist / config.FULL_RES demands complete coverage). Three regimes —
+    see the config.N_CELLS comment. Returns (zones, mode)."""
+    n = config.N_CELLS
+    total = sysmod.num_cells(res)
+    rng = np.random.default_rng(
+        [config.SEED, res] if config.PER_RES_SEED else config.SEED)
+
+    if total <= n or res in config.FULL_RES.get(dggs, ()):
+        return list(sysmod.enumerate_cells(res)), 'all'
+
+    if total <= config.SUBSAMPLE_MAX_RATIO * n:
         zones = list(sysmod.enumerate_cells(res))
-        mode = 'all'
-    else:
-        rng = np.random.default_rng(
-            [config.SEED, res] if config.PER_RES_SEED else config.SEED)
-        seen, zones = set(), []
-        for lng, lat in stats.sample_uniform_lnglat(n, rng):
+        idx = rng.choice(len(zones), n, replace=False)
+        return [zones[i] for i in idx], 'subsam'
+
+    seen, zones = set(), []
+    drawn = 0
+    while len(zones) < n:
+        if drawn >= MAX_DRAW_FACTOR * n:
+            raise RuntimeError(
+                f'{dggs} r{res}: {drawn:,} draws yielded only '
+                f'{len(zones):,}/{n:,} distinct cells')
+        k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
+        for lng, lat in stats.sample_uniform_lnglat(k, rng):
             z = sysmod.cell_at(res, float(lat), float(lng))
             if z not in seen:
                 seen.add(z)
                 zones.append(z)
-        mode = 'sample'
+                if len(zones) == n:
+                    break
+        drawn += k
+    return zones, 'sample'
+
+
+def build_table(dggs, res):
+    """Build the `(dggs, res)` table — geometry + stats in one pass — and
+    stream it to Parquet in BATCH-cell row groups, so memory stays flat at
+    any budget."""
+    sysmod = registry.get(dggs)
+    zones, mode = _select_zones(sysmod, dggs, res)
 
     # Sort by cid for a canonical, deterministic row order (independent of
     # sampling order): enables Parquet cid page-stats / range pushdown, and
     # lets DELTA_BYTE_ARRAY prefix-compress the sorted ids.
-    rows = sorted(((sysmod.cid_str(z), open_ring(sysmod.cell_boundary(z)))
-                   for z in zones), key=lambda cr: cr[0])
-    cids, verts, ars, areas = [], [], [], []
-    for cid, ring in rows:
-        latlng = [[float(la), float(ln)] for la, ln in ring]
-        ar, area = stats.cell_stats(latlng)
-        cids.append(cid)
-        verts.append(latlng)
-        ars.append(ar)
-        areas.append(area)
-
-    table = pa.table({
-        'dggs': pa.array([dggs] * len(cids), pa.string()),
-        'res': pa.array([res] * len(cids), pa.int32()),
-        'cid': pa.array(cids, pa.string()),
-        'verts': pa.array(verts, VERTS_TYPE),
-        'ar': pa.array(ars, pa.float64()),
-        'area': pa.array(areas, pa.float64()),
-    }, schema=SCHEMA).replace_schema_metadata(_provenance())
+    zones = sorted(((sysmod.cid_str(z), z) for z in zones), key=lambda cz: cz[0])
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = table_path(dggs, res)
     # BYTE_STREAM_SPLIT packs the float64s ~28% smaller, losslessly (shared
     # sign/exponent bytes compress; random mantissa bytes stay out of the way).
     # DELTA_BYTE_ARRAY prefix-compresses the sorted cids.
-    pq.write_table(
-        table, path,
+    writer = pq.ParquetWriter(
+        path, SCHEMA.with_metadata(_provenance()),
         compression='zstd',
         use_dictionary=['dggs', 'res'],
         column_encoding={'cid': 'DELTA_BYTE_ARRAY',
@@ -152,9 +152,33 @@ def build_table(dggs, res):
                          'ar': 'BYTE_STREAM_SPLIT',
                          'area': 'BYTE_STREAM_SPLIT'},
     )
+    dnc = 0
+    try:
+        for lo in range(0, len(zones), BATCH):
+            chunk = zones[lo:lo + BATCH]
+            cids, verts, ars, areas = [], [], [], []
+            for cid, z in chunk:
+                latlng = [[float(la), float(ln)]
+                          for la, ln in open_ring(sysmod.cell_boundary(z))]
+                ar, area = stats.cell_stats(latlng)
+                cids.append(cid)
+                verts.append(latlng)
+                ars.append(ar)
+                areas.append(area)
+            dnc += int(np.isnan(ars).sum())
+            writer.write_table(pa.table({
+                'dggs': pa.array([dggs] * len(cids), pa.string()),
+                'res': pa.array([res] * len(cids), pa.int32()),
+                'cid': pa.array(cids, pa.string()),
+                'verts': pa.array(verts, VERTS_TYPE),
+                'ar': pa.array(ars, pa.float64()),
+                'area': pa.array(areas, pa.float64()),
+            }, schema=SCHEMA))
+    finally:
+        writer.close()
+
     kb = os.path.getsize(path) / 1024
-    dnc = int(np.isnan(ars).sum())
-    print(f'[{dggs} r{res:<2}] {mode:>6} {len(cids):>7} cells '
+    print(f'[{dggs} r{res:<2}] {mode:>6} {len(zones):>8} cells '
           f'(DNC {dnc}) -> {path.name} ({kb:.0f} KiB)', flush=True)
     return path
 

@@ -61,32 +61,36 @@ web-vendor:
 # calibration, or a solver bump worth reflecting) — not per code release.
 # Normally cut from CI: gh workflow run data-release.yml -f tag=data-vN
 
-# Stage everything a data release ships: the tables as one tar + the web
-# viewer files flat-named for the release's flat asset namespace
-# (out/globe/<f> -> globe--<f>, out/full/<f> -> full--<f>).
+# Stage the flat-named web viewer files for the release's flat asset
+# namespace (out/globe/<f> -> globe--<f>, out/full/<f> -> full--<f>). The
+# Parquet tables are NOT staged — they upload straight from data/cells/
+# (their names are already flat, and skipping the copy halves the publish
+# job's disk footprint at the 1M-cell scale).
 data-pack:
     rm -rf data-stage && mkdir -p data-stage
-    tar -cf data-stage/cells-parquet.tar -C data cells
     cp web/out/histograms.json web/out/manifest.json data-stage/
     for f in web/out/globe/*; do cp "$f" "data-stage/globe--$(basename "$f")"; done
     for f in web/out/full/*; do cp "$f" "data-stage/full--$(basename "$f")"; done
     ls data-stage | wc -l
 
-# Create the GitHub release (if absent) and upload the staged assets (run
-# data-pack first). One glob + --clobber: idempotent, so a failed/retried
-# publish just overwrites — and no glob overlap (a *.json pattern once
-# double-matched the globe--*_ids.json assets and broke the upload).
+# Create the GitHub release (if absent) and upload: one asset per Parquet
+# table (each far under the 2GB/asset cap; a single tar would exceed it)
+# plus the staged viewer files. --clobber everywhere: idempotent, so a
+# failed/retried publish just overwrites.
 data-publish tag:
     uv run scripts/data_notes.py > data-stage/NOTES.md
     gh release view {{tag}} > /dev/null 2>&1 || \
         gh release create {{tag}} --title {{tag}} --notes-file data-stage/NOTES.md
+    gh release upload {{tag}} data/cells/*.parquet --clobber
     gh release upload {{tag}} data-stage/* --clobber
 
 # Download a data release's tables into data/cells/ — the instant alternative
-# to `just gen`.
+# to `just gen`. (~7GB at the 1M-cell budget; grab single tables with
+# `gh release download <tag> -p '<sys>_r<res>.parquet'` instead if that's
+# all you need.)
 fetch-data tag:
-    mkdir -p data
-    gh release download {{tag}} -p cells-parquet.tar -O - | tar -xf - -C data
+    mkdir -p data/cells
+    gh release download {{tag}} -p '*.parquet' -D data/cells --clobber
 
 # Open JupyterLab (notebooks/).
 lab:
