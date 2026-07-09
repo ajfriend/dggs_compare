@@ -72,13 +72,15 @@ data-pack:
     for f in web/out/full/*; do cp "$f" "data-stage/full--$(basename "$f")"; done
     ls data-stage | wc -l
 
-# Create the GitHub release and upload the staged assets (run data-pack first).
+# Create the GitHub release (if absent) and upload the staged assets (run
+# data-pack first). One glob + --clobber: idempotent, so a failed/retried
+# publish just overwrites — and no glob overlap (a *.json pattern once
+# double-matched the globe--*_ids.json assets and broke the upload).
 data-publish tag:
     uv run scripts/data_notes.py > data-stage/NOTES.md
-    gh release create {{tag}} --title {{tag}} --notes-file data-stage/NOTES.md
-    gh release upload {{tag}} data-stage/cells-parquet.tar data-stage/*.json
-    gh release upload {{tag}} data-stage/globe--*
-    gh release upload {{tag}} data-stage/full--*
+    gh release view {{tag}} > /dev/null 2>&1 || \
+        gh release create {{tag}} --title {{tag}} --notes-file data-stage/NOTES.md
+    gh release upload {{tag}} data-stage/* --clobber
 
 # Download a data release's tables into data/cells/ — the instant alternative
 # to `just gen`.
