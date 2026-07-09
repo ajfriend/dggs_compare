@@ -34,7 +34,7 @@ def main():
     tsys, tres = TARGET
     target = median_area(tsys, tres)
     print(f'target: {tsys} r{tres} median area = {target:.4e} sr  '
-          f'(N_BIG/N_SMALL={config.N_BIG}/{config.N_SMALL}, '
+          f'(N_CELLS={config.N_CELLS:,}, '
           f'seed={config.SEED:#x})\n')
 
     for s in cache.available_systems():

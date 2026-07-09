@@ -21,7 +21,7 @@ viewer's derived files (flat-named: `globe--*`, `full--*`,
 - date: {date.today().isoformat()}
 - systems: {', '.join(registry.names())}
 - sampling: seed {config.SEED:#x}, per-res-seed {config.PER_RES_SEED}, \
-budgets {config.N_BIG:,}/{config.N_SMALL:,}
+budget {config.N_CELLS:,}
 - solver: gap_tol {config.GAP_TOL:g}, method {config.SKAR_METHOD}
 - versions: {versions}
 

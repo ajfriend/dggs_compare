@@ -79,7 +79,7 @@ def build_histograms():
 def globe_resolutions(s):
     """The coarse resolutions to render for system `s`: the contiguous prefix
     up to the last res with <= GLOBE_MAX_CELLS cells. Stops at the FIRST
-    over-cap res — past the target resolution the tables hold N_SMALL
+    over-cap res — past it the tables hold N_CELLS
     *sampled* cells, which also fall under the cap but are sparse scatter,
     not globe coverage."""
     out = []

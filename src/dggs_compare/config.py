@@ -15,12 +15,20 @@ SEED = 0xC0FFEE
 # across resolutions but partly manufactures that agreement. Deterministic
 # either way; changes which cells are cached, not the schema.
 PER_RES_SEED = True
-# Per-resolution cell budget: dense N_BIG up to a system's working (target)
-# resolution — where the survey and explorations want lots of cells — and a
-# thin N_SMALL beyond it, where only the DNC/calibration tails read. Both are
-# capped by the resolution's total cell count (coarse resolutions enumerate
-# every cell, exactly).
-N_BIG, N_SMALL = 100_000, 25_000
+# Per-resolution cell budget — EXACTLY this many cells at every sampled
+# resolution (coarse resolutions with fewer enumerate every cell). Selection
+# is three-regime, by total cell count N at the resolution:
+#   N <= N_CELLS                      enumerate all
+#   N <= SUBSAMPLE_MAX_RATIO*N_CELLS  enumerate ids, subsample to N_CELLS
+#                                     (avoids the coupon-collector blowup of
+#                                     point-sampling near the cap)
+#   larger                            draw uniform points until N_CELLS
+#                                     distinct cells (~1.1x draws out here)
+# Nuance, negligible for ~equal-area grids: point-sampling includes a cell
+# with probability ~proportional to its area; subsampling is uniform per
+# cell.
+N_CELLS = 1_000_000
+SUBSAMPLE_MAX_RATIO = 4
 # Resolutions enumerated EXHAUSTIVELY regardless of the budgets — complete
 # coverage for the full-globe viewer page (web/globe_full.html renders every
 # cell; r6 is the 1.18M-cell torture test). webdata emits that page's

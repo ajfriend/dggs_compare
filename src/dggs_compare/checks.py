@@ -17,8 +17,8 @@ import numpy as np
 
 from . import cache, config
 
-# DNC-fraction noise floor — the finest resolutions are N_SMALL=25k cells
-# (~0.3% sampling noise), so a stray cell or two at the f64 floor isn't a
+# DNC-fraction noise floor — sampled resolutions are N_CELLS cells
+# (sampling noise), so a stray cell or two at the f64 floor isn’t a
 # real band.
 NOISE_TOL = 1e-2
 MAX_EXAMPLES = 5      # offending cell ids reported per failing resolution

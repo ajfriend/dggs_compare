@@ -72,7 +72,8 @@ One Parquet file per `(system, resolution)` at `data/cells/{sys}_r{res}.parquet`
 
 Provenance (seed policy, budgets, solver settings, library versions) rides in
 each file's Parquet metadata. Coarse resolutions are enumerated in full;
-finer ones hold up to 100k sampled cells (25k past the working resolution).
+finer ones hold exactly 1,000,000 sampled cells (enumerate-and-subsample
+near the cap, draw-until-n beyond it — see `config.N_CELLS`).
 
 ## Data releases
 
@@ -83,7 +84,7 @@ not per code release. The canonical producer is CI (native linux):
 
 ```sh
 gh workflow run data-release.yml -f tag=data-vN   # generate + gate + publish
-just fetch-data data-vN                           # pull the tables locally
+just fetch-data data-vN                           # pull the tables (~7GB)
 ```
 
 The optional `-f runner=ubuntu-24.04-arm` input switches every job in the
