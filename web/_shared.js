@@ -2,10 +2,11 @@
 // color pipeline can't drift between them. App-level code by design — the
 // ajglobe library owns no color scales or data loading.
 
-// Remote data source: pass ?data=<base-url> to load the viewer's data from a
-// GitHub data release instead of the local out/ directory, e.g.
-//   index.html?data=https://github.com/ajfriend/dggs_compare/releases/download/data-v1
-// Release assets are a flat namespace, so remote names encode the directory:
+// Alternate data source: pass ?data=<base-url> to load the viewer's data
+// from a flat-named mirror instead of the local out/ directory. NOTE:
+// GitHub release assets send no CORS headers, so a release URL only works
+// same-origin (the hosted page ships its data alongside via Pages); the
+// param is for local/same-origin mirrors. Flat names encode the directory:
 // out/globe/<f> -> globe--<f>, out/full/<f> -> full--<f>.
 export const DATA_BASE =
   new URLSearchParams(location.search).get('data') ?? '';

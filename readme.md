@@ -91,10 +91,18 @@ release to arm64 runners (faster single-core; one runner type per release so
 a data artifact never mixes float provenance across architectures).
 
 Each release carries provenance notes (the same facts ride in every table's
-Parquet metadata), and its assets are served with CORS + Range support — the
-web viewer loads a release directly via
-`index.html?data=https://github.com/ajfriend/dggs_compare/releases/download/data-vN`
-(release assets are flat, so directory names are encoded: `globe--<f>`,
+Parquet metadata). Release assets support HTTP Range but send **no CORS
+headers**, so browsers can't fetch them cross-origin — CLI/API consumers
+(`fetch-data`, pyarrow, DuckDB) are unaffected. The hosted viewer therefore
+lives on **GitHub Pages**, with a data release's viewer files deployed
+same-origin next to the page (never entering git):
+
+```sh
+gh workflow run pages.yml -f tag=data-vN   # deploy the explorer + that data
+```
+
+The viewer's `?data=<base-url>` parameter remains for same-origin or
+localhost data mirrors (asset names there are flat: `globe--<f>`,
 `full--<f>`).
 
 ## Relationship to skar_py
