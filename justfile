@@ -41,7 +41,8 @@ validate-corners:
     uv run scripts/validate_corners.py
 
 # Build the web viewer's static data (histograms + ajglobe globe binaries +
-# manifest) from the tables -> web/out/ (gitignored). A column reshape.
+# the full-globe page's complete-coverage binaries + manifest) from the
+# tables -> web/out/ (gitignored). A column reshape — nothing is solved.
 web-data:
     uv run scripts/web_data.py
 
@@ -53,15 +54,6 @@ web: web-data
 # sibling repo's dist (`just build` over there first if src changed).
 web-vendor:
     cp ../ajglobe/dist/ajglobe.min.js web/vendor/ajglobe.min.js
-
-# Full-globe experiment (web/globe_full.html): EVERY ivea7h cell at r1-r3 +
-# the r5/r6 torture tests. Two passes, both native; each skips levels already
-# on disk. Output -> web/out/full/ (gitignored).
-web-full-geom:
-    uv run scripts/web_full_geom.py
-
-web-full: web-full-geom
-    uv run scripts/web_full_ar.py
 
 # ----- data releases ------------------------------------------------------
 # The tables + web data are published as decoupled GitHub releases (data-v1,

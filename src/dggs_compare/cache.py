@@ -93,13 +93,15 @@ def build_table(dggs, res):
     write it to Parquet.
 
     Draws up to `n` cells (N_BIG at/below the system's target resolution,
-    N_SMALL above). If the resolution has `num_cells(res) <= n`, every cell
-    is enumerated (exact, complete); otherwise `n` uniform-on-sphere points
-    are drawn (module SEED policy) and deduped to distinct cells.
+    N_SMALL above). If the resolution has `num_cells(res) <= n` — or is
+    listed in config.FULL_RES (complete coverage for the full-globe page) —
+    every cell is enumerated; otherwise `n` uniform-on-sphere points are
+    drawn (module SEED policy) and deduped to distinct cells.
     """
     sysmod = registry.get(dggs)
     n = config.N_BIG if res <= config.TARGET_RES[dggs] else config.N_SMALL
-    if sysmod.num_cells(res) <= n:
+    full = res in config.FULL_RES.get(dggs, ())
+    if full or sysmod.num_cells(res) <= n:
         zones = list(sysmod.enumerate_cells(res))
         mode = 'all'
     else:

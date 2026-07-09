@@ -11,6 +11,9 @@ nothing is solved here. Emits into web/out/ (gitignored):
 - globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,ids.json} — ajglobe's native
   flat-binary polygon format, for the coarse resolutions only (largest res
   per system with <= GLOBE_MAX_CELLS cells, and everything below).
+- full/{sys}_r{res}_{pos.f32,idx.u32,ar.f32} — complete-coverage binaries
+  for the full-globe page, for every config.FULL_RES entry (those
+  resolutions are enumerated exhaustively in the tables).
 - manifest.json — what exists, per-system web colors/labels, the solve
   tolerance, and the shared globe AR max.
 """
@@ -115,8 +118,30 @@ def build_globe():
     return avail, globe_max
 
 
+def build_full():
+    """Write the full-globe page's binaries (pos/idx/ar per level) for every
+    config.FULL_RES entry, straight from the tables — those resolutions are
+    enumerated exhaustively at generation time, so this is a column reshape
+    of complete coverage (r6 = all 1,176,492 ivea7h cells)."""
+    full_dir = WEB_OUT / 'full'
+    full_dir.mkdir(parents=True, exist_ok=True)
+    for s, res_list in config.FULL_RES.items():
+        for res in res_list:
+            cols = cache.load_columns(s, res, ['verts', 'ar'])
+            pos, starts = [], [0]
+            for latlng in cols['verts']:
+                pos.append(np.asarray(latlng, dtype='<f4')[:, ::-1])  # -> [lng, lat]
+                starts.append(starts[-1] + len(latlng))
+            stem = full_dir / f'{s}_r{res}'
+            np.concatenate(pos).tofile(f'{stem}_pos.f32')
+            np.asarray(starts, dtype='<u4').tofile(f'{stem}_idx.u32')
+            cols['ar'].astype('<f4').tofile(f'{stem}_ar.f32')
+            print(f'  full {s} r{res}: {len(cols["ar"]):,} cells -> {stem.name}_*')
+
+
 def build_all():
-    """histograms.json + globe binaries + manifest.json under web/out/."""
+    """histograms.json + globe + full-globe binaries + manifest.json under
+    web/out/."""
     WEB_OUT.mkdir(parents=True, exist_ok=True)
 
     print('building histograms...')
@@ -126,6 +151,9 @@ def build_all():
 
     print('building globe binaries...')
     globe_avail, globe_max = build_globe()
+
+    print('building full-globe binaries...')
+    build_full()
 
     manifest = {
         'systems': systems(),
