@@ -3,7 +3,7 @@
 // Two views: dynamic overlaid histograms (Observable Plot) and two synced
 // orthographic globes (ajglobe), cells colored by aspect ratio.
 import { Orb, lnglatToQuat, quatToLngLat } from './vendor/ajglobe.min.js';
-import { DNC_GREY, viridis, lut, fetchBin, sortedFinite, quantileT } from './_shared.js';
+import { DNC_GREY, dataURL, viridis, lut, fetchBin, sortedFinite, quantileT } from './_shared.js';
 
 const fmt = (x, d = 4) => (x == null ? '—' : x.toFixed(d));
 const $ = (sel) => document.querySelector(sel);
@@ -308,7 +308,7 @@ const globe = (() => {
         fetchBin(`out/globe/${key}_pos.f32`, Float32Array),
         fetchBin(`out/globe/${key}_idx.u32`, Uint32Array),
         fetchBin(`out/globe/${key}_ar.f32`, Float32Array),
-        fetch(`out/globe/${key}_ids.json`).then((r) => r.json()),
+        fetch(dataURL(`out/globe/${key}_ids.json`)).then((r) => r.json()),
       ]));
     }
     const p = panels[id];
@@ -391,8 +391,8 @@ const globe = (() => {
 // ================= boot =================
 async function main() {
   [M, HIST] = await Promise.all([
-    fetch('out/manifest.json').then((r) => r.json()),
-    fetch('out/histograms.json').then((r) => r.json()),
+    fetch(dataURL('out/manifest.json')).then((r) => r.json()),
+    fetch(dataURL('out/histograms.json')).then((r) => r.json()),
   ]);
   $('#subtitle').textContent =
     `${M.systems.length} systems · skar gap_tol ${M.gap_tol.toExponential()} · AR over 1.0`;

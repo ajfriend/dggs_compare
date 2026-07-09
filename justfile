@@ -62,6 +62,37 @@ web-full-geom:
 web-full: web-full-geom
     uv run scripts/web_full_ar.py
 
+# ----- data releases ------------------------------------------------------
+# The tables + web data are published as decoupled GitHub releases (data-v1,
+# data-v2, ...), cut when the INPUTS change (seed/budgets, the grid set,
+# calibration, or a solver bump worth reflecting) — not per code release.
+# Normally cut from CI: gh workflow run data-release.yml -f tag=data-vN
+
+# Stage everything a data release ships: the tables as one tar + the web
+# viewer files flat-named for the release's flat asset namespace
+# (out/globe/<f> -> globe--<f>, out/full/<f> -> full--<f>).
+data-pack:
+    rm -rf data-stage && mkdir -p data-stage
+    tar -cf data-stage/cells-parquet.tar -C data cells
+    cp web/out/histograms.json web/out/manifest.json data-stage/
+    for f in web/out/globe/*; do cp "$f" "data-stage/globe--$(basename "$f")"; done
+    for f in web/out/full/*; do cp "$f" "data-stage/full--$(basename "$f")"; done
+    ls data-stage | wc -l
+
+# Create the GitHub release and upload the staged assets (run data-pack first).
+data-publish tag:
+    uv run scripts/data_notes.py > data-stage/NOTES.md
+    gh release create {{tag}} --title {{tag}} --notes-file data-stage/NOTES.md
+    gh release upload {{tag}} data-stage/cells-parquet.tar data-stage/*.json
+    gh release upload {{tag}} data-stage/globe--*
+    gh release upload {{tag}} data-stage/full--*
+
+# Download a data release's tables into data/cells/ — the instant alternative
+# to `just gen`.
+fetch-data tag:
+    mkdir -p data
+    gh release download {{tag}} -p cells-parquet.tar -O - | tar -xf - -C data
+
 # Open JupyterLab (notebooks/).
 lab:
     uv run --group lab jupyter lab

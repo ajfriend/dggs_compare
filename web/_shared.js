@@ -2,6 +2,20 @@
 // color pipeline can't drift between them. App-level code by design — the
 // ajglobe library owns no color scales or data loading.
 
+// Remote data source: pass ?data=<base-url> to load the viewer's data from a
+// GitHub data release instead of the local out/ directory, e.g.
+//   index.html?data=https://github.com/ajfriend/dggs_compare/releases/download/data-v1
+// Release assets are a flat namespace, so remote names encode the directory:
+// out/globe/<f> -> globe--<f>, out/full/<f> -> full--<f>.
+export const DATA_BASE =
+  new URLSearchParams(location.search).get('data') ?? '';
+
+export function dataURL(path) {
+  if (!DATA_BASE) return path;                      // local out/ layout
+  const flat = path.replace(/^out\//, '').replaceAll('/', '--');
+  return `${DATA_BASE}/${flat}`;
+}
+
 export const DNC_GREY = [68, 68, 68, 255];
 
 // viridis via control stops — no per-cell color-string parsing.
@@ -19,7 +33,7 @@ export const VIRIDIS = Array.from({ length: 256 }, (_, i) => viridis(i / 255));
 export const lut = (t) => VIRIDIS[Math.min(255, (t * 255) | 0)];
 
 export async function fetchBin(path, Ctor) {
-  const r = await fetch(path);
+  const r = await fetch(dataURL(path));
   if (!r.ok) throw new Error(`${path} ${r.status}`);
   return new Ctor(await r.arrayBuffer());
 }

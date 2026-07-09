@@ -74,6 +74,25 @@ Provenance (seed policy, budgets, solver settings, library versions) rides in
 each file's Parquet metadata. Coarse resolutions are enumerated in full;
 finer ones hold up to 100k sampled cells (25k past the working resolution).
 
+## Data releases
+
+The tables + the viewer's derived files are published as **decoupled GitHub
+releases** (`data-v1`, `data-v2`, …) — cut when the *inputs* change
+(seed/budgets, the grid set, calibration, a solver bump worth reflecting),
+not per code release. The canonical producer is CI (native linux):
+
+```sh
+gh workflow run data-release.yml -f tag=data-vN   # generate + gate + publish
+just fetch-data data-vN                           # pull the tables locally
+```
+
+Each release carries provenance notes (the same facts ride in every table's
+Parquet metadata), and its assets are served with CORS + Range support — the
+web viewer loads a release directly via
+`index.html?data=https://github.com/ajfriend/dggs_compare/releases/download/data-vN`
+(release assets are flat, so directory names are encoded: `globe--<f>`,
+`full--<f>`).
+
 ## Relationship to skar_py
 
 skar comes from the released tag pinned in `pyproject.toml`
