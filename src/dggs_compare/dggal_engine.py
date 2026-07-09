@@ -54,6 +54,7 @@ _app = Application(appGlobals=globals())
 pydggal_setup(_app)
 
 CHUNK = 50_000              # sampling batch size (keeps memory flat)
+NULL_ZONE = 0xFFFFFFFFFFFFFFFF   # DGGAL's nullZone sentinel (failed lookup)
 
 
 def sample_uniform_lnglat(n, rng):
@@ -97,6 +98,12 @@ class Adapter:
                     for p in self.dggrs.getZoneRefinedWGS84Vertices(zone, 0)]
         if len(ring) >= 2 and ring[0] == ring[-1]:
             ring = ring[:-1]
+        if len(set(ring)) < 3:
+            # Never let garbage geometry reach a table silently (a nullZone's
+            # "boundary" is all-(0,0); see zone_at).
+            raise ValueError(
+                f'{self.name}: degenerate boundary for zone '
+                f'{self.cid_str(zone)!r} ({len(ring)} verts)')
         return ring
 
     def refined_boundary(self, zone, refine):
@@ -123,17 +130,25 @@ class Adapter:
         yield from self.dggrs.listZones(level, wholeWorld)
 
     def zone_at(self, level, lng, lat):
-        """The zone at `level` containing the (lng, lat) point."""
-        return self.dggrs.getZoneFromWGS84Centroid(
+        """The zone at `level` containing the (lng, lat) point, or None when
+        the engine can't resolve it — DGGAL returns its nullZone sentinel for
+        rare singular points at deep levels (observed ~1 per 1M uniform
+        draws at isea7h r15, near an icosahedron edge). Callers sampling
+        points should skip None and draw again."""
+        zone = self.dggrs.getZoneFromWGS84Centroid(
             level, GeoPoint(float(lat), float(lng)))
+        return None if zone == NULL_ZONE else zone
 
     def sample(self, level, n, rng):
-        """`n` zones from uniform-on-sphere points (with repeats)."""
+        """`n` zones from uniform-on-sphere points (with repeats; failed
+        lookups skipped)."""
         done = 0
         while done < n:
             k = min(CHUNK, n - done)
             for lng, lat in sample_uniform_lnglat(k, rng):
-                yield self.zone_at(level, lng, lat)
+                zone = self.zone_at(level, lng, lat)
+                if zone is not None:
+                    yield zone
             done += k
 
     def iter_sample(self, level, n, seed):
@@ -142,7 +157,7 @@ class Adapter:
         seen = set()
         for lng, lat in sample_uniform_lnglat(n, rng):
             zone = self.zone_at(level, lng, lat)
-            if zone in seen:
+            if zone is None or zone in seen:
                 continue
             seen.add(zone)
             yield self.cid_str(zone), self.verts(zone)
