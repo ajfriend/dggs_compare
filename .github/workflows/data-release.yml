@@ -1,0 +1,45 @@
+# Generate the full data artifact from scratch and publish it as a GitHub
+# data release — the canonical producer (native linux; dggal's wheels are
+# correct there, no Rosetta anywhere). Trigger:
+#
+#   gh workflow run data-release.yml -f tag=data-vN
+#
+# Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
+# solver bump worth reflecting) — decoupled from code releases.
+name: data-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Data release tag (e.g. data-v1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: extractions/setup-just@v4
+      - name: sync (builds skar from the pinned git tag)
+        run: just sync
+      - name: generate the tables (geometry + stats, all systems)
+        run: just gen
+      - name: gate — DNC invariants must hold before anything ships
+        run: just dnc-check
+      - name: build the web viewer data
+        run: just web-data
+      - name: build the full-globe binaries (enumerate + solve)
+        run: just web-full
+      - name: stage + publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          just data-pack
+          just data-publish '${{ inputs.tag }}'

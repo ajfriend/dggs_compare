@@ -9,8 +9,9 @@ __pycache__/
 uv.lock
 
 # The data artifacts (published as GitHub data releases, not tracked):
-# the per-cell Parquet tables.
+# the per-cell Parquet tables and the release staging dir.
 data/
+data-stage/
 
 # Generated plots + the web viewer's built data, at any depth.
 **/out/
