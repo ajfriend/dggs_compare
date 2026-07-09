@@ -12,7 +12,10 @@ Every systems/ module implements:
 
     resolutions()            -> range of generatable resolutions (0..finest)
     num_cells(res)           -> int, total cells at `res`
-    cell_at(res, lat, lng)   -> native cell id (hashable) at the point
+    cell_at(res, lat, lng)   -> native cell id (hashable) at the point, or
+                                None when the engine can't resolve it (rare
+                                DGGAL deep-level singular points) — samplers
+                                skip and draw again
     cid_str(z)               -> str text id stored in the tables
     cell_boundary(z)         -> [(lat, lng), ...] degrees, open corner ring
 

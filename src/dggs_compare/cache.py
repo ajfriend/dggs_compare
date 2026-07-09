@@ -117,7 +117,9 @@ def _select_zones(sysmod, dggs, res):
         k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
         for lng, lat in stats.sample_uniform_lnglat(k, rng):
             z = sysmod.cell_at(res, float(lat), float(lng))
-            if z not in seen:
+            # None = the engine couldn't resolve the point (DGGAL nullZone
+            # at rare deep-level singular points) — draw again.
+            if z is not None and z not in seen:
                 seen.add(z)
                 zones.append(z)
                 if len(zones) == n:
