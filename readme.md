@@ -86,6 +86,10 @@ gh workflow run data-release.yml -f tag=data-vN   # generate + gate + publish
 just fetch-data data-vN                           # pull the tables locally
 ```
 
+The optional `-f runner=ubuntu-24.04-arm` input switches every job in the
+release to arm64 runners (faster single-core; one runner type per release so
+a data artifact never mixes float provenance across architectures).
+
 Each release carries provenance notes (the same facts ride in every table's
 Parquet metadata), and its assets are served with CORS + Range support — the
 web viewer loads a release directly via
