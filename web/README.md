@@ -40,6 +40,6 @@ globes):
 ## Full-globe experiment
 
 `globe_full.html` renders **every** ivea7h cell (up to 1.18M at r6) rather
-than the sampled tables — same binary format, produced by `just web-full`
-(geometry enumeration + native skar solve; both passes skip levels already
-on disk) into `out/full/`.
+than the sampled coarse resolutions — complete-coverage binaries emitted by
+`just web-data` straight from the tables (those resolutions are enumerated
+exhaustively at generation time — see `config.FULL_RES`) into `out/full/`.

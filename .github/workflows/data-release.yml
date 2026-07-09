@@ -8,9 +8,10 @@
 # solver bump worth reflecting) — decoupled from code releases.
 #
 # Fan-out/fan-in: one runner per DGGS builds that system's tables (keep the
-# matrix in sync with src/dggs_compare/systems/), the full-globe enumeration
-# runs alongside on its own runner, and the publish job merges the artifacts,
-# gates on the DNC invariants, derives the viewer data, and uploads.
+# matrix in sync with src/dggs_compare/systems/), and the publish job merges
+# the artifacts, gates on the DNC invariants, derives the viewer data
+# (including the full-globe page's complete-coverage binaries — those
+# resolutions live exhaustively in the ivea7h tables), and uploads.
 name: data-release
 
 on:
@@ -43,23 +44,8 @@ jobs:
           path: data/cells/
           if-no-files-found: error
 
-  full-globe:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.1.0
-      - uses: extractions/setup-just@v4
-      - run: just sync
-      - run: just web-full
-      - uses: actions/upload-artifact@v6
-        with:
-          name: full-globe
-          path: web/out/full/
-          if-no-files-found: error
-
   publish:
-    needs: [gen, full-globe]
+    needs: [gen]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -72,10 +58,6 @@ jobs:
           pattern: tables-*
           path: data/cells/
           merge-multiple: true
-      - uses: actions/download-artifact@v6
-        with:
-          name: full-globe
-          path: web/out/full/
       - name: gate — DNC invariants must hold before anything ships
         run: just dnc-check
       - name: derive the web viewer data

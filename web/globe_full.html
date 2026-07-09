@@ -36,8 +36,8 @@ import { Orb } from './vendor/ajglobe.min.js';
 import { DNC_GREY, lut, fetchBin, sortedFinite, quantileT } from './_shared.js';
 
 // The system + levels the full-enumeration pipeline generated (see
-// gen_ivea7h_full_geom.py / build_ivea7h_full_ar.py — keep in sync with their
-// SYSTEM / RES_LIST).
+// dggs_compare.config.FULL_RES — keep RES_LIST in sync with that entry (the
+// tables enumerate those resolutions exhaustively; webdata emits the binaries).
 const SYSTEM = 'ivea7h';
 const RES_LIST = [1, 2, 3, 5, 6];
 const START_RES = 5;
@@ -86,7 +86,7 @@ async function show(res) {
   try { d = await cache.get(res); }
   catch (err) {
     cache.delete(res);
-    status.textContent = `r${res}: ${err.message} — run \`just web-full-geom\` + \`just web-full\``;
+    status.textContent = `r${res}: ${err.message} — run \`just web-data\` (needs \`just gen\` or \`just fetch-data\` first)`;
     return;
   }
   if (e !== epoch) return;

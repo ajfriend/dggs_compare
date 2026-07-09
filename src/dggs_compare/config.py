@@ -21,6 +21,11 @@ PER_RES_SEED = True
 # capped by the resolution's total cell count (coarse resolutions enumerate
 # every cell, exactly).
 N_BIG, N_SMALL = 100_000, 25_000
+# Resolutions enumerated EXHAUSTIVELY regardless of the budgets — complete
+# coverage for the full-globe viewer page (web/globe_full.html renders every
+# cell; r6 is the 1.18M-cell torture test). webdata emits that page's
+# binaries for exactly these entries, straight from the tables.
+FULL_RES = {'ivea7h': (1, 2, 3, 5, 6)}
 
 # ----- per-system registry metadata ---------------------------------------
 # Working ("target") resolution per system: the finest in actual use, matched
