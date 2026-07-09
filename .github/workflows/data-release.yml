@@ -48,6 +48,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          # No cross-run cache: skar builds from source with zig ReleaseFast
+          # tuned to the build machine CPU, and hosted runners are a
+          # heterogeneous fleet — a wheel cached on one microarch can SIGILL
+          # on the next (exit 132; see skar_py issue on baseline targeting).
+          enable-cache: false
       - uses: extractions/setup-just@v4
       - run: just sync
       - run: just gen ${{ matrix.system }}
@@ -64,6 +70,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          # No cross-run cache: skar builds from source with zig ReleaseFast
+          # tuned to the build machine CPU, and hosted runners are a
+          # heterogeneous fleet — a wheel cached on one microarch can SIGILL
+          # on the next (exit 132; see skar_py issue on baseline targeting).
+          enable-cache: false
       - uses: extractions/setup-just@v4
       - run: just sync
       - uses: actions/download-artifact@v6
