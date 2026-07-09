@@ -21,6 +21,19 @@ on:
         description: 'Data release tag (e.g. data-v1)'
         required: true
         type: string
+      # One runner type for EVERY job in a release, so a data artifact never
+      # mixes float provenance across architectures. ubuntu-latest (x86_64)
+      # is the verified default; ubuntu-24.04-arm is the experiment — the
+      # aarch64 dggal/a5_fast wheels exist but are unverified (the dnc-check
+      # gate + a table spot-diff against an x86 release is the validation).
+      runner:
+        description: 'Runner type for all jobs'
+        required: false
+        default: ubuntu-latest
+        type: choice
+        options:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
 
 permissions:
   contents: write
@@ -30,7 +43,7 @@ jobs:
     strategy:
       matrix:
         system: [a5, h3, isea7h, ivea7h, rhealpix, s2]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -46,7 +59,7 @@ jobs:
 
   publish:
     needs: [gen]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
