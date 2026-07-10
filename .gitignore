@@ -15,3 +15,6 @@ data-stage/
 
 # Generated plots + the web viewer's built data, at any depth.
 **/out/
+
+# Local scratch (issue drafts etc.)
+dggal-nullzone-issue.md
