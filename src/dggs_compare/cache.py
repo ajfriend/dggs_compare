@@ -21,6 +21,7 @@ N_CELLS cells, enumerated in full where the resolution has fewer.
 """
 
 import os
+import time
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
@@ -132,6 +133,7 @@ def build_table(dggs, res):
     """Build the `(dggs, res)` table — geometry + stats in one pass — and
     stream it to Parquet in BATCH-cell row groups, so memory stays flat at
     any budget."""
+    t0 = time.perf_counter()
     sysmod = registry.get(dggs)
     zones, mode = _select_zones(sysmod, dggs, res)
 
@@ -181,14 +183,27 @@ def build_table(dggs, res):
 
     kb = os.path.getsize(path) / 1024
     print(f'[{dggs} r{res:<2}] {mode:>6} {len(zones):>8} cells '
-          f'(DNC {dnc}) -> {path.name} ({kb:.0f} KiB)', flush=True)
+          f'(DNC {dnc}) -> {path.name} ({kb:.0f} KiB) '
+          f'[{time.perf_counter() - t0:.0f}s]', flush=True)
     return path
 
 
 def build_system(dggs):
     """Build every resolution's table for one system."""
-    for res in registry.get(dggs).resolutions():
+    t0 = time.perf_counter()
+    res_list = list(registry.get(dggs).resolutions())
+    for i, res in enumerate(res_list):
         build_table(dggs, res)
+        done = time.perf_counter() - t0
+        # Live ETA for whoever is watching the CI log: naive per-resolution
+        # average — deep (sampled) resolutions dominate, so it converges to
+        # honest once the coarse levels are past.
+        if i + 1 < len(res_list):
+            eta = done / (i + 1) * (len(res_list) - i - 1)
+            print(f'    {i + 1}/{len(res_list)} resolutions in {done:.0f}s '
+                  f'(~{eta:.0f}s to go)', flush=True)
+    print(f'[{dggs}] all {len(res_list)} resolutions in '
+          f'{time.perf_counter() - t0:.0f}s', flush=True)
 
 
 def build_all():
