@@ -7,7 +7,9 @@ release (see readme).
 """
 
 # ----- sampling ----------------------------------------------------------
-SEED = 0xC0FFEE
+SEED = 0xDECAF   # data-v3+ (data-v1/v2 used 0xC0FFEE); changing the seed is
+                 # a data-release trigger — fresh sample points everywhere,
+                 # which doubles as a hunt for more DGGAL nullZone examples
 # Sampling-seed policy. True (default): a distinct stream per resolution
 # (default_rng([SEED, res])), so every resolution draws INDEPENDENT points and
 # cross-resolution agreement is honest convergence. False: every resolution
