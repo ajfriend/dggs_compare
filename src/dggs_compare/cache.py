@@ -150,6 +150,13 @@ def build_table(dggs, res):
     writer = pq.ParquetWriter(
         path, SCHEMA.with_metadata(_provenance()),
         compression='zstd',
+        # Level 19 is ~free to read (zstd decode speed is level-independent;
+        # measured 0.04s vs 0.05s on the 1.18M-row table) and pays only at
+        # write time (0.4s -> 9s there). It matters most on the
+        # full-enumeration tables, where cid-sorted neighbors have
+        # near-identical vertex bytes that long-range matching exploits:
+        # -23% there, ~-5% on sampled tables.
+        compression_level=19,
         use_dictionary=['dggs', 'res'],
         column_encoding={'cid': 'DELTA_BYTE_ARRAY',
                          VERTS_LEAF: 'BYTE_STREAM_SPLIT',
