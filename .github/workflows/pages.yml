@@ -1,18 +1,30 @@
-# Deploy the web explorer to GitHub Pages, serving a data release's viewer
-# data SAME-ORIGIN next to the page (release assets themselves send no CORS
-# headers, so the browser can't fetch them cross-origin — Pages is the
-# hosted path). Data never enters git: the site ships as an Actions artifact.
+# Deploy the static site to GitHub Pages, serving a data release's viewer data
+# SAME-ORIGIN next to the page (release assets themselves send no CORS headers,
+# so the browser can't fetch them cross-origin — Pages is the hosted path).
+# Data never enters git: the site ships as an Actions artifact.
 #
-#   gh workflow run pages.yml -f tag=data-vN
+#   gh workflow run pages.yml -f tag=data-vN                  # full: rebuild from the tables
+#   gh workflow run pages.yml -f tag=data-vN -f rebuild=false # fast: reuse the last build of this tag
+#
+# The full path fetches the release's ~6GB of tables and runs `just site`, so
+# every plot/globe is a pure function of the data. The fast path is for
+# front-end-only changes (HTML/CSS/JS): it restores the previously-built
+# web/out/ from the Actions cache and only re-copies the static files — no
+# fetch, no rebuild, no env build.
 name: deploy-pages
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Data release to serve (e.g. data-v1)'
+        description: 'Data release to serve (e.g. data-v3)'
         required: true
         type: string
+      rebuild:
+        description: 'Rebuild viewer data from the tables (uncheck for a fast front-end-only deploy)'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -36,15 +48,38 @@ jobs:
         with:
           enable-cache: false
       - uses: extractions/setup-just@v4
-      - run: just sync
-      - name: pull the data release and build the site from its tables
+
+      # Restore a previously-built web/out/ for this tag (the run_id makes each
+      # build's key unique; the restore-key prefix pulls the most recent one).
+      - id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: web/out
+          key: webout-${{ inputs.tag }}-${{ github.run_id }}
+          restore-keys: |
+            webout-${{ inputs.tag }}-
+
+      # Full build: fetch the release's tables and regenerate every plot + globe.
+      # Runs when a rebuild is requested, or when there's no cached build to reuse.
+      - name: build the site from the release tables
+        if: ${{ inputs.rebuild || steps.cache.outputs.cache-matched-key == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           DGGS_DATA_TAG: ${{ inputs.tag }}
         run: |
+          just sync
           just fetch-data '${{ inputs.tag }}'
           just site
-      - name: stage the site (page + same-origin data)
+
+      # Cache the freshly-built data so later front-end-only deploys can reuse it.
+      - name: cache the built viewer data
+        if: ${{ inputs.rebuild || steps.cache.outputs.cache-matched-key == '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: web/out
+          key: webout-${{ inputs.tag }}-${{ github.run_id }}
+
+      - name: stage the site (static files + the viewer data)
         run: |
           mkdir -p _site
           cp -R web/* _site/
