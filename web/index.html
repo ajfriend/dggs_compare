@@ -57,15 +57,21 @@
         <label class="scale-picker">Color scale
           <select id="scaleSelect"></select>
         </label>
-        <div class="legend">
+      </div>
+      <div class="scale-viz">
+        <div class="hist-head"><span id="histLabel">hover a globe to see its distribution</span></div>
+        <canvas id="histCanvas"></canvas>
+        <div class="leg-bar" id="legendGrad"></div>
+        <div class="leg-scale">
           <span class="leg-label" id="legLo">1.0</span>
-          <span class="leg-bar" id="legendGrad"></span>
           <span class="leg-label" id="legHi">—</span>
         </div>
       </div>
-      <p class="leg-cap">Position is linear in AR; grey = did-not-certify. The
-        <b>transform</b> (linear / γ / log / p99-clip) sets how AR maps to color;
-        the <b>colormap</b> sets the hue path.</p>
+      <p class="leg-cap">The bars are the hovered globe's AR distribution (log
+        count); the white line marks the hovered cell. Its position lines up with
+        the color bar below — both <b>linear in AR</b> — so you can read where a
+        cell sits in the distribution and how the color scale places it. Grey =
+        did-not-certify.</p>
       <div class="globe-grid" id="globeGrid"></div>
     </section>
   </main>

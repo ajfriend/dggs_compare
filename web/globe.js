@@ -1,13 +1,14 @@
 // Static DGGS aspect-ratio site: a grid of ajglobe globes, one per system,
-// cells colored by aspect ratio on a SHARED scale (so systems compare directly).
-// A dropdown picks the color scale — a (colormap, value-transform) pair — and
-// recolors every globe and the legend together, so you can see how the choice
-// affects what's visible (perceptually-uniform vs stretched, viridis vs turbo…).
+// cells colored by aspect ratio on a SHARED scale so systems compare directly.
+// - a Color-scale dropdown picks (colormap, value-transform); globes + legend
+//   recolor together.
+// - hovering a globe shows THAT globe's AR distribution as a histogram above
+//   the legend, with a line marking the hovered cell's AR (aligned to the
+//   color bar, so you see where that cell sits in both distribution and color).
+// - all globes rotate/zoom together.
 import { Orb } from './vendor/ajglobe.min.js';
 
 // ---- colormaps: RGB control points (0–255), linearly interpolated ----
-// viridis/cividis/magma are perceptually ~uniform; turbo is a rainbow (NOT
-// uniform — good for seeing false boundaries); gray is a plain luminance ramp.
 const CMAPS = {
   viridis: [[68,1,84],[72,40,120],[62,74,137],[49,104,142],[38,130,142],
             [31,158,137],[53,183,121],[110,206,88],[181,222,43],[253,231,37]],
@@ -29,20 +30,19 @@ function interp(stops, t) {
 const LUTS = {};
 const lutFor = (name) => (LUTS[name] ??= Array.from({ length: 256 }, (_, i) => interp(CMAPS[name], i / 255)));
 
-// ---- value transforms: aspect ratio (>= 1) -> t in [0,1], given the domain ----
+// ---- value transforms: aspect ratio (>= 1) -> t in [0,1] for the COLOR.
+// The AR axis (histogram + legend position) stays linear over [1, max]; only
+// the color placement changes, so a stretched scale shows saturation visibly.
 const TF = {
   linear: (ar, d) => (ar - 1) / (d.max - 1),
   power:  (ar, d) => Math.pow((ar - 1) / (d.max - 1), 0.4),   // the "modified" stretch
-  p99:    (ar, d) => clamp01((ar - 1) / (d.p99 - 1)),         // linear, clipped to p99
+  p99:    (ar, d) => clamp01((ar - 1) / (d.p99 - 1)),         // linear, saturates at p99
   log:    (ar, d) => (d.max > 1 ? Math.log(ar) / Math.log(d.max) : 0),
 };
-const TF_HI = { linear: (d) => d.max, power: (d) => d.max, p99: (d) => d.p99, log: (d) => d.max };
-
-// ---- named scales for the dropdown (default = the modified viridis) ----
 const SCALES = [
   { label: 'Viridis · γ0.4 (modified — the default)', cmap: 'viridis', tf: 'power' },
   { label: 'Viridis · linear (perceptually uniform in AR)', cmap: 'viridis', tf: 'linear' },
-  { label: 'Viridis · linear, clipped to p99', cmap: 'viridis', tf: 'p99' },
+  { label: 'Viridis · linear, saturates at p99', cmap: 'viridis', tf: 'p99' },
   { label: 'Viridis · log', cmap: 'viridis', tf: 'log' },
   { label: 'Cividis · linear (uniform, colorblind-optimized)', cmap: 'cividis', tf: 'linear' },
   { label: 'Magma · γ0.4', cmap: 'magma', tf: 'power' },
@@ -51,6 +51,7 @@ const SCALES = [
 ];
 
 const DNC_GREY = [68, 68, 68, 255];
+const HBINS = 64;
 const fmt = (x, d = 4) => (x == null || !Number.isFinite(x) ? '—' : x.toFixed(d));
 const $ = (s) => document.querySelector(s);
 
@@ -61,35 +62,96 @@ async function fetchBin(path, Ctor) {
 }
 
 const DOMAIN = { max: 1, p99: 1 };   // shared AR domain over all globe cells
-const PANELS = [];                   // { sys, orb, layer, ar }
+const PANELS = [];                   // { sys, label, color, orb, layer, ar, hist }
+let scale = SCALES[0];
 
-function makeFill(ar, scale) {
-  const lut = lutFor(scale.cmap), tf = TF[scale.tf];
+const makeFill = (ar, sc) => {
+  const lut = lutFor(sc.cmap), tf = TF[sc.tf];
   return (i) => {
     const a = ar[i];
     if (!Number.isFinite(a)) return DNC_GREY;
     return lut[Math.min(255, Math.max(0, (tf(a, DOMAIN) * 255) | 0))];
   };
-}
+};
 
-function drawLegend(scale) {
-  const hi = TF_HI[scale.tf](DOMAIN), lut = lutFor(scale.cmap), tf = TF[scale.tf];
+function drawLegend(sc) {
   $('#legLo').textContent = '1.0';
-  $('#legHi').textContent = (scale.tf === 'p99' ? '≥' : '') + fmt(hi, 2);
-  // Position is LINEAR in AR (so you read AR off the bar); color is the scale
-  // applied to that AR — for a stretched transform the color moves nonlinearly.
-  const n = 64;
+  $('#legHi').textContent = fmt(DOMAIN.max, 2);
+  const lut = lutFor(sc.cmap), tf = TF[sc.tf], n = 96;
   const stops = Array.from({ length: n }, (_, i) => {
-    const p = i / (n - 1), ar = 1 + p * (hi - 1);
+    const p = i / (n - 1), ar = 1 + p * (DOMAIN.max - 1);
     const c = lut[Math.min(255, (tf(ar, DOMAIN) * 255) | 0)];
     return `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0}) ${100 * p}%`;
   }).join(',');
   $('#legendGrad').style.background = `linear-gradient(90deg, ${stops})`;
 }
 
-function applyScale(scale) {
-  drawLegend(scale);
-  for (const p of PANELS) p.layer.update({ fill: makeFill(p.ar, scale) });
+function applyScale(sc) {
+  scale = sc;
+  drawLegend(sc);
+  for (const p of PANELS) p.layer.update({ fill: makeFill(p.ar, sc) });
+}
+
+// ---- shared AR domain + per-globe histograms (bars are scale-independent) ----
+function computeDomainAndHists() {
+  const all = [];
+  for (const p of PANELS) for (const a of p.ar) if (Number.isFinite(a)) all.push(a);
+  all.sort((x, y) => x - y);
+  DOMAIN.max = all.length ? all[all.length - 1] : 1;
+  DOMAIN.p99 = all.length ? all[Math.floor(0.99 * (all.length - 1))] : DOMAIN.max;
+  const span = DOMAIN.max - 1 || 1;
+  for (const p of PANELS) {
+    const counts = new Array(HBINS).fill(0);
+    for (const a of p.ar) {
+      if (!Number.isFinite(a)) continue;
+      counts[Math.min(HBINS - 1, Math.max(0, Math.floor((a - 1) / span * HBINS)))]++;
+    }
+    p.hist = { counts, cmax: Math.max(1, ...counts) };
+  }
+}
+
+// ---- the dynamic histogram canvas (shows the hovered globe) ----
+let hctx, hcw = 460, hch = 84;
+function initHist() {
+  const c = $('#histCanvas');
+  hcw = c.clientWidth || 460;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = hcw * dpr; c.height = hch * dpr;
+  c.style.height = hch + 'px';
+  hctx = c.getContext('2d');
+  hctx.scale(dpr, dpr);
+}
+function drawHist(panel, hlAR) {
+  $('#histLabel').innerHTML = panel
+    ? `<span class="swatch" style="background:${panel.color}"></span>${panel.label} — ${panel.ar.length.toLocaleString()} cells`
+    : 'hover a globe to see its distribution';
+  hctx.clearRect(0, 0, hcw, hch);
+  if (!panel) return;
+  const { counts, cmax } = panel.hist, bw = hcw / HBINS, logmax = Math.log(cmax + 1);
+  hctx.fillStyle = panel.color;
+  for (let i = 0; i < HBINS; i++) {
+    if (!counts[i]) continue;
+    const h = (Math.log(counts[i] + 1) / logmax) * (hch - 3);
+    hctx.fillRect(i * bw, hch - h, Math.max(1, bw - 0.6), h);
+  }
+  if (hlAR != null && Number.isFinite(hlAR)) {
+    const x = clamp01((hlAR - 1) / (DOMAIN.max - 1)) * hcw;
+    hctx.strokeStyle = '#fff'; hctx.lineWidth = 1.5;
+    hctx.beginPath(); hctx.moveTo(x, 0); hctx.lineTo(x, hch); hctx.stroke();
+    hctx.fillStyle = '#fff'; hctx.font = '11px ui-monospace, Menlo, monospace';
+    const t = `AR ${hlAR.toFixed(3)}`, tw = hctx.measureText(t).width;
+    hctx.fillText(t, x + tw + 6 > hcw ? x - 4 - tw : x + 4, 11);
+  }
+}
+
+// ---- rotate/zoom sync across all globes ----
+let syncing = false;
+function syncFrom(orb) {
+  if (syncing) return;
+  syncing = true;
+  const v = orb.getView();
+  for (const p of PANELS) if (p.orb !== orb) p.orb.setView(v);
+  syncing = false;
 }
 
 function byResGrid(M) {
@@ -135,29 +197,25 @@ async function buildGlobe(M, sys) {
   card.querySelector('.globe-meta').textContent =
     `${ids.length.toLocaleString()} cells · max AR ${fmt(amax, 3)}`;
 
-  const layer = orb.polygons({ lnglat: pos, starts, fill: makeFill(ar, SCALES[0]) });
-  PANELS.push({ sys, orb, layer, ar });
+  const layer = orb.polygons({ lnglat: pos, starts, fill: makeFill(ar, scale) });
+  const panel = { sys, label: `${M.labels[sys]} ${M.res_prefix[sys]}${res}`, color: M.colors[sys], orb, layer, ar };
+  PANELS.push(panel);
+
+  orb.on('viewchange', () => syncFrom(orb));
 
   const tip = $('#tooltip');
   orb.on('hover', (e) => {
     orb.highlight(e.index ?? -1, layer);
+    const a = e.index == null ? null : ar[e.index];
+    drawHist(panel, Number.isFinite(a) ? a : null);   // this globe's distribution + line
     if (e.index == null) { tip.style.opacity = 0; return; }
-    const a = ar[e.index];
     tip.innerHTML = `${ids[e.index]}<br>AR ${Number.isFinite(a) ? fmt(a, 4) : 'DNC'}`;
     const r = canvas.getBoundingClientRect();
     tip.style.left = `${r.left + e.x + 14}px`;
     tip.style.top = `${r.top + e.y + 14}px`;
     tip.style.opacity = 1;
   });
-  canvas.addEventListener('pointerleave', () => { tip.style.opacity = 0; });
-}
-
-function computeDomain() {
-  const all = [];
-  for (const p of PANELS) for (const a of p.ar) if (Number.isFinite(a)) all.push(a);
-  all.sort((x, y) => x - y);
-  DOMAIN.max = all.length ? all[all.length - 1] : 1;
-  DOMAIN.p99 = all.length ? all[Math.floor(0.99 * (all.length - 1))] : DOMAIN.max;
+  canvas.addEventListener('pointerleave', () => { tip.style.opacity = 0; drawHist(panel, null); });
 }
 
 async function main() {
@@ -168,14 +226,19 @@ async function main() {
   if (M.tag) $('#tag').textContent = M.tag;
 
   byResGrid(M);
+  initHist();
 
   const sel = $('#scaleSelect');
   SCALES.forEach((s, i) => sel.add(new Option(s.label, i)));
   sel.value = '0';
 
+  DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
+  DOMAIN.p99 = DOMAIN.max;
   for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
-  computeDomain();
+  computeDomainAndHists();
   applyScale(SCALES[0]);
+  drawHist(PANELS[0], null);          // seed the histogram before any hover
+
   sel.addEventListener('change', () => applyScale(SCALES[+sel.value]));
 }
 main();
