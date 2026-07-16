@@ -23,21 +23,45 @@ hand-authored or pre-baked into git. `just site` runs two steps into `web/out/`
   `by_res_<sys>.png` — the distribution and best/worst-cell plots (matplotlib).
 - **`scripts/web_data.py`** (via `dggs_compare.webdata`) → `manifest.json` and
   `globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,ids.json}` — ajglobe's flat-binary
-  polygons for each system's coarsest full-coverage resolution.
+  polygons, one globe per system.
 
-`globe.js` reads the manifest, draws one globe per system (rotate/zoom, hover
-for a cell's id + AR), and colors every cell by AR on the shared `[1, max]`
-scale in the manifest so the systems compare directly.
+**Globe resolution is area-matched.** Each system's globe uses the resolution
+whose cell count is closest (in log-ratio) to H3's at `config.GLOBE_H3_RES`
+(default r3). These are ~equal-area grids, so `avg cell area = 4πR²/N(res)` —
+matching cell counts matches cell size, computed from the closed-form counts in
+`config.CELLS_PER_RES` (no table reads). Raise `GLOBE_H3_RES` for finer/heavier
+globes, lower for coarser/lighter ones; changing it needs a full site rebuild.
+
+## Viewer features (`globe.js`)
+
+- **Globes** — one per system, cells colored by AR on a shared domain so
+  systems compare directly. Drag to rotate, scroll to zoom; **all globes are
+  synced** (moving one moves all). Hover a cell for its id + AR.
+- **Color-scale dropdown** — pick a `(colormap, value-transform)`: viridis
+  (linear / γ0.4 / p99 / log), cividis, magma, turbo, grayscale. The globes and
+  the legend recolor together. The AR axis stays linear; only the color mapping
+  changes (so, e.g., linear-viridis vs. the stretched default is directly
+  comparable — the stretched one is the historical default that keeps the
+  low-AR bulk legible).
+- **Hovered-globe histogram** — above the color bar, the AR distribution of the
+  globe under the cursor (log-count bars, shared AR axis), with a line marking
+  the hovered cell — aligned to the color bar below.
+- **Full-screen plots** — click any survey plot to view it full-screen; there's
+  an "open full-size" link to the original PNG. Esc / backdrop / × to close.
 
 ## Publishing
 
-The hosted site is deployed to GitHub Pages from a data release, built from
-that release's tables at deploy time:
+Deployed to GitHub Pages from a data release, via `pages.yml`:
 
 ```sh
-gh workflow run pages.yml -f tag=data-vN
+gh workflow run pages.yml -f tag=data-vN                    # full: rebuild from the release tables
+gh workflow run pages.yml -f tag=data-vN -f rebuild=false   # fast: front-end-only, reuse cached build
 ```
 
-`pages.yml` fetches the release's tables (`just fetch-data`), runs `just site`
-so every plot and globe comes from those tables, and publishes. The manifest
-records the release tag (shown in the page footer).
+The **full** run fetches the release's tables (`just fetch-data`), runs
+`just site` so every plot and globe comes from those tables, publishes, and
+caches the built `web/out/` (keyed per tag). The manifest records the release
+tag (shown in the footer). A **`rebuild=false`** run restores that cache and
+only re-copies the static files — no fetch, no rebuild — so an HTML/CSS/JS
+change deploys in ~30s. (Run a full deploy first after a new data release to
+seed the cache, and whenever you change `GLOBE_H3_RES` or the data.)

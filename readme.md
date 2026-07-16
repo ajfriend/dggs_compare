@@ -100,11 +100,16 @@ on **GitHub Pages**, rebuilt from a release's tables at deploy time (never
 entering git):
 
 ```sh
-gh workflow run pages.yml -f tag=data-vN   # fetch that release's tables, `just site`, publish
+gh workflow run pages.yml -f tag=data-vN                    # full: fetch tables, `just site`, publish
+gh workflow run pages.yml -f tag=data-vN -f rebuild=false   # fast: front-end-only change, ~30s
 ```
 
-Every plot and globe on the published site is generated in that job from the
-release's tables — the site is a pure function of the data artifact.
+Every plot and globe on the published site is generated in the full job from the
+release's tables — the site is a pure function of the data artifact. A full run
+also caches the built `web/out/` (keyed per tag); `rebuild=false` restores that
+cache and only re-copies the static files (HTML/CSS/JS), so a viewer-only change
+deploys in ~30s instead of re-fetching the ~7GB of tables. The first run after a
+data release must be a full one, to seed the cache.
 
 ## Relationship to csar_py
 
