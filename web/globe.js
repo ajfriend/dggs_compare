@@ -170,7 +170,10 @@ function byResGrid(M) {
 }
 
 async function buildGlobe(M, sys) {
-  const res = M.globe_res[sys].at(-1);   // most-detailed full-coverage resolution
+  // globe_res is now the single area-matched resolution per system; tolerate
+  // the older list form (a cached manifest from a previous build).
+  const gr = M.globe_res[sys];
+  const res = Array.isArray(gr) ? gr.at(-1) : gr;
   const card = document.createElement('div');
   card.className = 'globe-card';
   card.innerHTML =

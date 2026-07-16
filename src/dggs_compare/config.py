@@ -49,6 +49,25 @@ SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
 # S2 numbers its resolutions "levels"; everyone else says "r".
 RES_PREFIX = {s: 'L' if s == 's2' else 'r' for s in TARGET_RES}
 
+# ----- globe view: area-matched resolutions -------------------------------
+# Total cell count at each resolution, per system — exact closed forms. These
+# grids are ~equal-area, so a cell's average area is 4*pi*R^2 / N(res); matching
+# cell COUNTS across systems therefore matches average cell SIZE. This is the
+# cheap, table-free way to area-match (no reading areas, no medians).
+CELLS_PER_RES = {
+    'h3':       lambda r: 2 + 120 * 7 ** r,               # 122, 842, 5882, 41162, ...
+    's2':       lambda r: 6 * 4 ** r,                     # 6, 24, 96, ...
+    'a5':       lambda r: 12 if r == 0 else 15 * 4 ** r,  # 12, 60, 240, 960, ...
+    'isea7h':   lambda r: 10 * 7 ** r + 2,                # 12, 72, 492, 3432, 24012, ...
+    'ivea7h':   lambda r: 10 * 7 ** r + 2,
+    'rhealpix': lambda r: 6 * 9 ** r,                     # 6, 54, 486, 4374, 39366, ...
+}
+# The globe view draws one globe per system, all at a common cell size: this H3
+# resolution sets it (r3 ~ 41,162 cells ~ 12,600 km^2/cell), and every other
+# system uses the resolution whose cell count is closest to H3's here. Raise for
+# finer/heavier globes, lower for coarser/lighter ones.
+GLOBE_H3_RES = 3
+
 # ----- solver settings (recorded in the tables' metadata) -----------------
 GAP_TOL = 1e-6            # csar duality-gap certification threshold
 CSAR_METHOD = 'auto'      # solver path ('auto' = csar's recommended method)
