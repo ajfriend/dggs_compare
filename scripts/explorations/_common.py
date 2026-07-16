@@ -1,6 +1,6 @@
 """Shared helpers for the DGGS exploration scripts.
 
-Gives the skar/numpy primitives below directly, plus two lazy accessors
+Gives the csar/numpy primitives below directly, plus two lazy accessors
 (PEP 562) so importing this module stays light:
 
     cells — the table reader (dggs_compare.cache); pair with
@@ -11,7 +11,7 @@ Gives the skar/numpy primitives below directly, plus two lazy accessors
 
 import numpy as np
 
-import skar
+import csar
 
 # A known ISEA7H "dark spot" (sharp low-AR seam cell), from dark_spots_locate.py.
 SPIKE_LATLON = (-71.90959, 140.97260)
@@ -29,9 +29,9 @@ def __getattr__(name):
 
 
 def aspect_ratio(verts):
-    """skar enclosing-cone AR of an (M,3) unit-vertex array (nan if it DNCs)."""
-    r = skar.solve(verts, geo='vec3')
-    return r.aspect_ratio if isinstance(r, skar.Converged) else np.nan
+    """csar enclosing-cone AR of an (M,3) unit-vertex array (nan if it DNCs)."""
+    r = csar.solve(verts, geo='vec3')
+    return r.aspect_ratio if isinstance(r, csar.Converged) else np.nan
 
 
 def unit(lat_deg, lng_deg):

@@ -1,12 +1,12 @@
-"""Per-cell skar enclosing-cone AR vs PCA second-moment AR (ISEA7H).
+"""Per-cell csar enclosing-cone AR vs PCA second-moment AR (ISEA7H).
 
 Tests whether the near-1.0 tail of the AR distribution is "geometric accidents"
 (the minimum-enclosing ellipse collapses to a circle on an *irregular* cell) vs.
 the bulk being the real, smooth Tissot / shape-distortion field. Plots a 2-D
 histogram of the two metrics per cell and prints the breakdown:
-  - bulk cells lie on the skar == PCA diagonal (corr 1.0000, |diff| 0.0000)
+  - bulk cells lie on the csar == PCA diagonal (corr 1.0000, |diff| 0.0000)
     -> the metric IS the real smooth distortion field;
-  - the sub-1.0 tail peels off the diagonal (skar ~1.0 while PCA stays
+  - the sub-1.0 tail peels off the diagonal (csar ~1.0 while PCA stays
     ~1.1-1.16): an accident of the *grid* -- the ISEA construction makes
     isolated seam cells that are irregular hexagons yet happen to be
     circularly-boundable, which the (correct) enclosing-cone metric reports
@@ -14,7 +14,7 @@ histogram of the two metrics per cell and prints the breakdown:
 (Genuine isotropic cells exist only at the ~20 face centroids and are too rare
 by area to be hit by uniform sampling.)
 
-Reads Parquet, no DGGS library, so it runs natively (needs skar built):
+Reads Parquet, no DGGS library, so it runs natively (needs csar built):
     uv run scripts/explorations/ar_vs_pca.py
 """
 
@@ -27,7 +27,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 
-import skar
+import csar
 
 from _common import aspect_ratio, cells, gnomonic_xy, tangent_basis_vec
 from dggs_compare import config
@@ -47,7 +47,7 @@ def pca_ratio(v):
 
 sk, pc = [], []
 for _cid, latlng in cells.load_cells('isea7h', RES):
-    v = skar.to_vec3(latlng, geo='latlng_deg')
+    v = csar.to_vec3(latlng, geo='latlng_deg')
     sk.append(aspect_ratio(v))
     pc.append(pca_ratio(v))
 sk = np.asarray(sk)
@@ -57,21 +57,21 @@ low = sk < 1.05
 acc = low & (pc > 1.10)
 real = low & (pc < 1.05)
 print(f'cells {sk.size:,}')
-print(f'skar<1.05: {low.sum()}  -> accidents (PCA>1.10): {acc.sum()}; '
+print(f'csar<1.05: {low.sum()}  -> accidents (PCA>1.10): {acc.sum()}; '
       f'genuinely round (PCA<1.05): {real.sum()}')
 mid = (sk > 1.10) & (sk < 1.30)            # bulk
-print(f'bulk corr(skar, PCA): {np.corrcoef(sk[mid], pc[mid])[0, 1]:.4f}; '
-      f'bulk median |skar-PCA|: {np.median(np.abs(sk[mid] - pc[mid])):.4f}')
+print(f'bulk corr(csar, PCA): {np.corrcoef(sk[mid], pc[mid])[0, 1]:.4f}; '
+      f'bulk median |csar-PCA|: {np.median(np.abs(sk[mid] - pc[mid])):.4f}')
 
 fig, ax = plt.subplots(figsize=(8, 8))
 h = ax.hist2d(sk, pc, bins=240, norm=mcolors.LogNorm(), cmap='viridis')
 lim = [1.0, max(sk.max(), pc.max())]
-ax.plot(lim, lim, 'r--', lw=1.2, label='skar = PCA (smooth field)')
-ax.set_xlabel('skar enclosing-cone AR (the metric)')
+ax.plot(lim, lim, 'r--', lw=1.2, label='csar = PCA (smooth field)')
+ax.set_xlabel('csar enclosing-cone AR (the metric)')
 ax.set_ylabel('PCA second-moment AR (interior shape)')
 ax.set_title(f'ISEA7H r{RES}: enclosing-cone vs PCA AR, N={sk.size:,}\n'
              'on-diagonal = real smooth distortion; '
-             'low-skar/high-PCA = bounding-ellipse accidents')
+             'low-csar/high-PCA = bounding-ellipse accidents')
 ax.legend(loc='upper left')
 ax.set_aspect('equal')
 fig.colorbar(h[3], ax=ax, shrink=0.85, label='cell count (log)')

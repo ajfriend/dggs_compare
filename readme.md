@@ -2,7 +2,7 @@
 
 Comparing discrete global grid systems — **H3, S2, A5, ISEA7H, IVEA7H,
 rHEALPix** — by per-cell statistics: shape (aspect ratio via
-[skar](https://github.com/ajfriend/skar_py)'s enclosing-cone solver) and area
+[csar](https://github.com/ajfriend/csar_py)'s enclosing-cone solver) and area
 (via [sparea](https://pypi.org/project/sparea/)), at area-matched resolutions.
 
 **The products of this repo are data artifacts and web pages.** The Parquet
@@ -27,7 +27,7 @@ src/dggs_compare/     the internal library (organization only, not for PyPI)
                         registry, adding a grid = dropping in one file
   registry.py           folder discovery + lazy imports
   dggal_engine.py       shared DGGAL glue + the live-engine Adapter
-  stats.py              per-cell AR (skar) + area (sparea)
+  stats.py              per-cell AR (csar) + area (sparea)
   cache.py              the Parquet tables: build + read (data/cells/)
   checks.py             DNC invariants (cached-ar or re-solve modes)
   webdata.py            web-viewer artifacts from the tables
@@ -106,13 +106,13 @@ The viewer's `?data=<base-url>` parameter remains for same-origin or
 localhost data mirrors (asset names there are flat: `globe--<f>`,
 `full--<f>`).
 
-## Relationship to skar_py
+## Relationship to csar_py
 
-skar comes from the released tag pinned in `pyproject.toml`
-(`[tool.uv.sources]`). This repo is also **skar's pre-release regression
+csar comes from the released tag pinned in `pyproject.toml`
+(`[tool.uv.sources]`). This repo is also **csar's pre-release regression
 gate**: point the pin at a candidate, `uv sync`, set `RESOLVE=True` in
 `scripts/dnc_check.py`, and run it — that re-solves ~5.7M real cells with the
-installed skar against invariants that have caught real solver differences.
+installed csar against invariants that have caught real solver differences.
 
 Extracted from [skar_py](https://github.com/ajfriend/skar_py) (history through
 its PR #16); restructured for native dggal 0.0.6 (no more Rosetta) with stats

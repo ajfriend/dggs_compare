@@ -50,8 +50,8 @@ SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
 RES_PREFIX = {s: 'L' if s == 's2' else 'r' for s in TARGET_RES}
 
 # ----- solver settings (recorded in the tables' metadata) -----------------
-GAP_TOL = 1e-6            # skar duality-gap certification threshold
-SKAR_METHOD = 'auto'      # solver path ('auto' = skar's recommended method)
+GAP_TOL = 1e-6            # csar duality-gap certification threshold
+CSAR_METHOD = 'auto'      # solver path ('auto' = csar's recommended method)
 
 # ----- units ---------------------------------------------------------------
 R_KM = 6371.0088          # mean Earth radius; steradian -> km^2 is R^2

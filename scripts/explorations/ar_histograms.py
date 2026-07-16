@@ -6,7 +6,7 @@ distribution (per-grid bins, log y). This is what revealed that ISEA7H is
 right-skewed (long tail to ~1.36) while IVEA7H is a flat-topped, sharply-bounded
 band (~1.06-1.22).
 
-Reads Parquet, no DGGS library, so it runs natively (needs skar built):
+Reads Parquet, no DGGS library, so it runs natively (needs csar built):
     uv run scripts/explorations/ar_histograms.py
 """
 
@@ -18,7 +18,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-import skar
+import csar
 
 from _common import cells
 from dggs_compare import config
@@ -32,8 +32,8 @@ results = {}
 for dggs, color in GRIDS:
     ars, dnc = [], 0
     for _cid, latlng in cells.load_cells(dggs, RES):
-        r = skar.solve(skar.to_vec3(latlng, geo='latlng_deg'), geo='vec3', gap_tol=1e-6)
-        if isinstance(r, skar.Converged):
+        r = csar.solve(csar.to_vec3(latlng, geo='latlng_deg'), geo='vec3', gap_tol=1e-6)
+        if isinstance(r, csar.Converged):
             ars.append(r.aspect_ratio)
         else:
             dnc += 1

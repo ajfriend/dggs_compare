@@ -1,9 +1,9 @@
-"""Is a dark-spot cell a skar bug, or a real geometry? (independent MVEE check)
+"""Is a dark-spot cell a csar bug, or a real geometry? (independent MVEE check)
 
-skar's enclosing-cone AR should equal the aspect ratio of the minimum-area
+csar's enclosing-cone AR should equal the aspect ratio of the minimum-area
 enclosing ellipse of the cell's gnomonic-projected vertices. Compute that MVEE
 independently (Khachiyan) and compare at a known spike cell. They agree to ~5
-decimals (1.00191 vs 1.00191) -> skar is faithful; the spot is a real cell whose
+decimals (1.00191 vs 1.00191) -> csar is faithful; the spot is a real cell whose
 *irregular* hexagon (edge ratio ~1.25, vertex-radius ratio ~1.32) nonetheless
 has a near-circular bounding ellipse. Not a bug.
 
@@ -28,7 +28,7 @@ def tangent_xy(z):
 
 
 la, lo = SPIKE_LATLON
-print(f'{"offset":>7} {"skar":>9} {"MVEE":>9}')
+print(f'{"offset":>7} {"csar":>9} {"MVEE":>9}')
 for d in (0.0, 0.05):
     z = ad.zone_at(RES, lo, la + d)
     print(f'{d:7.2f} {aspect_ratio(ad.verts(z)):9.5f} {mvee_ratio(tangent_xy(z)):9.5f}')
@@ -41,5 +41,5 @@ radii = np.linalg.norm(xy, axis=1)
 print(f'\nspike cell {ad.cid_str(z)}: edge-len ratio {edges.max() / edges.min():.3f}, '
       f'vertex-radius ratio {radii.max() / radii.min():.3f} '
       f'(regular hexagon = 1.000)')
-print('=> skar AR matches independent MVEE: not a bug; the irregular hexagon '
+print('=> csar AR matches independent MVEE: not a bug; the irregular hexagon '
       'simply has a near-circular bounding ellipse.')

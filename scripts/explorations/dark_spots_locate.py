@@ -7,7 +7,7 @@ Random sampling at fine resolution rarely lands on the rare low-AR cells, so:
     sharp* dips (AR ~1.0 at a point, ~1.34 just 0.05 deg away), embedded in the
     high-distortion seams (not the smooth face-centroid lows).
 
-See dark_spots_verify.py (not a skar bug) and dark_spots_cells.py (the grid
+See dark_spots_verify.py (not a csar bug) and dark_spots_cells.py (the grid
 geometry there). Run under the x86_64 (Rosetta) env — see ../README.md:
     uv run \
         scripts/explorations/dark_spots_locate.py
@@ -15,7 +15,7 @@ geometry there). Run under the x86_64 (Rosetta) env — see ../README.md:
 
 import numpy as np
 
-import skar
+import csar
 
 from _common import dc
 
@@ -25,8 +25,8 @@ ad = dc.Adapter('ISEA7H')
 
 def ar_at(lng, lat):
     z = ad.zone_at(RES, float(lng), float(lat))
-    r = skar.solve(ad.verts(z), geo='vec3')
-    ok = isinstance(r, skar.Converged)
+    r = csar.solve(ad.verts(z), geo='vec3')
+    ok = isinstance(r, csar.Converged)
     return (r.aspect_ratio if ok else np.nan), ok, (None if ok else r.status)
 
 

@@ -1,5 +1,5 @@
 """Build the (system, resolution) Parquet tables: geometry + per-cell stats
-(skar aspect ratio, sparea area) in one pass, one env.
+(csar aspect ratio, sparea area) in one pass, one env.
 
 Systems come from the library registry (the systems/ folder); config
 (SEED, budgets, target resolutions, solver settings) from

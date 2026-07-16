@@ -12,7 +12,7 @@ sync:
     uv sync --python {{python}}
 
 # Build the (system, resolution) Parquet tables: geometry + per-cell stats
-# (skar AR, sparea area) in one pass. Systems come from the library registry
+# (csar AR, sparea area) in one pass. Systems come from the library registry
 # (src/dggs_compare/systems/ — one file per DGGS). Output -> data/cells/
 # (gitignored; published as GitHub data releases). Pass a system name to
 # build just that one (how CI parallelizes: one runner per system).
@@ -31,7 +31,7 @@ calibrate:
 
 # DNC invariants: working resolutions clean, DNC only at the finest sub-metre
 # levels, monotone. Exits non-zero on a regression. Set RESOLVE=True in the
-# script to re-solve with the installed skar (the skar pre-release gate).
+# script to re-solve with the installed csar (the csar pre-release gate).
 dnc-check:
     uv run scripts/dnc_check.py
 

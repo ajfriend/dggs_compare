@@ -7,9 +7,9 @@ codes.
 DNC sweep modes (`resolve=`):
   False (default) — read the cached `ar` column; DNC = NaN. Fast: checks the
       published artifact itself.
-  True — re-solve every cell's `verts` with the *installed* skar at the
-      config solver settings, ignoring the cached stats. This is the skar
-      pre-release regression gate: point the pyproject skar pin at a release
+  True — re-solve every cell's `verts` with the *installed* csar at the
+      config solver settings, ignoring the cached stats. This is the csar
+      pre-release regression gate: point the pyproject csar pin at a release
       candidate, `uv sync`, and run the gate — no table rebuild needed.
 """
 
@@ -29,15 +29,15 @@ def sweep_system(name, *, resolve=False):
     rows = []
     for res in cache.available_resolutions(name):
         if resolve:
-            import skar
+            import csar
             tested = dnc = 0
             examples = []
             for cid, latlng in cache.load_cells(name, res):
                 tested += 1
-                r = skar.solve(skar.to_vec3(latlng, geo='latlng_deg'),
+                r = csar.solve(csar.to_vec3(latlng, geo='latlng_deg'),
                                geo='vec3', gap_tol=config.GAP_TOL,
-                               method=config.SKAR_METHOD)
-                if not isinstance(r, skar.Converged):
+                               method=config.CSAR_METHOD)
+                if not isinstance(r, csar.Converged):
                     dnc += 1
                     if len(examples) < MAX_EXAMPLES:
                         examples.append(cid)

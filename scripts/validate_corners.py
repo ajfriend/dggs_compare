@@ -1,6 +1,6 @@
 """Validate the corners-only enclosing-cone metric for the DGGAL grids.
 
-The tables feed skar only a cell's *corner* vertices. For geodesic edges
+The tables feed csar only a cell's *corner* vertices. For geodesic edges
 that's exact: the min-enclosing ellipse of the corners already contains them
 (convexity). The equal-area DGGAL grids have slightly *non-geodesic* edges
 that could bow outward at coarse levels, so this checks it empirically for
@@ -18,7 +18,7 @@ No CLI args (project convention) — edit the knobs below.
 
 import numpy as np
 
-import skar
+import csar
 
 from dggs_compare import registry
 
@@ -31,8 +31,8 @@ K = 300                     # cells tested per level (enumerate if fewer exist)
 
 
 def ar(verts):
-    r = skar.solve(verts, geo='vec3')
-    return r.aspect_ratio if isinstance(r, skar.Converged) else None
+    r = csar.solve(verts, geo='vec3')
+    return r.aspect_ratio if isinstance(r, csar.Converged) else None
 
 
 def cells_for_level(ad, level, rng):
@@ -67,7 +67,7 @@ def check(name, ad):
             if corners.shape[0] == 5:
                 npent += 1
             a_c = ar(corners)
-            a_r = ar(skar.to_vec3(ad.refined_boundary(z, REFINE),
+            a_r = ar(csar.to_vec3(ad.refined_boundary(z, REFINE),
                                   geo='latlng_deg'))
             if a_c is None or a_r is None:
                 continue

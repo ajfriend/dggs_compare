@@ -10,7 +10,7 @@ from dggs_compare import config, registry
 if __name__ == '__main__':
     versions = ', '.join(
         f'{pkg} {version(pkg)}'
-        for pkg in ('skar', 'sparea', 'h3', 's2sphere', 'a5_fast', 'dggal'))
+        for pkg in ('csar', 'sparea', 'h3', 's2sphere', 'a5_fast', 'dggal'))
     print(f"""\
 Data release — the per-cell Parquet tables (`cells-parquet.tar`, one table
 per system x resolution: geometry + `ar` + `area` columns) and the web
@@ -22,7 +22,7 @@ viewer's derived files (flat-named: `globe--*`, `full--*`,
 - systems: {', '.join(registry.names())}
 - sampling: seed {config.SEED:#x}, per-res-seed {config.PER_RES_SEED}, \
 budget {config.N_CELLS:,}
-- solver: gap_tol {config.GAP_TOL:g}, method {config.SKAR_METHOD}
+- solver: gap_tol {config.GAP_TOL:g}, method {config.CSAR_METHOD}
 - versions: {versions}
 
 Fetch the tables: `just fetch-data <tag>` (or read any asset directly with

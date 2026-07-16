@@ -22,7 +22,7 @@ import numpy as np
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Polygon as MPoly
 
-import skar
+import csar
 
 from _common import (SPIKE_LATLON, aspect_ratio, dc, ellipse_pts, mvee,
                      tangent_basis)
@@ -42,7 +42,7 @@ def ortho(vecs, e1, e2):
 def refined_xy(z, e1, e2, n=10):
     pts = ad.dggrs.getZoneRefinedWGS84Vertices(z, n)
     ring = [(float(p.lat), float(p.lon)) for p in pts]
-    return ortho(skar.to_vec3(ring, geo='latlng_deg'), e1, e2)
+    return ortho(csar.to_vec3(ring, geo='latlng_deg'), e1, e2)
 
 
 la0, lo0 = SPIKE_LATLON

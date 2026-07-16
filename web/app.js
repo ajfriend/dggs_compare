@@ -396,7 +396,7 @@ async function main() {
     fetch(dataURL('out/histograms.json')).then((r) => r.json()),
   ]);
   $('#subtitle').textContent =
-    `${M.systems.length} systems · skar gap_tol ${M.gap_tol.toExponential()} · AR over 1.0`;
+    `${M.systems.length} systems · csar gap_tol ${M.gap_tol.toExponential()} · AR over 1.0`;
   buildSeriesPicker();
   initHistControls();
   // Open on the cross-system comparison at each system's working resolution.

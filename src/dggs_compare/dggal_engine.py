@@ -22,7 +22,7 @@ import importlib.util
 import os
 
 import numpy as np
-import skar
+import csar
 import sparea
 
 from . import config
@@ -112,7 +112,7 @@ class Adapter:
 
     def verts(self, zone):
         """Corner vertices as an (M, 3) unit-vec3 array (corners only)."""
-        return skar.to_vec3(self.cell_boundary(zone), geo='latlng_deg')
+        return csar.to_vec3(self.cell_boundary(zone), geo='latlng_deg')
 
     # ----- ids / counts -------------------------------------------------
     def cid_str(self, zone):

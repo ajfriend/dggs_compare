@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "dggs_compare"
 version = "0.1.0"
-description = "Comparing DGGS grids (H3, S2, A5, ISEA7H, IVEA7H, rHEALPix) by per-cell shape and area stats, via skar + sparea."
+description = "Comparing DGGS grids (H3, S2, A5, ISEA7H, IVEA7H, rHEALPix) by per-cell shape and area stats, via csar + sparea."
 readme = "readme.md"
 # a5_fast has no cp314 wheels yet (Rust sdist otherwise), so dev/CI pin 3.13.
 requires-python = ">=3.11,<3.14"
@@ -18,7 +18,7 @@ dependencies = [
     "numpy>=1.24",
     "pyarrow>=15",
     "matplotlib>=3",
-    "skar",
+    "csar",
     "sparea>=0.4",
     "h3>=4",
     "s2sphere",
@@ -33,7 +33,7 @@ lab = ["jupyterlab>=4"]
 packages = ["src/dggs_compare"]
 
 [tool.uv.sources]
-# skar isn't on PyPI yet; pin the released tag (uv builds it from source —
-# the zig/meson toolchain arrives via build isolation). Bump on skar releases;
+# csar isn't on PyPI yet; pin the released tag (uv builds it from source —
+# the zig/meson toolchain arrives via build isolation). Bump on csar releases;
 # point at a branch/rev to run the pre-release regression gate.
-skar = { git = "https://github.com/ajfriend/skar_py", tag = "v0.6.0" }
+csar = { git = "https://github.com/ajfriend/csar_py", tag = "v0.1.0" }

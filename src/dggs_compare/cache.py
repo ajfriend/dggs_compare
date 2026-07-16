@@ -7,7 +7,7 @@ Schema:
     res    int32                             constant per file
     cid    string                            cell id text
     verts  list<fixed_size_list<double, 2>>  ring of [lat, lng] degrees (open)
-    ar     float64                           enclosing-cone aspect ratio (skar);
+    ar     float64                           enclosing-cone aspect ratio (csar);
                                              NaN = did-not-converge at GAP_TOL
     area   float64                           spherical area, steradians (sparea)
 
@@ -56,9 +56,9 @@ def _provenance():
         'per_res_seed': str(config.PER_RES_SEED),
         'n_cells': str(config.N_CELLS),
         'gap_tol': repr(config.GAP_TOL),
-        'skar_method': config.SKAR_METHOD,
+        'csar_method': config.CSAR_METHOD,
     }
-    for pkg in ('skar', 'sparea', 'h3', 's2sphere', 'a5_fast', 'dggal'):
+    for pkg in ('csar', 'sparea', 'h3', 's2sphere', 'a5_fast', 'dggal'):
         try:
             meta[f'version_{pkg}'] = _pkg_version(pkg)
         except Exception:

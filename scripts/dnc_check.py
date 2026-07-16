@@ -9,9 +9,9 @@ Reads the cached `ar` column (or re-solves, see RESOLVE) and verifies:
 Exits non-zero (printing the offenders) if either invariant breaks. Writes
 one diagnostic plot (out/dnc_check.png: DNC % vs resolution per system).
 
-RESOLVE=True re-solves every cell with the *installed* skar instead of
-reading the cached stats — the skar pre-release regression gate (point the
-pyproject skar pin at the candidate, `uv sync`, run this).
+RESOLVE=True re-solves every cell with the *installed* csar instead of
+reading the cached stats — the csar pre-release regression gate (point the
+pyproject csar pin at the candidate, `uv sync`, run this).
 
 Run with:  just dnc-check
 No CLI args (project convention) — edit RESOLVE below.
@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 from dggs_compare import cache, checks, config
 
 # ----- knobs -------------------------------------------------------------
-RESOLVE = False           # True: re-solve with the installed skar (release gate)
+RESOLVE = False           # True: re-solve with the installed csar (release gate)
 OUT = Path(__file__).resolve().parent.parent / 'out' / 'dnc_check.png'
 # -------------------------------------------------------------------------
 

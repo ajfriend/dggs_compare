@@ -1,4 +1,4 @@
-"""Per-cell statistics: aspect ratio (skar) + spherical area (sparea).
+"""Per-cell statistics: aspect ratio (csar) + spherical area (sparea).
 
 Computed once, at generation time, and stored as columns in the tables —
 downstream consumers read them; they never re-solve. Solver settings come
@@ -6,7 +6,7 @@ from `config` and are recorded in each table's metadata (see `cache.py`).
 """
 
 import numpy as np
-import skar
+import csar
 import sparea
 
 from . import config
@@ -20,10 +20,10 @@ def cell_stats(latlng):
     area_sr: spherical polygon area in steradians (multiply by
     `config.SR2KM2` for km^2).
     """
-    v = skar.to_vec3(latlng, geo='latlng_deg')
-    r = skar.solve(v, geo='vec3', gap_tol=config.GAP_TOL,
-                   method=config.SKAR_METHOD)
-    ar = r.aspect_ratio if isinstance(r, skar.Converged) else float('nan')
+    v = csar.to_vec3(latlng, geo='latlng_deg')
+    r = csar.solve(v, geo='vec3', gap_tol=config.GAP_TOL,
+                   method=config.CSAR_METHOD)
+    ar = r.aspect_ratio if isinstance(r, csar.Converged) else float('nan')
     return ar, float(sparea.area(v, geo='vec3'))
 
 

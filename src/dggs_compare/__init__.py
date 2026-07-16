@@ -10,7 +10,7 @@ Modules:
     registry      system discovery (the systems/ folder IS the registry)
     systems/      one module per DGGS, nothing else
     dggal_engine  shared DGGAL glue + the live-engine Adapter
-    stats         per-cell aspect ratio (skar) + area (sparea)
+    stats         per-cell aspect ratio (csar) + area (sparea)
     cache         the Parquet tables: build (geometry + stats) and read
     checks        DNC invariants + corners-only validation
     webdata       web-viewer artifacts derived from the tables

@@ -10,7 +10,7 @@ No CLI args (project convention).
 import a5_fast as a5
 import numpy as np
 
-import skar
+import csar
 
 from dggs_compare import stats
 
@@ -21,13 +21,13 @@ TURN_DEG = 5.0            # exterior-angle threshold marking a corner
 
 
 def ar(latlng):
-    r = skar.solve(skar.to_vec3(latlng, geo='latlng_deg'), geo='vec3')
-    return r.aspect_ratio if isinstance(r, skar.Converged) else np.nan
+    r = csar.solve(csar.to_vec3(latlng, geo='latlng_deg'), geo='vec3')
+    return r.aspect_ratio if isinstance(r, csar.Converged) else np.nan
 
 
 def corner_idx(ring_latlng):
     """Indices of high-turning points of an open (lat,lng) ring."""
-    v = np.asarray(skar.to_vec3(ring_latlng, geo='latlng_deg'), dtype=float)
+    v = np.asarray(csar.to_vec3(ring_latlng, geo='latlng_deg'), dtype=float)
     e = np.roll(v, -1, axis=0) - v                    # chord to next vertex
     e /= np.linalg.norm(e, axis=1, keepdims=True)
     prev = np.roll(e, 1, axis=0)

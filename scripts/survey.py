@@ -25,7 +25,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 
-import skar
+import csar
 
 from dggs_compare import cache, config
 
@@ -53,9 +53,9 @@ def sweep_system(name):
     cols = cache.load_columns(name, target, ['cid', 'verts', 'ar'])
 
     def record(idx):
-        verts = skar.to_vec3(cols['verts'][idx], geo='latlng_deg')
-        r = skar.solve(verts, geo='vec3', gap_tol=config.GAP_TOL,
-                       method=config.SKAR_METHOD)
+        verts = csar.to_vec3(cols['verts'][idx], geo='latlng_deg')
+        r = csar.solve(verts, geo='vec3', gap_tol=config.GAP_TOL,
+                       method=config.CSAR_METHOD)
         return {'ar': float(cols['ar'][idx]), 'id': cols['cid'][idx],
                 'verts': verts, 'result': r}
 
@@ -103,7 +103,7 @@ def plot_histograms(results):
 
 def draw_cell(ax, rec, color):
     """Draw a cell's boundary + enclosing ellipse, major axis horizontal."""
-    xy, semi = skar.project_to_cone(rec['result'], rec['verts'], up=None)
+    xy, semi = csar.project_to_cone(rec['result'], rec['verts'], up=None)
     ring = np.vstack([xy, xy[:1]])
     t = np.linspace(0.0, 2.0 * np.pi, 400)
     ax.plot(ring[:, 0], ring[:, 1], '-o', color=color, lw=1.3, ms=4, label='cell')
