@@ -229,3 +229,49 @@ footer {
   color: var(--dim);
   font-size: 13px;
 }
+
+/* ---- clickable plots + full-screen lightbox ---- */
+.plot, .byres-grid img { cursor: zoom-in; }
+
+#lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 3vw;
+  background: rgba(3, 5, 8, 0.92);
+}
+#lightbox.open { display: flex; }
+#lightboxImg {
+  max-width: 94vw;
+  max-height: 94vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  cursor: zoom-out;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+}
+#lightboxClose {
+  position: fixed;
+  top: 14px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+#lightboxClose:hover { border-color: var(--muted); }
+#lightboxRaw {
+  position: fixed;
+  top: 20px;
+  left: 22px;
+  color: var(--muted);
+  font-size: 13px;
+}

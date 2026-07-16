@@ -221,6 +221,27 @@ async function buildGlobe(M, sys) {
   canvas.addEventListener('pointerleave', () => { tip.style.opacity = 0; drawHist(panel, null); });
 }
 
+// Click any plot (static histogram/extremes or a dynamically-added by-res
+// image) to view it full-screen; click/Esc to close, or open the original.
+function initLightbox() {
+  const box = $('#lightbox'), img = $('#lightboxImg'), raw = $('#lightboxRaw');
+  const open = (src, alt) => {
+    img.src = src; img.alt = alt || ''; raw.href = src;
+    box.classList.add('open'); document.body.style.overflow = 'hidden';
+  };
+  const close = () => {
+    box.classList.remove('open'); img.removeAttribute('src'); document.body.style.overflow = '';
+  };
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t.matches('.plot, .byres-grid img')) open(t.currentSrc || t.src, t.alt);
+    else if (t === box || t.id === 'lightboxImg' || t.id === 'lightboxClose') close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && box.classList.contains('open')) close();
+  });
+}
+
 async function main() {
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
@@ -229,6 +250,7 @@ async function main() {
   if (M.tag) $('#tag').textContent = M.tag;
 
   byResGrid(M);
+  initLightbox();
   initHist();
 
   const sel = $('#scaleSelect');
