@@ -46,8 +46,18 @@ validate-corners:
 web-data:
     uv run scripts/web_data.py
 
-# Serve the web viewer at http://localhost:8000 (builds the data first).
-web: web-data
+# Build EVERYTHING the static site serves, from the tables, into web/out/:
+# the survey PNGs (cross-system + by-resolution histograms, best/worst cells)
+# AND the ajglobe globe binaries + manifest. This is the single command the
+# published site runs (pages.yml) after fetching a data release, so every plot
+# on the site is generated from that release's tables — not from anything on
+# disk. Reads the `ar` column; nothing is solved but the two extreme cells the
+# survey re-draws per system.
+site: survey web-data
+    cp out/histograms.png out/extremes.png out/by_res_*.png web/out/
+
+# Serve the static site at http://localhost:8000 (builds it first).
+web: site
     uv run -m http.server 8000 -d web
 
 # Refresh the vendored ajglobe bundle (checked in under web/vendor/) from the
@@ -61,16 +71,16 @@ web-vendor:
 # calibration, or a solver bump worth reflecting) — not per code release.
 # Normally cut from CI: gh workflow run data-release.yml -f tag=data-vN
 
-# Stage the flat-named web viewer files for the release's flat asset
-# namespace (out/globe/<f> -> globe--<f>, out/full/<f> -> full--<f>). The
-# Parquet tables are NOT staged — they upload straight from data/cells/
-# (their names are already flat, and skipping the copy halves the publish
-# job's disk footprint at the 1M-cell scale).
+# Stage the flat-named globe binaries + manifest for the release's flat asset
+# namespace (out/globe/<f> -> globe--<f>). The Parquet tables are NOT staged —
+# they upload straight from data/cells/ (their names are already flat, and
+# skipping the copy halves the publish job's disk footprint at the 1M-cell
+# scale). The site itself is rebuilt from the tables at deploy time (pages.yml
+# runs `just site`), so these globe assets are a convenience, not the source.
 data-pack:
     rm -rf data-stage && mkdir -p data-stage
-    cp web/out/histograms.json web/out/manifest.json data-stage/
+    cp web/out/manifest.json data-stage/
     for f in web/out/globe/*; do cp "$f" "data-stage/globe--$(basename "$f")"; done
-    for f in web/out/full/*; do cp "$f" "data-stage/full--$(basename "$f")"; done
     ls data-stage | wc -l
 
 # Create the GitHub release (if absent) and upload: one asset per Parquet

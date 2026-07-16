@@ -33,8 +33,8 @@ src/dggs_compare/     the internal library (organization only, not for PyPI)
   webdata.py            web-viewer artifacts from the tables
 scripts/              thin callers: gen, survey, calibrate, dnc_check,
                       validate_corners, web_*, explorations/
-web/                  the interactive explorer (ajglobe globes + dynamic
-                      histograms); static page, data from web/out/
+web/                  the static comparison site (survey plots + ajglobe
+                      globes colored by AR); data from web/out/
 data/cells/           the tables (gitignored; published as data releases)
 notebooks/            interactive companions
 ```
@@ -53,7 +53,8 @@ just gen               # build all tables: geometry + stats, one pass (~min)
 just survey            # AR comparison plots -> out/
 just calibrate         # area-match resolutions across systems
 just dnc-check         # assert the DNC invariants (pass/fail)
-just web               # interactive explorer at :8000
+just site              # build the static site into web/out/ (survey plots + globes)
+just web               # build the site, then serve it at :8000
 just validate-corners  # corners-only exactness check (per new DGGAL grid)
 ```
 
@@ -94,17 +95,16 @@ a data artifact never mixes float provenance across architectures).
 Each release carries provenance notes (the same facts ride in every table's
 Parquet metadata). Release assets support HTTP Range but send **no CORS
 headers**, so browsers can't fetch them cross-origin — CLI/API consumers
-(`fetch-data`, pyarrow, DuckDB) are unaffected. The hosted viewer therefore
-lives on **GitHub Pages**, with a data release's viewer files deployed
-same-origin next to the page (never entering git):
+(`fetch-data`, pyarrow, DuckDB) are unaffected. The hosted site therefore lives
+on **GitHub Pages**, rebuilt from a release's tables at deploy time (never
+entering git):
 
 ```sh
-gh workflow run pages.yml -f tag=data-vN   # deploy the explorer + that data
+gh workflow run pages.yml -f tag=data-vN   # fetch that release's tables, `just site`, publish
 ```
 
-The viewer's `?data=<base-url>` parameter remains for same-origin or
-localhost data mirrors (asset names there are flat: `globe--<f>`,
-`full--<f>`).
+Every plot and globe on the published site is generated in that job from the
+release's tables — the site is a pure function of the data artifact.
 
 ## Relationship to csar_py
 

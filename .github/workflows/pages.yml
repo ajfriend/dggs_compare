@@ -37,12 +37,13 @@ jobs:
           enable-cache: false
       - uses: extractions/setup-just@v4
       - run: just sync
-      - name: pull the data release and derive the viewer data
+      - name: pull the data release and build the site from its tables
         env:
           GH_TOKEN: ${{ github.token }}
+          DGGS_DATA_TAG: ${{ inputs.tag }}
         run: |
           just fetch-data '${{ inputs.tag }}'
-          just web-data
+          just site
       - name: stage the site (page + same-origin data)
         run: |
           mkdir -p _site
