@@ -1,24 +1,56 @@
 // Static DGGS aspect-ratio site: a grid of ajglobe globes, one per system,
 // cells colored by aspect ratio on a SHARED scale (so systems compare directly).
-// Data comes from the tables via `just site` (out/manifest.json + out/globe/*).
-// No dynamic histograms, no synced panels — the distribution plots are the
-// pre-rendered matplotlib PNGs on the page; this file only draws the globes.
+// A dropdown picks the color scale — a (colormap, value-transform) pair — and
+// recolors every globe and the legend together, so you can see how the choice
+// affects what's visible (perceptually-uniform vs stretched, viridis vs turbo…).
 import { Orb } from './vendor/ajglobe.min.js';
 
-// ---- value-based color: viridis over [1, shared max] with a gamma stretch ----
-// (equal AR ⇒ equal color; the sub-linear stretch keeps the low-AR bulk legible)
-const STOPS = [[68, 1, 84], [71, 44, 122], [59, 81, 139], [44, 113, 142],
-               [33, 144, 141], [39, 173, 129], [92, 200, 99], [253, 231, 37]];
-function viridis(t) {
-  t = Math.max(0, Math.min(1, t)) * (STOPS.length - 1);
-  const i = Math.min(STOPS.length - 2, t | 0), f = t - i, a = STOPS[i], b = STOPS[i + 1];
+// ---- colormaps: RGB control points (0–255), linearly interpolated ----
+// viridis/cividis/magma are perceptually ~uniform; turbo is a rainbow (NOT
+// uniform — good for seeing false boundaries); gray is a plain luminance ramp.
+const CMAPS = {
+  viridis: [[68,1,84],[72,40,120],[62,74,137],[49,104,142],[38,130,142],
+            [31,158,137],[53,183,121],[110,206,88],[181,222,43],[253,231,37]],
+  cividis: [[0,34,78],[0,55,110],[62,73,106],[112,94,100],[150,116,94],
+            [190,140,86],[230,169,73],[255,201,58],[255,233,69]],
+  magma:   [[0,0,4],[28,16,68],[79,18,123],[129,37,129],[181,54,122],
+            [229,80,100],[251,135,97],[254,194,135],[252,253,191]],
+  turbo:   [[48,18,59],[54,88,196],[36,133,237],[30,183,208],[45,224,152],
+            [122,247,79],[189,238,52],[245,197,45],[251,131,42],[226,72,28],
+            [175,31,17],[122,4,3]],
+  gray:    [[20,20,20],[245,245,245]],
+};
+const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+function interp(stops, t) {
+  t = clamp01(t) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, t | 0), f = t - i, a = stops[i], b = stops[i + 1];
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 255];
 }
-const LUT = Array.from({ length: 256 }, (_, i) => viridis(i / 255));
-const lut = (t) => LUT[Math.min(255, (t * 255) | 0)];
-const DNC_GREY = [68, 68, 68, 255];
-const GAMMA = 0.4;
+const LUTS = {};
+const lutFor = (name) => (LUTS[name] ??= Array.from({ length: 256 }, (_, i) => interp(CMAPS[name], i / 255)));
 
+// ---- value transforms: aspect ratio (>= 1) -> t in [0,1], given the domain ----
+const TF = {
+  linear: (ar, d) => (ar - 1) / (d.max - 1),
+  power:  (ar, d) => Math.pow((ar - 1) / (d.max - 1), 0.4),   // the "modified" stretch
+  p99:    (ar, d) => clamp01((ar - 1) / (d.p99 - 1)),         // linear, clipped to p99
+  log:    (ar, d) => (d.max > 1 ? Math.log(ar) / Math.log(d.max) : 0),
+};
+const TF_HI = { linear: (d) => d.max, power: (d) => d.max, p99: (d) => d.p99, log: (d) => d.max };
+
+// ---- named scales for the dropdown (default = the modified viridis) ----
+const SCALES = [
+  { label: 'Viridis · γ0.4 (modified — the default)', cmap: 'viridis', tf: 'power' },
+  { label: 'Viridis · linear (perceptually uniform in AR)', cmap: 'viridis', tf: 'linear' },
+  { label: 'Viridis · linear, clipped to p99', cmap: 'viridis', tf: 'p99' },
+  { label: 'Viridis · log', cmap: 'viridis', tf: 'log' },
+  { label: 'Cividis · linear (uniform, colorblind-optimized)', cmap: 'cividis', tf: 'linear' },
+  { label: 'Magma · γ0.4', cmap: 'magma', tf: 'power' },
+  { label: 'Turbo · linear (rainbow — NOT perceptually uniform)', cmap: 'turbo', tf: 'linear' },
+  { label: 'Grayscale · linear', cmap: 'gray', tf: 'linear' },
+];
+
+const DNC_GREY = [68, 68, 68, 255];
 const fmt = (x, d = 4) => (x == null || !Number.isFinite(x) ? '—' : x.toFixed(d));
 const $ = (s) => document.querySelector(s);
 
@@ -28,15 +60,36 @@ async function fetchBin(path, Ctor) {
   return new Ctor(await r.arrayBuffer());
 }
 
-function legend(hi) {
+const DOMAIN = { max: 1, p99: 1 };   // shared AR domain over all globe cells
+const PANELS = [];                   // { sys, orb, layer, ar }
+
+function makeFill(ar, scale) {
+  const lut = lutFor(scale.cmap), tf = TF[scale.tf];
+  return (i) => {
+    const a = ar[i];
+    if (!Number.isFinite(a)) return DNC_GREY;
+    return lut[Math.min(255, Math.max(0, (tf(a, DOMAIN) * 255) | 0))];
+  };
+}
+
+function drawLegend(scale) {
+  const hi = TF_HI[scale.tf](DOMAIN), lut = lutFor(scale.cmap), tf = TF[scale.tf];
   $('#legLo').textContent = '1.0';
-  $('#legHi').textContent = fmt(hi, 2);
-  const n = 48;
+  $('#legHi').textContent = (scale.tf === 'p99' ? '≥' : '') + fmt(hi, 2);
+  // Position is LINEAR in AR (so you read AR off the bar); color is the scale
+  // applied to that AR — for a stretched transform the color moves nonlinearly.
+  const n = 64;
   const stops = Array.from({ length: n }, (_, i) => {
-    const f = i / (n - 1), c = viridis(Math.pow(f, GAMMA));
-    return `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0}) ${100 * f}%`;
+    const p = i / (n - 1), ar = 1 + p * (hi - 1);
+    const c = lut[Math.min(255, (tf(ar, DOMAIN) * 255) | 0)];
+    return `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0}) ${100 * p}%`;
   }).join(',');
   $('#legendGrad').style.background = `linear-gradient(90deg, ${stops})`;
+}
+
+function applyScale(scale) {
+  drawLegend(scale);
+  for (const p of PANELS) p.layer.update({ fill: makeFill(p.ar, scale) });
 }
 
 function byResGrid(M) {
@@ -54,10 +107,8 @@ function byResGrid(M) {
   }
 }
 
-async function drawGlobe(M, sys) {
+async function buildGlobe(M, sys) {
   const res = M.globe_res[sys].at(-1);   // most-detailed full-coverage resolution
-  const hi = M.globe_ar_max;
-
   const card = document.createElement('div');
   card.className = 'globe-card';
   card.innerHTML =
@@ -69,7 +120,7 @@ async function drawGlobe(M, sys) {
   const canvas = card.querySelector('canvas');
   const orb = new Orb(canvas, { background: '#0b0e13', sphere: '#11151c' });
   orb.lookAt(0, 20);
-  orb.borders({ color: '#2a3340', width: 1 });   // Natural Earth outlines (CDN)
+  orb.borders({ color: '#2a3340', width: 1 });
 
   const key = `${sys}_r${res}`;
   const [pos, starts, ar, ids] = await Promise.all([
@@ -84,13 +135,9 @@ async function drawGlobe(M, sys) {
   card.querySelector('.globe-meta').textContent =
     `${ids.length.toLocaleString()} cells · max AR ${fmt(amax, 3)}`;
 
-  const fill = (i) => {
-    const a = ar[i];
-    return Number.isFinite(a) ? lut(Math.pow((Math.min(a, hi) - 1) / (hi - 1), GAMMA)) : DNC_GREY;
-  };
-  const layer = orb.polygons({ lnglat: pos, starts, fill });
+  const layer = orb.polygons({ lnglat: pos, starts, fill: makeFill(ar, SCALES[0]) });
+  PANELS.push({ sys, orb, layer, ar });
 
-  // Light hover: highlight the picked cell + a tooltip with its id and AR.
   const tip = $('#tooltip');
   orb.on('hover', (e) => {
     orb.highlight(e.index ?? -1, layer);
@@ -105,6 +152,14 @@ async function drawGlobe(M, sys) {
   canvas.addEventListener('pointerleave', () => { tip.style.opacity = 0; });
 }
 
+function computeDomain() {
+  const all = [];
+  for (const p of PANELS) for (const a of p.ar) if (Number.isFinite(a)) all.push(a);
+  all.sort((x, y) => x - y);
+  DOMAIN.max = all.length ? all[all.length - 1] : 1;
+  DOMAIN.p99 = all.length ? all[Math.floor(0.99 * (all.length - 1))] : DOMAIN.max;
+}
+
 async function main() {
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
@@ -113,7 +168,14 @@ async function main() {
   if (M.tag) $('#tag').textContent = M.tag;
 
   byResGrid(M);
-  legend(M.globe_ar_max);
-  for (const sys of M.systems) await drawGlobe(M, sys);   // one at a time; 6 WebGL panels
+
+  const sel = $('#scaleSelect');
+  SCALES.forEach((s, i) => sel.add(new Option(s.label, i)));
+  sel.value = '0';
+
+  for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
+  computeDomain();
+  applyScale(SCALES[0]);
+  sel.addEventListener('change', () => applyScale(SCALES[+sel.value]));
 }
 main();

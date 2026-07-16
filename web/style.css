@@ -100,12 +100,37 @@ h2 {
   gap: 7px;
 }
 
-/* ---- shared color legend ---- */
+/* ---- color-scale controls + shared legend ---- */
+.globe-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  margin: 0 0 8px;
+}
+.scale-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.scale-picker select {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.scale-picker select:focus { outline: 1px solid var(--accent); }
+
 .legend {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 0 22px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -116,7 +141,12 @@ h2 {
   border: 1px solid var(--line);
 }
 .leg-label { font-family: ui-monospace, Menlo, monospace; color: var(--ink); }
-.leg-cap { color: var(--dim); }
+.leg-cap {
+  margin: 0 0 22px;
+  color: var(--dim);
+  font-size: 13px;
+}
+.leg-cap b { color: var(--muted); font-weight: 600; }
 
 /* ---- globe grid ---- */
 .globe-grid {

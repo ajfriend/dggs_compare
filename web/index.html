@@ -48,13 +48,24 @@
       <h2>Globes — cells colored by aspect ratio</h2>
       <p class="caption">One globe per system at its coarsest full-coverage
         resolution, colored on a <b>shared</b> AR scale so the systems compare
-        directly. Drag to rotate, scroll to zoom, hover for a cell's id and AR.</p>
-      <div class="legend">
-        <span class="leg-label" id="legLo">1.0</span>
-        <span class="leg-bar" id="legendGrad"></span>
-        <span class="leg-label" id="legHi">—</span>
-        <span class="leg-cap">aspect ratio · grey = did-not-certify</span>
+        directly. Drag to rotate, scroll to zoom, hover for a cell's id and AR.
+        Use the <b>Color scale</b> menu to switch colormap + value transform —
+        the globes and legend update together, so you can see how the choice
+        (e.g. perceptually-uniform linear viridis vs. the stretched default)
+        changes what's visible.</p>
+      <div class="globe-controls">
+        <label class="scale-picker">Color scale
+          <select id="scaleSelect"></select>
+        </label>
+        <div class="legend">
+          <span class="leg-label" id="legLo">1.0</span>
+          <span class="leg-bar" id="legendGrad"></span>
+          <span class="leg-label" id="legHi">—</span>
+        </div>
       </div>
+      <p class="leg-cap">Position is linear in AR; grey = did-not-certify. The
+        <b>transform</b> (linear / γ / log / p99-clip) sets how AR maps to color;
+        the <b>colormap</b> sets the hue path.</p>
       <div class="globe-grid" id="globeGrid"></div>
     </section>
   </main>
