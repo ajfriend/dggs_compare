@@ -1,28 +1,20 @@
-"""ISEA3H — Snyder equal-area icosahedral aperture-3 hex (via DGGAL)."""
+"""ISEA3H — Snyder equal-area icosahedral aperture-3 hex (via DGGAL).
+
+KNOWN APPROXIMATION (issue #25): stats are corners-only, like every other
+grid, but isea3h's odd-level cells straddling an icosahedron edge kink
+there — the real boundary bulges past the corner hexagon by 100s of
+meters (ground-truthed via point->zone), so corners-only AR is off by up
+to ~4e-3 for those cells, and `just validate-corners` reports this line
+red by design. The honest fix (a `stats_ring` of edge-refined vertices,
+see the registry contract) is disabled because dggal 0.0.6's runtime
+degrades under that path's per-cell array churn — revisit per issue #25
+(upstream distortion-vertices API / dggal 0.0.7 / direct-C corners).
+Even levels are corner-exact (<2e-8), as is all of IVEA3H.
+"""
 
 from dggs_compare.dggal_engine import Adapter
 
 _adapter = Adapter('ISEA3H')
-
-# Even refinement counts land a vertex on the icosahedron-edge kink (odd
-# counts miss it and reproduce the corners-only answer). 6 matches
-# refine-40 AR to ~1e-8 (validated over 4.5k cells at levels 9/11/13)
-# at half the solve cost and a third the FFI-array size of 20.
-STATS_REFINE = 6
-
-
-def stats_ring(z):
-    """Solver-ring override for odd levels; None where corners suffice.
-
-    Odd-level cells straddling an icosahedron edge kink there: the real
-    boundary bulges past the corner hexagon by 100s of meters (points in
-    the bulge classify to this cell via point->zone), putting corners-only
-    AR off by up to ~4e-3. Even levels are corner-exact (<2e-8), as are
-    all IVEA3H levels — vertex-oriented distortion doesn't kink.
-    """
-    if _adapter.level(z) % 2:
-        return _adapter.refined_boundary(z, STATS_REFINE)
-    return None
 
 
 def adapter():
