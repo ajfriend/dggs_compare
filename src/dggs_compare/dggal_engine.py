@@ -1,5 +1,6 @@
 """Shared DGGAL binding glue — the common code behind the DGGAL-backed
-systems/ modules (isea7h, ivea7h, rhealpix) and the live-engine analyses.
+systems/ modules (isea7h, ivea7h, isea3h, ivea3h, rhealpix) and the
+live-engine analyses.
 
 DGGAL (Ecere's Discrete Global Grid Abstraction Library, `pip install dggal`,
 BSD-3-Clause) exposes many DGGRSs through a single `DGGRS` API. This module
@@ -77,6 +78,22 @@ def latlng_ring(points):
     return ring
 
 
+def orient_ccw(ring):
+    """`ring` ([(lat, lng), ...]) in CCW-seen-from-outside order.
+
+    DGGAL is inconsistent about corner winding: the 7H grids and rHEALPix
+    come back CCW but ISEA3H/IVEA3H come back CW (dggal 0.0.6), and
+    sparea's signed area turns a CW ring into its ~4pi complement. Every
+    ring an Adapter hands out goes through here so the tables carry one
+    convention.
+    """
+    v = csar.to_vec3(ring, geo='latlng_deg')
+    outward = np.cross(v, np.roll(v, -1, axis=0)).sum(axis=0)
+    if float(outward @ v.mean(axis=0)) < 0:
+        ring = ring[::-1]
+    return ring
+
+
 class Adapter:
     """Wrap one DGGAL DGGRS. `cls` is the DGGRS class name (e.g. 'ISEA7H')."""
 
@@ -104,11 +121,12 @@ class Adapter:
             raise ValueError(
                 f'{self.name}: degenerate boundary for zone '
                 f'{self.cid_str(zone)!r} ({len(ring)} verts)')
-        return ring
+        return orient_ccw(ring)
 
     def refined_boundary(self, zone, refine):
         """Edge-refined [(lat, lng), ...] open ring (`refine` points/edge)."""
-        return latlng_ring(self.dggrs.getZoneRefinedWGS84Vertices(zone, refine))
+        return orient_ccw(
+            latlng_ring(self.dggrs.getZoneRefinedWGS84Vertices(zone, refine)))
 
     def verts(self, zone):
         """Corner vertices as an (M, 3) unit-vec3 array (corners only)."""

@@ -140,6 +140,7 @@ def build_table(dggs, res):
     any budget."""
     t0 = time.perf_counter()
     sysmod = registry.get(dggs)
+    stats_ring = getattr(sysmod, 'stats_ring', None)
     zones, mode = _select_zones(sysmod, dggs, res)
 
     # Sort by cid for a canonical, deterministic row order (independent of
@@ -176,7 +177,13 @@ def build_table(dggs, res):
             for cid, z in chunk:
                 latlng = [[float(la), float(ln)]
                           for la, ln in open_ring(sysmod.cell_boundary(z))]
-                ar, area = stats.cell_stats(latlng)
+                # A system may declare its corner ring unfit for the solvers
+                # (isea3h: odd-level cells kink at icosahedron edges) by
+                # exposing stats_ring(z); verts still stores the corners.
+                sring = latlng if stats_ring is None else [
+                    [float(la), float(ln)]
+                    for la, ln in open_ring(stats_ring(z))]
+                ar, area = stats.cell_stats(sring)
                 cids.append(cid)
                 verts.append(latlng)
                 ars.append(ar)
