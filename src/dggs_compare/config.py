@@ -42,10 +42,14 @@ FULL_RES = {'ivea7h': (1, 2, 3, 5, 6)}
 # to an H3 r9 cell by scripts/calibrate.py. Systems appear here iff they have
 # a module in systems/ (the folder is the registry; this is its metadata).
 TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
-              'rhealpix': 9}
+              'rhealpix': 9,
+              # count-matched picks (10*3^r+2 vs H3 r9); confirm with
+              # scripts/calibrate.py once the first 3H tables are generated
+              'isea3h': 18, 'ivea3h': 18}
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
-             'ivea7h': 'C4', 'rhealpix': 'C5'}
+             'ivea7h': 'C4', 'rhealpix': 'C5', 'isea3h': 'C6',
+             'ivea3h': 'C7'}
 # S2 numbers its resolutions "levels"; everyone else says "r".
 RES_PREFIX = {s: 'L' if s == 's2' else 'r' for s in TARGET_RES}
 
@@ -60,6 +64,8 @@ CELLS_PER_RES = {
     'a5':       lambda r: 12 if r == 0 else 15 * 4 ** r,  # 12, 60, 240, 960, ...
     'isea7h':   lambda r: 10 * 7 ** r + 2,                # 12, 72, 492, 3432, 24012, ...
     'ivea7h':   lambda r: 10 * 7 ** r + 2,
+    'isea3h':   lambda r: 10 * 3 ** r + 2,                # 12, 32, 92, 272, 812, ...
+    'ivea3h':   lambda r: 10 * 3 ** r + 2,
     'rhealpix': lambda r: 6 * 9 ** r,                     # 6, 54, 486, 4374, 39366, ...
 }
 # The globe view draws one globe per system, all at a common cell size: this H3

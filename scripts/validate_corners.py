@@ -1,13 +1,16 @@
-"""Validate the corners-only enclosing-cone metric for the DGGAL grids.
+"""Validate the stats-input ring against a refined reference, per DGGAL grid.
 
-The tables feed csar only a cell's *corner* vertices. For geodesic edges
-that's exact: the min-enclosing ellipse of the corners already contains them
-(convexity). The equal-area DGGAL grids have slightly *non-geodesic* edges
-that could bow outward at coarse levels, so this checks it empirically for
-every DGGAL-backed system in the registry: across levels — including the
-coarsest and the 12 pentagons (level 0) — it compares the aspect ratio from
-corners against the ratio from edge-refined vertices. If the max delta is
-within solver tolerance, corners-only is confirmed.
+The tables feed csar a cell's *corner* vertices by default. For geodesic
+edges that's exact: the min-enclosing ellipse of the corners already contains
+them (convexity). The equal-area DGGAL grids have slightly *non-geodesic*
+edges that could bow outward at coarse levels — and isea3h's odd-level cells
+genuinely kink at icosahedron edges, which is why that system feeds the
+solvers an edge-refined `stats_ring` instead. So this checks, for every
+DGGAL-backed system in the registry, whatever ring the pipeline ACTUALLY
+feeds csar (corners, or the system's stats_ring override) against a
+doubly-refined reference boundary, across levels — including the coarsest
+and the 12 pentagons (level 0). If the max delta is within solver tolerance,
+the stats input is confirmed faithful.
 
 Prints a report; writes nothing. Run whenever a new DGGAL grid is added —
 this is the check that admits it to the pipeline.
@@ -24,7 +27,8 @@ from dggs_compare import registry
 
 # ----- knobs -------------------------------------------------------------
 SEED = 0xC0FFEE
-REFINE = 20                 # edge-refinement points per edge for the reference
+REF_REFINE = 40             # reference-boundary refinement; must stay finer
+                            # than any system's stats ring (isea3h uses 20)
 LEVELS = [0, 1, 2, 3, 5, 8, 11]   # incl coarsest + the 12 pentagons (level 0)
 K = 300                     # cells tested per level (enumerate if fewer exist)
 # -------------------------------------------------------------------------
@@ -48,12 +52,13 @@ def cells_for_level(ad, level, rng):
     return out
 
 
-def check(name, ad):
-    """Report corners-vs-refined max |dAR| per level; return the overall max."""
+def check(name, ad, stats_ring=None):
+    """Report stats-ring-vs-reference max |dAR| per level; return the max."""
     rng = np.random.default_rng(SEED)
-    print(f'\n{name} corners-vs-refined (edgeRefinement={REFINE})')
+    src = 'corners' if stats_ring is None else 'stats_ring'
+    print(f'\n{name} {src}-vs-refined (edgeRefinement={REF_REFINE})')
     print(f'{"lvl":>3} {"cells":>6} {"pents":>6} {"max|dAR|":>10} '
-          f'{"max_rel":>10} {"corners_AR_range":>22}')
+          f'{"max_rel":>10} {"stats_AR_range":>22}')
     overall = 0.0
     for level in LEVELS:
         if level > ad.max_level():
@@ -66,8 +71,11 @@ def check(name, ad):
             corners = ad.verts(z)
             if corners.shape[0] == 5:
                 npent += 1
-            a_c = ar(corners)
-            a_r = ar(csar.to_vec3(ad.refined_boundary(z, REFINE),
+            ring = stats_ring(z) if stats_ring else None
+            stats_in = corners if ring is None else csar.to_vec3(
+                ring, geo='latlng_deg')
+            a_c = ar(stats_in)
+            a_r = ar(csar.to_vec3(ad.refined_boundary(z, REF_REFINE),
                                   geo='latlng_deg'))
             if a_c is None or a_r is None:
                 continue
@@ -88,10 +96,11 @@ def main():
         sysmod = registry.get(name)
         if not hasattr(sysmod, 'adapter'):     # DGGAL-backed systems only
             continue
-        worst = max(worst, check(name, sysmod.adapter()))
+        worst = max(worst, check(name, sysmod.adapter(),
+                                 getattr(sysmod, 'stats_ring', None)))
     print(f'\noverall max |dAR| across all grids = {worst:.3e}')
-    print('corners-only CONFIRMED (within solver tolerance)' if worst < 1e-3
-          else 'corners-only delta NOT negligible — investigate')
+    print('stats input CONFIRMED (within solver tolerance)' if worst < 1e-3
+          else 'stats-input delta NOT negligible — investigate')
 
 
 if __name__ == '__main__':
