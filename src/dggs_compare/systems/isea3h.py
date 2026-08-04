@@ -5,9 +5,10 @@ from dggs_compare.dggal_engine import Adapter
 _adapter = Adapter('ISEA3H')
 
 # Even refinement counts land a vertex on the icosahedron-edge kink (odd
-# counts miss it and reproduce the corners-only answer); 20 matches
-# refine-80 AR to ~1e-8.
-STATS_REFINE = 20
+# counts miss it and reproduce the corners-only answer). 6 matches
+# refine-40 AR to ~1e-8 (validated over 4.5k cells at levels 9/11/13)
+# at half the solve cost and a third the FFI-array size of 20.
+STATS_REFINE = 6
 
 
 def stats_ring(z):

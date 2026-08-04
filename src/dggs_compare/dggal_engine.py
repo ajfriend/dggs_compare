@@ -65,14 +65,30 @@ def sample_uniform_lnglat(n, rng):
     return np.column_stack([lng, lat])
 
 
+def _drain(points):
+    """Copy a DGGAL vertex Array out as [(lat, lng), ...], then FREE it.
+
+    The dggal 0.0.6 binding never frees the eC Array a vertex call returns
+    (~0.5 KB per corners call, ~3.6 KB per refined call). At a million
+    boundary calls per table that OOMs the data-release runners — isea3h's
+    refined odd levels were the first to hit it — so every Array is deleted
+    here the moment its floats are copied out.
+    """
+    try:
+        return [(float(p.lat), float(p.lon)) for p in points]
+    finally:
+        # Instance.delete explicitly: on Arrays, `.delete` resolves to eC
+        # Container's per-ELEMENT delete and would fail wanting an argument.
+        Instance.delete(points)
+
+
 def latlng_ring(points):
     """DGGAL WGS84 vertex points (`.lat`/`.lon` Degrees) -> [(lat, lng), ...].
 
-    Corners only: strips a closing repeat if present (matches the H3/S2/A5
-    adapters; handles hexagons and the 12 pentagons). validate_corners feeds
-    it edge-refined vertices instead.
+    Frees the passed Array (see _drain). Strips a closing repeat if present
+    (matches the H3/S2/A5 adapters; handles hexagons and the 12 pentagons).
     """
-    ring = [(float(p.lat), float(p.lon)) for p in points]
+    ring = _drain(points)
     if len(ring) >= 2 and ring[0] == ring[-1]:
         ring = ring[:-1]
     return ring
@@ -99,19 +115,21 @@ class Adapter:
     def __init__(self, cls):
         self.name = cls
         self.dggrs = globals()[cls]()
+        # One reused query point: a GeoPoint constructed per zone_at call
+        # is never freed by the binding (~1M leaked instances per sampled
+        # resolution).
+        self._pt = GeoPoint(0.0, 0.0)
 
     # ----- geometry -----------------------------------------------------
     def cell_boundary(self, zone):
         """Corner vertices of `zone` as [(lat, lng), ...] deg, open ring."""
-        ring = [(float(p.lat), float(p.lon))
-                for p in self.dggrs.getZoneWGS84Vertices(zone)]
+        ring = _drain(self.dggrs.getZoneWGS84Vertices(zone))
         # DGGAL's corner method collapses 2 of 4 corners to (0, 0) for some
         # rHEALPix polar-cap/equatorial-seam cells (a dggal bug). The collapse
         # shows up as duplicate vertices; fall back to the edge-refined
         # boundary, which traces the real cell correctly.
         if len(set(ring)) < len(ring):
-            ring = [(float(p.lat), float(p.lon))
-                    for p in self.dggrs.getZoneRefinedWGS84Vertices(zone, 0)]
+            ring = _drain(self.dggrs.getZoneRefinedWGS84Vertices(zone, 0))
         if len(ring) >= 2 and ring[0] == ring[-1]:
             ring = ring[:-1]
         if len(set(ring)) < 3:
@@ -147,7 +165,11 @@ class Adapter:
     # ----- cell streams -------------------------------------------------
     def enumerate(self, level):
         """Every zone at `level`, whole world."""
-        yield from self.dggrs.listZones(level, wholeWorld)
+        arr = self.dggrs.listZones(level, wholeWorld)
+        try:
+            yield from arr
+        finally:
+            Instance.delete(arr)   # the binding never frees the zone Array
 
     def zone_at(self, level, lng, lat):
         """The zone at `level` containing the (lng, lat) point, or None when
@@ -155,8 +177,9 @@ class Adapter:
         rare singular points at deep levels (observed ~1 per 1M uniform
         draws at isea7h r15, near an icosahedron edge). Callers sampling
         points should skip None and draw again."""
-        zone = self.dggrs.getZoneFromWGS84Centroid(
-            level, GeoPoint(float(lat), float(lng)))
+        p = self._pt
+        p.lat, p.lon = float(lat), float(lng)
+        zone = self.dggrs.getZoneFromWGS84Centroid(level, p)
         return None if zone == NULL_ZONE else zone
 
     def sample(self, level, n, rng):
