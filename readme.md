@@ -28,7 +28,7 @@ covered by the ISEA7H tables — only the cell ID strings would differ.
 src/dggs_compare/     the internal library (organization only, not for PyPI)
   config.py             pipeline constants — the single source of truth
   systems/              ONE FILE PER DGGS, nothing else; the folder is the
-                        registry, adding a grid = dropping in one file
+                        registry (see "Adding a grid")
   registry.py           folder discovery + lazy imports
   dggal_engine.py       shared DGGAL glue + the live-engine Adapter
   stats.py              per-cell AR (csar) + area (sparea)
@@ -61,6 +61,21 @@ just site              # build the static site into web/out/ (survey plots + glo
 just web               # build the site, then serve it at :8000
 just validate-corners  # corners-only exactness check (per new DGGAL grid)
 ```
+
+## Adding a grid
+
+The `systems/` folder is the registry, but a new DGGS touches four places:
+
+1. `src/dggs_compare/systems/<name>.py` — the module (mirror any existing
+   one; add `stats_ring` only if the corner ring isn't faithful).
+2. `config.py` — `TARGET_RES` (count-match via `CELLS_PER_RES`, then confirm
+   with `just calibrate` once tables exist), `SYS_COLOR`, `CELLS_PER_RES`.
+3. `.github/workflows/data-release.yml` — the gen matrix.
+4. `just validate-corners` — the admission gate for DGGAL-backed grids.
+
+Then cut a data release. `just dnc-check` fails the publish gate if any
+registry system is missing tables or config, so a stale gen matrix cannot
+ship a release (it happened once).
 
 ## Table schema
 

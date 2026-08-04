@@ -26,10 +26,12 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from dggs_compare import cache, checks, config
+from dggs_compare import cache, checks, config, registry
 
 # ----- knobs -------------------------------------------------------------
 RESOLVE = False           # True: re-solve with the installed csar (release gate)
+REQUIRE_ALL = True        # every registry system must have tables + config;
+                          # False relaxes for local runs on an older release
 OUT = Path(__file__).resolve().parent.parent / 'out' / 'dnc_check.png'
 # -------------------------------------------------------------------------
 
@@ -55,6 +57,22 @@ def plot(per_system):
 
 
 def main():
+    # The release gate must see EVERY grid: a system without tables (a
+    # data-release gen matrix out of sync with systems/) or without config
+    # metadata is a broken artifact, not a smaller one.
+    if REQUIRE_ALL:
+        no_config = [s for s in registry.names() if s not in config.TARGET_RES]
+        no_tables = [s for s in registry.names()
+                     if s not in cache.available_systems()]
+        if no_config or no_tables:
+            if no_config:
+                print(f'FAIL — no config.TARGET_RES entry: {no_config}')
+            if no_tables:
+                print(f'FAIL — no tables in data/cells/: {no_tables} '
+                      '(data-release gen matrix out of sync with systems/, '
+                      'or fetch an up-to-date release)')
+            sys.exit(1)
+
     print(f'{"system":8} {"onset":>6} {"finest %DNC":>12} {"result":>8}')
     all_failures = []
     per_system = {}
