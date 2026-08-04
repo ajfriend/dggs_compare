@@ -42,9 +42,11 @@ jobs:
   gen:
     strategy:
       matrix:
-        system: [a5, h3, isea7h, ivea7h, rhealpix, s2]
+        system: [a5, h3, isea3h, isea7h, ivea3h, ivea7h, rhealpix, s2]
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 120
+    # The aperture-3 grids build 34 resolutions each (vs isea7h's 20), and
+    # isea3h's odd levels solve 126-point refined rings — the longest jobs.
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
