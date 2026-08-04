@@ -15,13 +15,29 @@ DNC sweep modes (`resolve=`):
 
 import numpy as np
 
-from . import cache, config
+from . import cache, config, registry
 
 # DNC-fraction noise floor — sampled resolutions are N_CELLS cells
 # (sampling noise), so a stray cell or two at the f64 floor isn’t a
 # real band.
 NOISE_TOL = 1e-2
 MAX_EXAMPLES = 5      # offending cell ids reported per failing resolution
+
+
+def missing_systems():
+    """Registry systems absent from the data or the per-system config.
+
+    Returns (no_tables, no_config): names with no tables in data/cells/,
+    and 'name (DICT)' entries for each config.PER_SYSTEM dict a name is
+    missing from. Both empty = the artifact covers the whole registry —
+    the release-gate completeness check.
+    """
+    names = registry.names()
+    have = set(cache.available_systems())
+    no_tables = [s for s in names if s not in have]
+    no_config = [f'{s} ({k})' for s in names
+                 for k, d in config.PER_SYSTEM.items() if s not in d]
+    return no_tables, no_config
 
 
 def sweep_system(name, *, resolve=False):

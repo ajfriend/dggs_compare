@@ -55,10 +55,23 @@ def plot(per_system):
 
 
 def main():
+    # The release gate must see EVERY grid: a registry system without tables
+    # or per-system config is a broken artifact, not a smaller one. (On a
+    # local checkout this also means: fetch a release that matches the code.)
+    no_tables, no_config = checks.missing_systems()
+    if no_tables:
+        print(f'FAIL — no tables in data/cells/: {no_tables} '
+              '(fetch an up-to-date release?)')
+    if no_config:
+        print(f'FAIL — missing config.PER_SYSTEM entries: {no_config}')
+    if no_tables or no_config:
+        sys.exit(1)
+
     print(f'{"system":8} {"onset":>6} {"finest %DNC":>12} {"result":>8}')
     all_failures = []
     per_system = {}
-    for name in [s for s in config.TARGET_RES if s in cache.available_systems()]:
+    have = set(cache.available_systems())
+    for name in [s for s in config.TARGET_RES if s in have]:
         t0 = time.perf_counter()
         rows = checks.sweep_system(name, resolve=RESOLVE)
         per_system[name] = rows

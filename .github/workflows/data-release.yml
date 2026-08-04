@@ -7,9 +7,10 @@
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
 # solver bump worth reflecting) — decoupled from code releases.
 #
-# Fan-out/fan-in: one runner per DGGS builds that system's tables (keep the
-# matrix in sync with src/dggs_compare/systems/), and the publish job merges
-# the artifacts, gates on the DNC invariants, derives the viewer data
+# Fan-out/fan-in: one runner per DGGS builds that system's tables — the
+# matrix is derived from src/dggs_compare/systems/ at run time, so it can
+# never go stale — and the publish job merges the artifacts, gates on the
+# DNC invariants (including registry-completeness), derives the viewer data
 # (including the full-globe page's complete-coverage binaries — those
 # resolutions live exhaustively in the ivea7h tables), and uploads.
 name: data-release
@@ -39,10 +40,23 @@ permissions:
   contents: write
 
 jobs:
+  systems:
+    # The gen matrix IS the registry: one line of shell over systems/*.py.
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 5
+    outputs:
+      list: ${{ steps.ls.outputs.list }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: ls
+        run: |
+          echo "list=$(basename -a -s .py src/dggs_compare/systems/*.py | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
+
   gen:
+    needs: [systems]
     strategy:
       matrix:
-        system: [a5, h3, isea3h, isea7h, ivea3h, ivea7h, rhealpix, s2]
+        system: ${{ fromJSON(needs.systems.outputs.list) }}
     runs-on: ${{ inputs.runner }}
     # The aperture-3 grids build 34 resolutions each (vs isea7h's 20), and
     # isea3h's odd levels solve 126-point refined rings — the longest jobs.

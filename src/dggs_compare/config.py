@@ -68,6 +68,12 @@ CELLS_PER_RES = {
     'ivea3h':   lambda r: 10 * 3 ** r + 2,
     'rhealpix': lambda r: 6 * 9 ** r,                     # 6, 54, 486, 4374, 39366, ...
 }
+# Every per-system dict a new grid must appear in. The dnc-check release
+# gate asserts each registry system is present in all of these, so adding
+# a dict here extends the gate for free (FULL_RES stays optional;
+# RES_PREFIX is derived).
+PER_SYSTEM = {'TARGET_RES': TARGET_RES, 'SYS_COLOR': SYS_COLOR,
+              'CELLS_PER_RES': CELLS_PER_RES}
 # The globe view draws one globe per system, all at a common cell size: this H3
 # resolution sets it (r3 ~ 41,162 cells ~ 12,600 km^2/cell), and every other
 # system uses the resolution whose cell count is closest to H3's here. Raise for
