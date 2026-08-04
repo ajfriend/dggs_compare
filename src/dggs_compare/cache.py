@@ -209,16 +209,30 @@ def build_table(dggs, res):
 def build_system(dggs):
     """Build every resolution's table for one system."""
     t0 = time.perf_counter()
-    res_list = list(registry.get(dggs).resolutions())
+    sysmod = registry.get(dggs)
+    res_list = list(sysmod.resolutions())
+    # Live ETA for whoever is watching the CI log, weighted by CELL counts
+    # (known exactly up front from the three-regime budget) — a per-
+    # resolution average is useless here because the coarse resolutions are
+    # nearly free and every deep one is a full N_CELLS build. Per-cell cost
+    # is ~constant across a system's resolutions (boundary FFI + solve are
+    # both per-cell flat; for DGGAL grids the boundary call is the bigger
+    # share), so remaining-cells x observed rate is honest from the first
+    # resolutions on. Known wobble: isea3h's odd levels cost ~4x its even
+    # ones (refined stats rings).
+    full = config.FULL_RES.get(dggs, ())
+    cells = {r: sysmod.num_cells(r) if r in full
+             else min(sysmod.num_cells(r), config.N_CELLS) for r in res_list}
+    total_cells = sum(cells.values())
+    done_cells = 0
     for i, res in enumerate(res_list):
         build_table(dggs, res)
         done = time.perf_counter() - t0
-        # Live ETA for whoever is watching the CI log: naive per-resolution
-        # average — deep (sampled) resolutions dominate, so it converges to
-        # honest once the coarse levels are past.
+        done_cells += cells[res]
         if i + 1 < len(res_list):
-            eta = done / (i + 1) * (len(res_list) - i - 1)
-            print(f'    {i + 1}/{len(res_list)} resolutions in {done:.0f}s '
+            eta = done / done_cells * (total_cells - done_cells)
+            print(f'    {i + 1}/{len(res_list)} resolutions '
+                  f'({done_cells:,}/{total_cells:,} cells) in {done:.0f}s '
                   f'(~{eta:.0f}s to go)', flush=True)
     print(f'[{dggs}] all {len(res_list)} resolutions in '
           f'{time.perf_counter() - t0:.0f}s', flush=True)
