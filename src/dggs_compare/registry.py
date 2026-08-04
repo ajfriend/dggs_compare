@@ -24,9 +24,10 @@ DGGAL-backed modules additionally expose `adapter()` — the live-engine
 that need more than a bag of cells.
 
 Optional: `stats_ring(z)` -> [(lat, lng), ...] open ring fed to the AR/area
-solvers INSTEAD of cell_boundary(z), for systems whose corner ring does not
-faithfully bound the cell (isea3h: odd-level cells kink at icosahedron
-edges). The tables' verts column always stores the corner ring.
+solvers INSTEAD of cell_boundary(z), or None where the corner ring is
+already faithful — for systems whose corners do not always bound the cell
+(isea3h: odd-level cells kink at icosahedron edges). The tables' verts
+column always stores the corner ring.
 """
 
 import importlib

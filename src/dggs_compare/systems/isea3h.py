@@ -11,7 +11,7 @@ STATS_REFINE = 20
 
 
 def stats_ring(z):
-    """Ring fed to the AR/area solvers (the verts column stays corners).
+    """Solver-ring override for odd levels; None where corners suffice.
 
     Odd-level cells straddling an icosahedron edge kink there: the real
     boundary bulges past the corner hexagon by 100s of meters (points in
@@ -19,9 +19,9 @@ def stats_ring(z):
     AR off by up to ~4e-3. Even levels are corner-exact (<2e-8), as are
     all IVEA3H levels — vertex-oriented distortion doesn't kink.
     """
-    if _adapter.dggrs.getZoneLevel(z) % 2:
+    if _adapter.level(z) % 2:
         return _adapter.refined_boundary(z, STATS_REFINE)
-    return _adapter.cell_boundary(z)
+    return None
 
 
 def adapter():

@@ -24,7 +24,13 @@ def cell_stats(latlng):
     r = csar.solve(v, geo='vec3', gap_tol=config.GAP_TOL,
                    method=config.CSAR_METHOD)
     ar = r.aspect_ratio if isinstance(r, csar.Converged) else float('nan')
-    return ar, float(sparea.area(v, geo='vec3'))
+    area = float(sparea.area(v, geo='vec3'))
+    if area > 2 * np.pi:
+        # No cell approaches a hemisphere: this is a wound-backwards ring
+        # (sparea returns the ~4pi complement) or garbage geometry. Never
+        # let it reach a table silently.
+        raise ValueError(f'cell area {area:.4f} sr > 2*pi — reversed ring?')
+    return ar, area
 
 
 def sample_uniform_lnglat(n, rng):

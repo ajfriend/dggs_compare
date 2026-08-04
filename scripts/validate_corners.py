@@ -27,7 +27,8 @@ from dggs_compare import registry
 
 # ----- knobs -------------------------------------------------------------
 SEED = 0xC0FFEE
-REFINE = 20                 # stats-side refinement; the reference uses 2x this
+REF_REFINE = 40             # reference-boundary refinement; must stay finer
+                            # than any system's stats ring (isea3h uses 20)
 LEVELS = [0, 1, 2, 3, 5, 8, 11]   # incl coarsest + the 12 pentagons (level 0)
 K = 300                     # cells tested per level (enumerate if fewer exist)
 # -------------------------------------------------------------------------
@@ -55,7 +56,7 @@ def check(name, ad, stats_ring=None):
     """Report stats-ring-vs-reference max |dAR| per level; return the max."""
     rng = np.random.default_rng(SEED)
     src = 'corners' if stats_ring is None else 'stats_ring'
-    print(f'\n{name} {src}-vs-refined (edgeRefinement={2 * REFINE})')
+    print(f'\n{name} {src}-vs-refined (edgeRefinement={REF_REFINE})')
     print(f'{"lvl":>3} {"cells":>6} {"pents":>6} {"max|dAR|":>10} '
           f'{"max_rel":>10} {"stats_AR_range":>22}')
     overall = 0.0
@@ -70,10 +71,11 @@ def check(name, ad, stats_ring=None):
             corners = ad.verts(z)
             if corners.shape[0] == 5:
                 npent += 1
-            stats_in = corners if stats_ring is None else csar.to_vec3(
-                stats_ring(z), geo='latlng_deg')
+            ring = stats_ring(z) if stats_ring else None
+            stats_in = corners if ring is None else csar.to_vec3(
+                ring, geo='latlng_deg')
             a_c = ar(stats_in)
-            a_r = ar(csar.to_vec3(ad.refined_boundary(z, 2 * REFINE),
+            a_r = ar(csar.to_vec3(ad.refined_boundary(z, REF_REFINE),
                                   geo='latlng_deg'))
             if a_c is None or a_r is None:
                 continue
