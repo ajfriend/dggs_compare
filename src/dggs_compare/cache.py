@@ -215,8 +215,11 @@ def build_system(dggs):
     # (known exactly up front from the three-regime budget) — a per-
     # resolution average is useless here because the coarse resolutions are
     # nearly free and every deep one is a full N_CELLS build. Per-cell cost
-    # is ~uniform (the csar solve dominates), so remaining-cells x observed
-    # rate is honest from the first resolutions on.
+    # is ~constant across a system's resolutions (boundary FFI + solve are
+    # both per-cell flat; for DGGAL grids the boundary call is the bigger
+    # share), so remaining-cells x observed rate is honest from the first
+    # resolutions on. Known wobble: isea3h's odd levels cost ~4x its even
+    # ones (refined stats rings).
     full = config.FULL_RES.get(dggs, ())
     cells = {r: sysmod.num_cells(r) if r in full
              else min(sysmod.num_cells(r), config.N_CELLS) for r in res_list}
