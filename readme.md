@@ -1,7 +1,7 @@
 # dggs_compare
 
 Comparing discrete global grid systems — **H3, S2, A5, ISEA7H, IVEA7H,
-rHEALPix** — by per-cell statistics: shape (aspect ratio via
+ISEA3H, IVEA3H, rHEALPix** — by per-cell statistics: shape (aspect ratio via
 [csar](https://github.com/ajfriend/csar_py)'s enclosing-cone solver) and area
 (via [sparea](https://pypi.org/project/sparea/)), at area-matched resolutions.
 
@@ -17,6 +17,10 @@ a≥b) of a cell's enclosing-cone ellipse — the discrete per-cell analogue of
 Tissot's indicatrix. AR = 1 is isotropic; AR > 1 is anisotropic ("squished").
 Since these grids are ~equal-area, AR is where the unavoidable distortion
 surfaces.
+
+Not listed separately: **IGEO7** is geometrically identical to ISEA7H (it is
+ISEA7H with Z7 cell indexing), so its shape/area statistics are already
+covered by the ISEA7H tables — only the cell ID strings would differ.
 
 ## Layout
 
