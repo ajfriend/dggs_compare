@@ -64,18 +64,18 @@ just validate-corners  # corners-only exactness check (per new DGGAL grid)
 
 ## Adding a grid
 
-The `systems/` folder is the registry, but a new DGGS touches four places:
+The `systems/` folder is the registry — the data-release gen matrix is
+derived from it at run time. A new DGGS touches:
 
 1. `src/dggs_compare/systems/<name>.py` — the module (mirror any existing
    one; add `stats_ring` only if the corner ring isn't faithful).
-2. `config.py` — `TARGET_RES` (count-match via `CELLS_PER_RES`, then confirm
-   with `just calibrate` once tables exist), `SYS_COLOR`, `CELLS_PER_RES`.
-3. `.github/workflows/data-release.yml` — the gen matrix.
-4. `just validate-corners` — the admission gate for DGGAL-backed grids.
+2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
+   (count-match, then confirm with `just calibrate` once tables exist),
+   `SYS_COLOR`.
 
-Then cut a data release. `just dnc-check` fails the publish gate if any
-registry system is missing tables or config, so a stale gen matrix cannot
-ship a release (it happened once).
+Then run `just validate-corners` (the admission gate for DGGAL-backed
+grids) and cut a data release — `just dnc-check` fails its publish gate
+unless every registry system has tables and `PER_SYSTEM` config.
 
 ## Table schema
 
