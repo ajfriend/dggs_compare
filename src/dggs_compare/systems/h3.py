@@ -28,6 +28,11 @@ def boundaries(res, zones):
 def refined_boundaries(res, zones, refine):
     # h3 edges ARE geodesics between the boundary vertices (which already
     # include icosahedron-edge distortion vertices), so refinement is slerp.
+    # Note: since the reference is built from the same corners under the
+    # same edge model, validate-corners reduces to a solver-numerics check
+    # here (agreement is a convexity theorem) — it cannot falsify the
+    # geodesic-edge model itself; only a point-classification ground-truth
+    # test could.
     return [stats.refine_geodesic(h3.cell_to_boundary(z), refine)
             for z in zones]
 

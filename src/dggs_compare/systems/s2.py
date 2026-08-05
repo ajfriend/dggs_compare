@@ -43,6 +43,9 @@ def boundaries(res, zones):
 def refined_boundaries(res, zones, refine):
     # s2 cell edges lie in planes through the origin (constant-u/v lines on
     # the cube), i.e. great circles — refinement is slerp between corners.
+    # Here that's definitional (s2sphere's own containment uses these great
+    # circles), so validate-corners reduces to a solver-numerics check:
+    # agreement is a convexity theorem, not an empirical finding.
     return [stats.refine_geodesic(_boundary(z), refine) for z in zones]
 
 
