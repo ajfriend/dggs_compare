@@ -2,10 +2,10 @@
 
 a5_fast's `cell_to_boundary` returns an adaptively densified ring (321
 points at res 0 down to 6 from res ~9 up). The extra points don't change the
-enclosing-cone AR — validated to max |dAR| = 3.5e-9 across resolutions by
-scripts/validate_corners_a5.py — so the boundary path reduces the ring to its
-corner vertices (turning-angle peaks): 5 for the pentagons, 3 for the res-1
-"quintant" triangles.
+enclosing-cone AR — validated to max |dAR| ~ 6e-10 across resolutions by
+scripts/validate_corners.py (the every-system gate) — so the boundary path
+reduces the ring to its corner vertices (turning-angle peaks): 5 for the
+pentagons, 3 for the res-1 "quintant" triangles.
 """
 
 import a5_fast as a5
