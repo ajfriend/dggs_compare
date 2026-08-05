@@ -43,11 +43,9 @@ FULL_RES = {'ivea7h': (1, 2, 3, 5, 6)}
 # a module in systems/ (the folder is the registry; this is its metadata).
 TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
               'rhealpix': 9,
-              # count-matched picks (10*3^r+2 vs H3 r9); confirm with
-              # scripts/calibrate.py once the first 3H tables are generated
+              # confirmed by calibrate on the data-v4 tables (1.210x h3 r9)
               'isea3h': 18, 'ivea3h': 18,
-              # count-matched (20*4^r vs H3 r9, ratio 1.11); confirm with
-              # calibrate once real isea4t tables exist
+              # confirmed by calibrate on the 1M-cell tables (0.872x h3 r9)
               'isea4t': 14}
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
