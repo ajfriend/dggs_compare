@@ -27,6 +27,7 @@ import csar
 import sparea
 
 from . import config
+from .stats import orient_ccw
 
 
 def _preload_native():
@@ -96,10 +97,8 @@ def latlng_ring(points):
 
 # DGGAL is inconsistent about corner winding: the 7H grids and rHEALPix
 # come back CCW but ISEA3H/IVEA3H come back CW (dggal 0.0.6), except two
-# pentagons per level. Every ring an Adapter hands out is normalized.
-from .stats import orient_ccw  # noqa: E402
-
-
+# pentagons per level. Every ring an Adapter hands out is normalized
+# (stats.orient_ccw).
 class Adapter:
     """Wrap one DGGAL DGGRS. `cls` is the DGGRS class name (e.g. 'ISEA7H')."""
 
@@ -110,6 +109,22 @@ class Adapter:
         # is never freed by the binding (~1M leaked instances per sampled
         # resolution).
         self._pt = GeoPoint(0.0, 0.0)
+
+    # ----- registry-contract batches ------------------------------------
+    # The five DGGAL systems/ modules delegate their batch calls here, so
+    # the loop bodies — including the (lat, lng) -> (lng, lat) argument
+    # swap — live once.
+    def cells_at(self, level, points):
+        return [self.zone_at(level, lng, lat) for lat, lng in points]
+
+    def cid_strs(self, zones):
+        return [self.cid_str(z) for z in zones]
+
+    def boundaries(self, zones):
+        return [self.cell_boundary(z) for z in zones]
+
+    def refined_boundaries(self, zones, refine):
+        return [self.refined_boundary(z, refine) for z in zones]
 
     # ----- geometry -----------------------------------------------------
     def cell_boundary(self, zone):

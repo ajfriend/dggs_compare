@@ -23,6 +23,7 @@ import numpy as np
 import csar
 
 from dggs_compare import registry, stats
+from dggs_compare.cache import open_ring
 
 # ----- knobs -------------------------------------------------------------
 SEED = 0xC0FFEE
@@ -39,11 +40,23 @@ def ar(ring):
 
 
 def cells_for_level(mod, level, rng):
-    if mod.num_cells(level) <= K:
+    total = mod.num_cells(level)
+    if total <= K:
         return list(mod.enumerate_cells(level))
+    if total <= 4 * K:
+        # Coupon-collector territory: enumerate + subsample instead of
+        # point-sampling (mirrors cache._select_zones's middle regime).
+        zones = list(mod.enumerate_cells(level))
+        idx = rng.choice(len(zones), K, replace=False)
+        return [zones[i] for i in idx]
     seen, out = set(), []
+    drawn = 0
     while len(out) < K:
-        pts = stats.sample_uniform_lnglat(K * 4, rng)[:, ::-1].tolist()
+        if drawn >= 60 * K:   # cap, like cache.MAX_DRAW_FACTOR
+            raise RuntimeError(
+                f'{drawn:,} draws yielded only {len(out)}/{K} distinct cells')
+        pts = stats.sample_uniform_latlng(K * 4, rng).tolist()
+        drawn += len(pts)
         for z in mod.cells_at(level, pts):
             if z is not None and z not in seen:
                 seen.add(z)
@@ -76,8 +89,10 @@ def check(name, mod):
         for ring, ref, sring in zip(corners, refs, override):
             if len(ring) == 5:
                 npent += 1
-            a_c = ar(ring if sring is None else sring)
-            a_r = ar(ref)
+            # open_ring, exactly as cache.build_table feeds the solvers —
+            # the validator must test the pipeline's true stats input.
+            a_c = ar(open_ring(ring if sring is None else sring))
+            a_r = ar(open_ring(ref))
             if a_c is None or a_r is None:
                 continue
             ars.append(a_c)

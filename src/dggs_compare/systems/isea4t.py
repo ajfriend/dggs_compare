@@ -34,21 +34,22 @@ def cells_at(res, points):
     return _engine.cells_at(res, points)
 
 
+# Zero-padded to the max seqnum's width: cache.build_table sorts rows by
+# cid TEXT for spatially coherent Parquet pages, and variable-width
+# decimals would sort '10' < '9'.
+_CID_WIDTH = len(str(num_cells(MAX_RES)))
+
+
 def cid_strs(zones):
-    # Zero-padded to fixed width (max seqnum at MAX_RES is 19 digits):
-    # cache.build_table sorts rows by cid TEXT for spatially coherent
-    # Parquet pages, and variable-width decimals would sort '10' < '9'.
-    return [f'{z:019d}' for z in zones]
+    return [f'{z:0{_CID_WIDTH}d}' for z in zones]
 
 
 def boundaries(res, zones):
-    rings = _engine.boundaries(res, zones)
-    return [rings[z] for z in zones]
+    return _engine.boundaries(res, zones)
 
 
 def refined_boundaries(res, zones, refine):
-    rings = _engine.boundaries(res, zones, refine)
-    return [rings[z] for z in zones]
+    return _engine.boundaries(res, zones, refine)
 
 
 def enumerate_cells(res):

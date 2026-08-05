@@ -11,6 +11,8 @@ corner vertices (turning-angle peaks): 5 for the pentagons, 3 for the res-1
 import a5_fast as a5
 import numpy as np
 
+from dggs_compare import stats
+
 # Exterior-angle threshold marking a corner (degrees). Densified edge points
 # turn by small fractions of a degree; true corners by tens of degrees.
 _TURN_DEG = 5.0
@@ -55,10 +57,14 @@ def boundaries(res, zones):
 
 
 def refined_boundaries(res, zones, refine):
-    # a5's native boundary is already adaptively densified (321 points at
-    # r0 down to 6 deep); it IS the refined reference, so `refine` is
-    # ignored (this is the ring the corner reduction was validated against).
-    return [[(lat, lng) for lng, lat in a5.cell_to_boundary(z)[:-1]]
+    # a5's native boundary is adaptively densified under a5's own edge
+    # model (321 points at r0 down to 6 from res ~9 up). Slerp `refine`
+    # points between the native vertices on top of that, so the reference
+    # stays strictly finer than the corner ring even at the deep
+    # resolutions where the native ring IS the corner ring.
+    return [stats.refine_geodesic(
+                [(lat, lng) for lng, lat in a5.cell_to_boundary(z)[:-1]],
+                refine)
             for z in zones]
 
 

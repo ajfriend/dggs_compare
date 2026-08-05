@@ -44,8 +44,8 @@ for res in RES_LIST:
         zones = a5.get_res0_cells() if res == 0 else list(
             c for c0 in a5.get_res0_cells() for c in a5.cell_to_children(c0, res))
     else:
-        pts = stats.sample_uniform_lnglat(K * 2, rng)
-        zones = list({a5.lonlat_to_cell(lng, lat, res) for lng, lat in pts})[:K]
+        pts = stats.sample_uniform_latlng(K * 2, rng)
+        zones = list({a5.lonlat_to_cell(lng, lat, res) for lat, lng in pts})[:K]
     max_abs = max_rel = 0.0
     ncorners = set()
     npts = None

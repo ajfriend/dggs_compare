@@ -41,19 +41,25 @@ def refine_geodesic(ring, k):
     return list(zip(lat.tolist(), lng.tolist()))
 
 
+def is_ccw(ring):
+    """True if `ring` ([(lat, lng), ...]) is CCW seen from outside.
+
+    THE winding predicate — the sign convention lives here and nowhere
+    else (binding-neutral home: both engines need it, and importing one
+    engine from the other would load its native library).
+    """
+    return sparea.area(ring, signed=True) >= 0
+
+
 def orient_ccw(ring):
     """`ring` ([(lat, lng), ...]) in CCW-seen-from-outside order.
 
-    Binding-neutral home (both engines need it; importing one engine from
-    the other would load its native library). sparea's unsigned area turns
-    a CW ring into its ~4pi complement, so every ring an engine hands out
-    is normalized. Decided per ring: DGGAL winds two pentagons per level
-    opposite to the rest of their grid, so a per-grid flip would corrupt
-    exactly those cells.
+    sparea's unsigned area turns a CW ring into its ~4pi complement, so
+    every ring an engine hands out is normalized. Decided per ring: DGGAL
+    winds two pentagons per level opposite to the rest of their grid, so
+    a per-grid flip would corrupt exactly those cells.
     """
-    if sparea.area(ring, signed=True) < 0:
-        ring = ring[::-1]
-    return ring
+    return ring if is_ccw(ring) else ring[::-1]
 
 
 def cell_stats(latlng):
@@ -77,8 +83,10 @@ def cell_stats(latlng):
     return ar, area
 
 
-def sample_uniform_lnglat(n, rng):
-    """Uniform-on-sphere samples as (lng_deg, lat_deg), shape (n, 2)."""
+def sample_uniform_latlng(n, rng):
+    """Uniform-on-sphere samples as (lat_deg, lng_deg), shape (n, 2) —
+    the registry contract's point order. (lng is drawn first to preserve
+    the historical RNG stream: same seed, same points, same tables.)"""
     lng = 360.0 * rng.random(n) - 180.0
     lat = np.degrees(np.arcsin(2.0 * rng.random(n) - 1.0))  # equal-area in lat
-    return np.column_stack([lng, lat])
+    return np.column_stack([lat, lng])

@@ -116,7 +116,7 @@ def _select_zones(sysmod, dggs, res):
                 f'{dggs} r{res}: {drawn:,} draws yielded only '
                 f'{len(zones):,}/{n:,} distinct cells')
         k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
-        pts = stats.sample_uniform_lnglat(k, rng)[:, ::-1].tolist()  # (lat, lng)
+        pts = stats.sample_uniform_latlng(k, rng).tolist()
         hits = sysmod.cells_at(res, pts)
         for (lat, lng), z in zip(pts, hits):
             if z is None:
@@ -174,8 +174,7 @@ def build_table(dggs, res):
     try:
         for lo in range(0, len(zones), BATCH):
             chunk = zones[lo:lo + BATCH]
-            zlist = [z for _, z in chunk]
-            cids = [cid for cid, _ in chunk]
+            cids, zlist = zip(*chunk)
             rings = sysmod.boundaries(res, zlist)
             # A system may declare some corner rings unfit for the solvers
             # (isea3h: odd-level cells kink at icosahedron edges) via the

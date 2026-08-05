@@ -14,24 +14,26 @@ The binary: set DGGS_COMPARE_DGGRID, or drop a build at .tools/dggrid
 (no PyPI wheels exist; conda-forge ships `dggrid`, or build from source
 with cmake — see the justfile recipe).
 
-Zone handles are (res, seqnum) tuples: DGGRID SEQNUM addresses are only
-unique within a resolution, unlike DGGAL's level-encoding zone ints.
-Output parsing uses the AIGEN text format (id + centroid line, one
-"lon lat" per vertex, closing repeat, END) — the only output type that
-needs neither GDAL nor XML.
+Zone handles are plain SEQNUM ints — only unique within a resolution
+(unlike DGGAL's level-encoding zone ints), which is why every engine call
+takes `res`. Output parsing uses the AIGEN text format (id + centroid
+line, one "lon lat" per vertex, closing repeat, END) — the only output
+type that needs neither GDAL nor XML.
 """
 
 import os
 import shutil
 import subprocess
 import tempfile
+from functools import cache
 from pathlib import Path
 
-import sparea
+from .stats import is_ccw
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+@cache
 def _find_bin():
     """DGGS_COMPARE_DGGRID env var, then .tools/dggrid, then PATH."""
     env = os.environ.get('DGGS_COMPARE_DGGRID')
@@ -68,8 +70,8 @@ def _parse_aigen(path):
     """Yield (seqnum, [(lat, lng), ...]) open CCW rings from an AIGEN file.
 
     Winding is uniform within one DGGRID output (measured: always CCW), so
-    the sparea orientation test runs on the first ring only — a violation
-    of the uniformity assumption would still fail loudly downstream in
+    the orientation test runs on the first ring only — a violation of the
+    uniformity assumption would still fail loudly downstream in
     stats.cell_stats' area-over-2pi guard.
     """
     flip = None
@@ -84,7 +86,7 @@ def _parse_aigen(path):
                     if len(ring) > 1 and ring[0] == ring[-1]:
                         ring = ring[:-1]
                     if flip is None:
-                        flip = sparea.area(ring, signed=True) < 0
+                        flip = not is_ccw(ring)
                     yield cur, ring[::-1] if flip else ring
                 cur, ring = None, []
             elif cur is None:
@@ -151,8 +153,8 @@ class Engine:
             return out
 
     def boundaries(self, res, seqnums, refine=0):
-        """{seqnum: open CCW ring} for exactly `seqnums` (clipped
-        generation); `refine` densification points per edge."""
+        """Open CCW rings aligned with `seqnums` (clipped generation);
+        `refine` densification points per edge."""
         with tempfile.TemporaryDirectory() as d:
             ids = Path(d) / 'ids.txt'
             ids.write_text(''.join(f'{s}\n' for s in seqnums))
@@ -164,7 +166,7 @@ class Engine:
                 f'{self.dggs_type} r{res}: no boundary returned for '
                 f'{len(missing)} of {len(seqnums)} cells '
                 f'(e.g. {sorted(missing)[:3]})')
-        return rings
+        return [rings[s] for s in seqnums]
 
     def _generate(self, res, workdir, clip, densification=0):
         params = {**self._base(res),

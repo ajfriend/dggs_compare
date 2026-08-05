@@ -23,19 +23,19 @@ def num_cells(res):
 
 
 def cells_at(res, points):
-    return [_adapter.zone_at(res, lng, lat) for lat, lng in points]
+    return _adapter.cells_at(res, points)
 
 
 def cid_strs(zones):
-    return [_adapter.cid_str(z) for z in zones]
+    return _adapter.cid_strs(zones)
 
 
 def boundaries(res, zones):
-    return [_adapter.cell_boundary(z) for z in zones]
+    return _adapter.boundaries(zones)
 
 
 def refined_boundaries(res, zones, refine):
-    return [_adapter.refined_boundary(z, refine) for z in zones]
+    return _adapter.refined_boundaries(zones, refine)
 
 
 def enumerate_cells(res):
