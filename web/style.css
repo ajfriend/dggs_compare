@@ -92,7 +92,7 @@ h2 {
   background: #fff;
 }
 .byres-grid figcaption {
-  margin-top: 6px;
+  margin-bottom: 6px;
   color: var(--muted);
   font-size: 13px;
   display: flex;
