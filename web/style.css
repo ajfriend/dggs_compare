@@ -122,8 +122,18 @@ h2 {
 .scale-picker select:focus { outline: 1px solid var(--accent); }
 
 /* histogram + color bar share this width and left edge, so a cell's AR lines
-   up in both */
-.scale-viz { max-width: 480px; margin: 0 0 8px; }
+   up in both. Sticky: with nine globes the grid is three rows deep, and the
+   histogram would be scrolled away by row two — pin it to the viewport top
+   while the globes section is in view (it releases at the section's end). */
+.scale-viz {
+  max-width: 480px;
+  margin: 0 0 8px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg);
+  padding: 10px 0 8px;
+}
 .hist-head {
   display: flex;
   align-items: center;
