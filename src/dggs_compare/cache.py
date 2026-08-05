@@ -58,7 +58,8 @@ def _provenance():
         'gap_tol': repr(config.GAP_TOL),
         'csar_method': config.CSAR_METHOD,
     }
-    for pkg in ('csar', 'sparea', 'h3', 's2sphere', 'a5_fast', 'dggal'):
+    for pkg in ('csar', 'sparea', 'h3', 's2sphere', 'a5_fast', 'dggal',
+                'hex9'):
         try:
             meta[f'version_{pkg}'] = _pkg_version(pkg)
         except Exception:
