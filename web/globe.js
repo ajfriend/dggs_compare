@@ -16,6 +16,12 @@ const CMAPS = {
             [190,140,86],[230,169,73],[255,201,58],[255,233,69]],
   magma:   [[0,0,4],[28,16,68],[79,18,123],[129,37,129],[181,54,122],
             [229,80,100],[251,135,97],[254,194,135],[252,253,191]],
+  // CET-R2: Kovesi's perceptually uniform rainbow (stops from colorcet).
+  cetr2:   [[0,51,245],[0,78,214],[0,99,183],[0,115,154],[40,127,127],
+            [57,138,101],[63,151,69],[64,162,33],[87,171,14],[116,177,19],
+            [142,184,24],[167,190,29],[191,195,34],[215,201,39],[238,205,43],
+            [251,198,42],[253,184,36],[254,168,30],[255,151,23],[255,135,17],
+            [255,118,10],[255,99,4],[254,77,0],[252,48,0]],
   turbo:   [[48,18,59],[54,88,196],[36,133,237],[30,183,208],[45,224,152],
             [122,247,79],[189,238,52],[245,197,45],[251,131,42],[226,72,28],
             [175,31,17],[122,4,3]],
@@ -44,6 +50,7 @@ const CMAP_OPTS = [
   { key: 'viridis', label: 'Viridis (perceptually uniform — the default)' },
   { key: 'cividis', label: 'Cividis (uniform, colorblind-optimized)' },
   { key: 'magma',   label: 'Magma (uniform)' },
+  { key: 'cetr2',   label: 'CET-R2 (rainbow, perceptually uniform)' },
   { key: 'turbo',   label: 'Turbo (rainbow — NOT perceptually uniform)' },
   { key: 'gray',    label: 'Grayscale' },
 ];
