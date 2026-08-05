@@ -1,7 +1,7 @@
 // Static DGGS aspect-ratio site: a grid of ajglobe globes, one per system,
 // cells colored by aspect ratio on a SHARED scale so systems compare directly.
-// - a Color-scale dropdown picks (colormap, value-transform); globes + legend
-//   recolor together.
+// - two dropdowns pick the colormap and the value transform independently
+//   (any combination is valid); globes + legend recolor together.
 // - hovering a globe shows THAT globe's AR distribution as a histogram above
 //   the legend, with a line marking the hovered cell's AR (aligned to the
 //   color bar, so you see where that cell sits in both distribution and color).
@@ -39,15 +39,19 @@ const TF = {
   p99:    (ar, d) => clamp01((ar - 1) / (d.p99 - 1)),         // linear, saturates at p99
   log:    (ar, d) => (d.max > 1 ? Math.log(ar) / Math.log(d.max) : 0),
 };
-const SCALES = [
-  { label: 'Viridis · γ0.4 (modified — the default)', cmap: 'viridis', tf: 'power' },
-  { label: 'Viridis · linear (perceptually uniform in AR)', cmap: 'viridis', tf: 'linear' },
-  { label: 'Viridis · linear, saturates at p99', cmap: 'viridis', tf: 'p99' },
-  { label: 'Viridis · log', cmap: 'viridis', tf: 'log' },
-  { label: 'Cividis · linear (uniform, colorblind-optimized)', cmap: 'cividis', tf: 'linear' },
-  { label: 'Magma · γ0.4', cmap: 'magma', tf: 'power' },
-  { label: 'Turbo · linear (rainbow — NOT perceptually uniform)', cmap: 'turbo', tf: 'linear' },
-  { label: 'Grayscale · linear', cmap: 'gray', tf: 'linear' },
+// The two dropdowns: colors, and where along the AR axis they are spent.
+const CMAP_OPTS = [
+  { key: 'viridis', label: 'Viridis (perceptually uniform — the default)' },
+  { key: 'cividis', label: 'Cividis (uniform, colorblind-optimized)' },
+  { key: 'magma',   label: 'Magma (uniform)' },
+  { key: 'turbo',   label: 'Turbo (rainbow — NOT perceptually uniform)' },
+  { key: 'gray',    label: 'Grayscale' },
+];
+const TF_OPTS = [
+  { key: 'power',  label: 'γ0.4 stretch (the default)' },
+  { key: 'linear', label: 'linear in AR' },
+  { key: 'p99',    label: 'linear, saturates at p99' },
+  { key: 'log',    label: 'log' },
 ];
 
 const DNC_GREY = [68, 68, 68, 255];
@@ -63,7 +67,7 @@ async function fetchBin(path, Ctor) {
 
 const DOMAIN = { max: 1, p99: 1 };   // shared AR domain over all globe cells
 const PANELS = [];                   // { sys, label, color, orb, layer, ar, hist }
-let scale = SCALES[0];
+let scale = { cmap: 'viridis', tf: 'power' };
 
 const makeFill = (ar, sc) => {
   const lut = lutFor(sc.cmap), tf = TF[sc.tf];
@@ -253,17 +257,21 @@ async function main() {
   initLightbox();
   initHist();
 
-  const sel = $('#scaleSelect');
-  SCALES.forEach((s, i) => sel.add(new Option(s.label, i)));
-  sel.value = '0';
+  const cmapSel = $('#cmapSelect'), tfSel = $('#tfSelect');
+  CMAP_OPTS.forEach((o) => cmapSel.add(new Option(o.label, o.key)));
+  TF_OPTS.forEach((o) => tfSel.add(new Option(o.label, o.key)));
+  cmapSel.value = scale.cmap;
+  tfSel.value = scale.tf;
 
   DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
   DOMAIN.p99 = DOMAIN.max;
   for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
   computeDomainAndHists();
-  applyScale(SCALES[0]);
+  applyScale(scale);
   drawHist(PANELS[0], null);          // seed the histogram before any hover
 
-  sel.addEventListener('change', () => applyScale(SCALES[+sel.value]));
+  const onPick = () => applyScale({ cmap: cmapSel.value, tf: tfSel.value });
+  cmapSel.addEventListener('change', onPick);
+  tfSel.addEventListener('change', onPick);
 }
 main();

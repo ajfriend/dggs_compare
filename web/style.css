@@ -101,7 +101,7 @@ h2 {
 }
 
 /* ---- color-scale controls: dropdown, dynamic histogram, legend ---- */
-.globe-controls { margin: 0 0 12px; }
+.globe-controls { margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 10px 22px; }
 .scale-picker {
   display: inline-flex;
   align-items: center;

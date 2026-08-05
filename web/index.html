@@ -49,13 +49,17 @@
       <p class="caption">One globe per system at its coarsest full-coverage
         resolution, colored on a <b>shared</b> AR scale so the systems compare
         directly. Drag to rotate, scroll to zoom, hover for a cell's id and AR.
-        Use the <b>Color scale</b> menu to switch colormap + value transform —
-        the globes and legend update together, so you can see how the choice
-        (e.g. perceptually-uniform linear viridis vs. the stretched default)
-        changes what's visible.</p>
+        The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu picks
+        where along the AR axis they are spent — hold one fixed and switch the
+        other (e.g. the stretched default vs. linear on the same colormap) to
+        see how the choice changes what's visible. Globes and legend update
+        together.</p>
       <div class="globe-controls">
-        <label class="scale-picker">Color scale
-          <select id="scaleSelect"></select>
+        <label class="scale-picker">Colormap
+          <select id="cmapSelect"></select>
+        </label>
+        <label class="scale-picker">Scaling
+          <select id="tfSelect"></select>
         </label>
       </div>
       <div class="scale-viz">
