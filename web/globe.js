@@ -164,7 +164,7 @@ function byResGrid(M) {
     img.loading = 'lazy';
     const cap = document.createElement('figcaption');
     cap.innerHTML = `<span class="swatch" style="background:${M.colors[sys]}"></span>${M.labels[sys]}`;
-    fig.append(img, cap);
+    fig.append(cap, img);   // caption above the plot
     grid.appendChild(fig);
   }
 }
