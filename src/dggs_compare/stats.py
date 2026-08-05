@@ -12,6 +12,35 @@ import sparea
 from . import config
 
 
+def refine_geodesic(ring, k):
+    """Insert `k` slerp points along each great-circle edge of an open
+    (lat, lng)-degree ring.
+
+    For systems whose edges ARE geodesics between their boundary vertices
+    (h3, s2), this produces the refined reference ring that validate-
+    corners compares against — the enclosing cone can't change (convexity),
+    so the check confirms the implementation matches the theorem.
+    """
+    la, lo = np.radians(np.asarray(ring, dtype=float)).T
+    v = np.column_stack([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo),
+                         np.sin(la)])
+    out = []
+    n = len(v)
+    for i in range(n):
+        a, b = v[i], v[(i + 1) % n]
+        out.append(a)
+        ang = np.arccos(np.clip(a @ b, -1.0, 1.0))
+        if ang > 0:
+            s = np.sin(ang)
+            for j in range(1, k + 1):
+                t = j / (k + 1)
+                out.append((np.sin((1 - t) * ang) * a + np.sin(t * ang) * b) / s)
+    out = np.asarray(out)
+    lat = np.degrees(np.arcsin(np.clip(out[:, 2], -1.0, 1.0)))
+    lng = np.degrees(np.arctan2(out[:, 1], out[:, 0]))
+    return list(zip(lat.tolist(), lng.tolist()))
+
+
 def orient_ccw(ring):
     """`ring` ([(lat, lng), ...]) in CCW-seen-from-outside order.
 

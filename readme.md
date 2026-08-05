@@ -73,8 +73,7 @@ derived from it at run time. A new DGGS touches:
    (count-match, then confirm with `just calibrate` once tables exist),
    `SYS_COLOR`.
 
-Then run `just validate-corners` (the admission gate for DGGAL-backed
-grids) and cut a data release — `just dnc-check` fails its publish gate
+Then run `just validate-corners` (the admission gate) and cut a data release — `just dnc-check` fails its publish gate
 unless every registry system has tables and `PER_SYSTEM` config.
 
 ## Table schema

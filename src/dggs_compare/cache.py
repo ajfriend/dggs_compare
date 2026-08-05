@@ -147,7 +147,7 @@ def build_table(dggs, res):
     # Sort by cid for a canonical, deterministic row order (independent of
     # sampling order): enables Parquet cid page-stats / range pushdown, and
     # lets DELTA_BYTE_ARRAY prefix-compress the sorted ids.
-    zones = sorted(((sysmod.cid_str(z), z) for z in zones), key=lambda cz: cz[0])
+    zones = sorted(zip(sysmod.cid_strs(zones), zones), key=lambda cz: cz[0])
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = table_path(dggs, res)
@@ -176,11 +176,12 @@ def build_table(dggs, res):
             chunk = zones[lo:lo + BATCH]
             zlist = [z for _, z in chunk]
             cids = [cid for cid, _ in chunk]
-            rings = sysmod.boundaries(zlist)
+            rings = sysmod.boundaries(res, zlist)
             # A system may declare some corner rings unfit for the solvers
             # (isea3h: odd-level cells kink at icosahedron edges) via the
             # optional stats_rings override; verts still stores corners.
-            srings = stats_rings(zlist) if stats_rings else [None] * len(chunk)
+            srings = (stats_rings(res, zlist) if stats_rings
+                      else [None] * len(chunk))
             verts, ars, areas = [], [], []
             for ring, sring in zip(rings, srings):
                 latlng = [[float(la), float(ln)] for la, ln in open_ring(ring)]

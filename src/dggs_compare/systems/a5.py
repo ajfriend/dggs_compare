@@ -29,8 +29,8 @@ def cells_at(res, points):
             for lat, lng in points]
 
 
-def cid_str(z):
-    return a5.u64_to_hex(z)
+def cid_strs(zones):
+    return [a5.u64_to_hex(z) for z in zones]
 
 
 def _corners(latlng):
@@ -50,8 +50,16 @@ def _boundary(z):
     return _corners([(lat, lng) for lng, lat in ring[:-1]])
 
 
-def boundaries(zones):
+def boundaries(res, zones):
     return [_boundary(z) for z in zones]
+
+
+def refined_boundaries(res, zones, refine):
+    # a5's native boundary is already adaptively densified (321 points at
+    # r0 down to 6 deep); it IS the refined reference, so `refine` is
+    # ignored (this is the ring the corner reduction was validated against).
+    return [[(lat, lng) for lng, lat in a5.cell_to_boundary(z)[:-1]]
+            for z in zones]
 
 
 def enumerate_cells(res):

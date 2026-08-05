@@ -3,8 +3,8 @@
 The first DGGRID-backed system: batch subprocess calls instead of
 per-cell FFI (see dggrid_engine) — the batch-first registry contract
 means the module is stateless: each call maps directly onto one or two
-DGGRID invocations. Zone handles are (res, seqnum) tuples since DGGRID
-SEQNUM addresses are only unique within a resolution.
+DGGRID invocations. Zones are plain SEQNUM ints; they are only unique
+within a resolution, which is why the contract passes `res` alongside.
 
 MAX_RES 28: DGGRID accepts finer, but 20*4^r overflows uint64 seqnums
 past r30 (observed: r31 ids come out smaller than r30's), and r28 cells
@@ -31,26 +31,25 @@ def num_cells(res):
 
 
 def cells_at(res, points):
-    return [None if s is None else (res, s)
-            for s in _engine.cells_at(res, points)]
+    return _engine.cells_at(res, points)
 
 
-def cid_str(z):
+def cid_strs(zones):
     # Zero-padded to fixed width (max seqnum at MAX_RES is 19 digits):
     # cache.build_table sorts rows by cid TEXT for spatially coherent
     # Parquet pages, and variable-width decimals would sort '10' < '9'.
-    return f'{z[1]:019d}'
+    return [f'{z:019d}' for z in zones]
 
 
-def boundaries(zones):
-    """One clipped generation for the chunk (cache.build_table only ever
-    passes zones of a single resolution)."""
-    res = zones[0][0]
-    assert all(z[0] == res for z in zones), 'mixed-resolution chunk'
-    rings = _engine.boundaries(res, [seq for _, seq in zones])
-    return [rings[seq] for _, seq in zones]
+def boundaries(res, zones):
+    rings = _engine.boundaries(res, zones)
+    return [rings[z] for z in zones]
+
+
+def refined_boundaries(res, zones, refine):
+    rings = _engine.boundaries(res, zones, refine)
+    return [rings[z] for z in zones]
 
 
 def enumerate_cells(res):
-    for seq in _engine.enumerate_ids(res):
-        yield (res, seq)
+    yield from _engine.enumerate_ids(res)

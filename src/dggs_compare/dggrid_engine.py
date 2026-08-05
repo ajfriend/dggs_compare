@@ -150,12 +150,13 @@ class Engine:
                     f'{len(out)} ids out')
             return out
 
-    def boundaries(self, res, seqnums):
-        """{seqnum: open CCW ring} for exactly `seqnums` (clipped generation)."""
+    def boundaries(self, res, seqnums, refine=0):
+        """{seqnum: open CCW ring} for exactly `seqnums` (clipped
+        generation); `refine` densification points per edge."""
         with tempfile.TemporaryDirectory() as d:
             ids = Path(d) / 'ids.txt'
             ids.write_text(''.join(f'{s}\n' for s in seqnums))
-            self._generate(res, d, clip='ids.txt')
+            self._generate(res, d, clip='ids.txt', densification=refine)
             rings = dict(_parse_aigen(Path(d) / 'cells.gen'))
         missing = set(seqnums) - rings.keys()
         if missing:
@@ -165,12 +166,12 @@ class Engine:
                 f'(e.g. {sorted(missing)[:3]})')
         return rings
 
-    def _generate(self, res, workdir, clip):
+    def _generate(self, res, workdir, clip, densification=0):
         params = {**self._base(res),
                   'dggrid_operation': 'GENERATE_GRID',
                   'cell_output_type': 'AIGEN',
                   'cell_output_file_name': 'cells',
-                  'densification': 0}
+                  'densification': densification}
         if clip is None:
             params['clip_subset_type'] = 'WHOLE_EARTH'
         else:

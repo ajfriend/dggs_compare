@@ -2,6 +2,8 @@
 
 import s2sphere
 
+from dggs_compare import stats
+
 
 def resolutions():
     return range(31)            # s2sphere supports levels 0..30
@@ -21,8 +23,8 @@ def cells_at(res, points):
     return [_cell_at(res, lat, lng) for lat, lng in points]
 
 
-def cid_str(z):
-    return format(z, '016x')
+def cid_strs(zones):
+    return [format(z, '016x') for z in zones]
 
 
 def _boundary(z):
@@ -34,8 +36,14 @@ def _boundary(z):
     return ring
 
 
-def boundaries(zones):
+def boundaries(res, zones):
     return [_boundary(z) for z in zones]
+
+
+def refined_boundaries(res, zones, refine):
+    # s2 cell edges lie in planes through the origin (constant-u/v lines on
+    # the cube), i.e. great circles — refinement is slerp between corners.
+    return [stats.refine_geodesic(_boundary(z), refine) for z in zones]
 
 
 def enumerate_cells(res):
