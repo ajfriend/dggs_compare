@@ -94,19 +94,10 @@ def latlng_ring(points):
     return ring
 
 
-def orient_ccw(ring):
-    """`ring` ([(lat, lng), ...]) in CCW-seen-from-outside order.
-
-    DGGAL is inconsistent about corner winding: the 7H grids and rHEALPix
-    come back CCW but ISEA3H/IVEA3H come back CW (dggal 0.0.6) — except two
-    pentagons per level, so this must be decided per ring, not per grid —
-    and sparea's unsigned area turns a CW ring into its ~4pi complement.
-    Every ring an Adapter hands out goes through here so the tables carry
-    one convention.
-    """
-    if sparea.area(ring, signed=True) < 0:
-        ring = ring[::-1]
-    return ring
+# DGGAL is inconsistent about corner winding: the 7H grids and rHEALPix
+# come back CCW but ISEA3H/IVEA3H come back CW (dggal 0.0.6), except two
+# pentagons per level. Every ring an Adapter hands out is normalized.
+from .stats import orient_ccw  # noqa: E402
 
 
 class Adapter:

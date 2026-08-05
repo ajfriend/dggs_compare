@@ -11,14 +11,14 @@ def num_cells(res):
     return 6 * 4 ** res
 
 
+def _cell_at(res, lat, lng):
+    # from_lat_lng yields a level-30 leaf; walk up to the cell at `res`.
+    leaf = s2sphere.CellId.from_lat_lng(s2sphere.LatLng.from_degrees(lat, lng))
+    return leaf.parent(res).id()   # int, hashable
+
+
 def cells_at(res, points):
-    out = []
-    for lat, lng in points:
-        # from_lat_lng yields a level-30 leaf; walk up to the cell at `res`.
-        leaf = s2sphere.CellId.from_lat_lng(
-            s2sphere.LatLng.from_degrees(lat, lng))
-        out.append(leaf.parent(res).id())   # int, hashable
-    return out
+    return [_cell_at(res, lat, lng) for lat, lng in points]
 
 
 def cid_str(z):

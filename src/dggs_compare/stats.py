@@ -12,6 +12,21 @@ import sparea
 from . import config
 
 
+def orient_ccw(ring):
+    """`ring` ([(lat, lng), ...]) in CCW-seen-from-outside order.
+
+    Binding-neutral home (both engines need it; importing one engine from
+    the other would load its native library). sparea's unsigned area turns
+    a CW ring into its ~4pi complement, so every ring an engine hands out
+    is normalized. Decided per ring: DGGAL winds two pentagons per level
+    opposite to the rest of their grid, so a per-grid flip would corrupt
+    exactly those cells.
+    """
+    if sparea.area(ring, signed=True) < 0:
+        ring = ring[::-1]
+    return ring
+
+
 def cell_stats(latlng):
     """(ar, area_sr) for one open (lat, lng)-degree ring.
 

@@ -116,10 +116,9 @@ def _select_zones(sysmod, dggs, res):
                 f'{dggs} r{res}: {drawn:,} draws yielded only '
                 f'{len(zones):,}/{n:,} distinct cells')
         k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
-        pts = stats.sample_uniform_lnglat(k, rng)
-        hits = sysmod.cells_at(res, [(float(la), float(ln))
-                                     for ln, la in pts])
-        for (lng, lat), z in zip(pts, hits):
+        pts = stats.sample_uniform_lnglat(k, rng)[:, ::-1].tolist()  # (lat, lng)
+        hits = sysmod.cells_at(res, pts)
+        for (lat, lng), z in zip(pts, hits):
             if z is None:
                 # The engine couldn't resolve the point (DGGAL nullZone at
                 # rare singular points) — draw again, and log the specimen:
@@ -176,19 +175,17 @@ def build_table(dggs, res):
         for lo in range(0, len(zones), BATCH):
             chunk = zones[lo:lo + BATCH]
             zlist = [z for _, z in chunk]
+            cids = [cid for cid, _ in chunk]
             rings = sysmod.boundaries(zlist)
             # A system may declare some corner rings unfit for the solvers
             # (isea3h: odd-level cells kink at icosahedron edges) via the
             # optional stats_rings override; verts still stores corners.
-            srings = stats_rings(zlist) if stats_rings else None
-            cids, verts, ars, areas = [], [], [], []
-            for i, (cid, z) in enumerate(chunk):
-                latlng = [[float(la), float(ln)]
-                          for la, ln in open_ring(rings[i])]
-                sring = srings[i] if srings else None
+            srings = stats_rings(zlist) if stats_rings else [None] * len(chunk)
+            verts, ars, areas = [], [], []
+            for ring, sring in zip(rings, srings):
+                latlng = [[float(la), float(ln)] for la, ln in open_ring(ring)]
                 ar, area = stats.cell_stats(
                     latlng if sring is None else open_ring(sring))
-                cids.append(cid)
                 verts.append(latlng)
                 ars.append(ar)
                 areas.append(area)

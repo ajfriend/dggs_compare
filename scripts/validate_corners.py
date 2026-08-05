@@ -64,14 +64,14 @@ def check(name, ad, stats_rings=None):
         if level > ad.max_level():
             continue
         zones = cells_for_level(ad, level, rng)
+        override = stats_rings(zones) if stats_rings else [None] * len(zones)
         npent = 0
         max_abs = max_rel = 0.0
         ars = []
-        for z in zones:
+        for z, ring in zip(zones, override):
             corners = ad.verts(z)
             if corners.shape[0] == 5:
                 npent += 1
-            ring = stats_rings([z])[0] if stats_rings else None
             stats_in = corners if ring is None else csar.to_vec3(
                 ring, geo='latlng_deg')
             a_c = ar(stats_in)

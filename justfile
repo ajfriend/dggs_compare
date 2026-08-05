@@ -123,5 +123,5 @@ install-dggrid:
     git clone --depth 1 https://github.com/sahrk/dggrid.git .tools/dggrid-src
     cmake -S .tools/dggrid-src -B .tools/dggrid-src/build -DCMAKE_BUILD_TYPE=Release
     cmake --build .tools/dggrid-src/build --target dggrid -j 8
-    mkdir -p .tools && cp .tools/dggrid-src/build/src/apps/dggrid/dggrid .tools/dggrid
+    cp .tools/dggrid-src/build/src/apps/dggrid/dggrid .tools/dggrid
     rm -rf .tools/dggrid-src

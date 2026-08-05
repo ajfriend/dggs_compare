@@ -68,7 +68,7 @@ The `systems/` folder is the registry — the data-release gen matrix is
 derived from it at run time. A new DGGS touches:
 
 1. `src/dggs_compare/systems/<name>.py` — the module (mirror any existing
-   one; add `stats_ring` only if the corner ring isn't faithful).
+   one; add `stats_rings` only if the corner rings are not faithful).
 2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
    (count-match, then confirm with `just calibrate` once tables exist),
    `SYS_COLOR`.

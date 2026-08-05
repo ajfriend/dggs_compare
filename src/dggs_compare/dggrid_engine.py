@@ -22,6 +22,7 @@ needs neither GDAL nor XML.
 """
 
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -29,8 +30,22 @@ from pathlib import Path
 import sparea
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-DGGRID_BIN = Path(os.environ.get('DGGS_COMPARE_DGGRID',
-                                 _REPO_ROOT / '.tools' / 'dggrid'))
+
+
+def _find_bin():
+    """DGGS_COMPARE_DGGRID env var, then .tools/dggrid, then PATH."""
+    env = os.environ.get('DGGS_COMPARE_DGGRID')
+    if env:
+        return Path(env)
+    tools = _REPO_ROOT / '.tools' / 'dggrid'
+    if tools.exists():
+        return tools
+    on_path = shutil.which('dggrid')
+    if on_path:
+        return Path(on_path)
+    raise FileNotFoundError(
+        'no dggrid binary found: set DGGS_COMPARE_DGGRID, or run '
+        '`just install-dggrid` (builds into .tools/)')
 
 # AIGEN emits this many decimal degrees digits; 12 keeps float64 fidelity
 # through the text round-trip.
@@ -41,26 +56,23 @@ def _run(params, workdir):
     """Write a metafile from `params` and run dggrid on it in `workdir`."""
     meta = Path(workdir) / 'job.meta'
     meta.write_text(''.join(f'{k} {v}\n' for k, v in params.items()))
-    proc = subprocess.run([str(DGGRID_BIN), str(meta)],
+    proc = subprocess.run([str(_find_bin()), str(meta)],
                           capture_output=True, text=True, cwd=workdir)
     if proc.returncode != 0:
         raise RuntimeError(
-            f'dggrid failed (exit {proc.returncode}) for {dict(params)!r}:\n'
+            f'dggrid failed (exit {proc.returncode}) for {params!r}:\n'
             f'{proc.stdout[-2000:]}\n{proc.stderr[-2000:]}')
-    return proc
-
-
-def _orient_ccw(ring):
-    """CCW-seen-from-outside, decided per ring (measured: DGGRID emits CCW
-    everywhere, but a reversed ring would poison sparea's signed area, and
-    the DGGAL winding saga earned this three-line insurance)."""
-    if sparea.area(ring, signed=True) < 0:
-        ring = ring[::-1]
-    return ring
 
 
 def _parse_aigen(path):
-    """Yield (seqnum, [(lat, lng), ...]) open CCW rings from an AIGEN file."""
+    """Yield (seqnum, [(lat, lng), ...]) open CCW rings from an AIGEN file.
+
+    Winding is uniform within one DGGRID output (measured: always CCW), so
+    the sparea orientation test runs on the first ring only — a violation
+    of the uniformity assumption would still fail loudly downstream in
+    stats.cell_stats' area-over-2pi guard.
+    """
+    flip = None
     with open(path) as f:
         cur, ring = None, []
         for line in f:
@@ -71,12 +83,29 @@ def _parse_aigen(path):
                 if cur is not None:
                     if len(ring) > 1 and ring[0] == ring[-1]:
                         ring = ring[:-1]
-                    yield cur, _orient_ccw(ring)
+                    if flip is None:
+                        flip = sparea.area(ring, signed=True) < 0
+                    yield cur, ring[::-1] if flip else ring
                 cur, ring = None, []
             elif cur is None:
                 cur = int(t[0])              # "seqnum centroid_lon centroid_lat"
             else:
                 ring.append((float(t[1]), float(t[0])))   # lon lat -> (lat, lng)
+
+
+def _parse_aigen_ids(path):
+    """Yield only the seqnums from an AIGEN file (~15x cheaper than the
+    full parse when the rings would be discarded)."""
+    with open(path) as f:
+        expect_header = True
+        for line in f:
+            if expect_header:
+                t = line.split(None, 1)
+                if t and t[0] != 'END':
+                    yield int(t[0])
+                    expect_header = False
+            elif line.startswith('END'):
+                expect_header = True
 
 
 class Engine:
@@ -93,8 +122,7 @@ class Engine:
         """Every seqnum at `res` (whole-earth generation, ids only)."""
         with tempfile.TemporaryDirectory() as d:
             self._generate(res, d, clip=None)
-            for seq, _ in _parse_aigen(Path(d) / 'cells.gen'):
-                yield seq
+            yield from _parse_aigen_ids(Path(d) / 'cells.gen')
 
     def cells_at(self, res, latlngs):
         """seqnum (or None) for each (lat, lng) — one TRANSFORM_POINTS run."""
@@ -102,7 +130,7 @@ class Engine:
             pts = Path(d) / 'points.txt'
             with open(pts, 'w') as f:
                 for lat, lng in latlngs:
-                    f.write(f'{lng:.12f} {lat:.12f}\n')
+                    f.write(f'{lng:.{PRECISION}f} {lat:.{PRECISION}f}\n')
             _run({**self._base(res),
                   'dggrid_operation': 'TRANSFORM_POINTS',
                   'input_file_name': 'points.txt',

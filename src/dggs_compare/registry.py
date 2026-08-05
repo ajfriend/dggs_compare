@@ -20,7 +20,10 @@ made of. Every systems/ module implements:
                               couldn't resolve the point (rare DGGAL
                               deep-level singular points) — samplers skip
                               and draw again
-    cid_str(z)             -> str text id stored in the tables
+    cid_str(z)             -> str text id stored in the tables; must sort
+                              (as text) in a spatially coherent order —
+                              cache.build_table orders rows by it for
+                              Parquet page locality (fixed-width ids)
     boundaries(zones)      -> [[(lat, lng), ...] open corner ring, ...]
                               aligned with `zones`, degrees
     enumerate_cells(res)   -> iterator of every zone at `res`

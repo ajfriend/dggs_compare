@@ -36,20 +36,19 @@ def cells_at(res, points):
 
 
 def cid_str(z):
-    res, seq = z
-    return str(seq)
+    # Zero-padded to fixed width (max seqnum at MAX_RES is 19 digits):
+    # cache.build_table sorts rows by cid TEXT for spatially coherent
+    # Parquet pages, and variable-width decimals would sort '10' < '9'.
+    return f'{z[1]:019d}'
 
 
 def boundaries(zones):
-    """One clipped generation per resolution present in `zones`."""
-    by_res = {}
-    for res, seq in zones:
-        by_res.setdefault(res, []).append(seq)
-    rings = {}
-    for res, seqs in by_res.items():
-        for seq, ring in _engine.boundaries(res, seqs).items():
-            rings[(res, seq)] = ring
-    return [rings[z] for z in zones]
+    """One clipped generation for the chunk (cache.build_table only ever
+    passes zones of a single resolution)."""
+    res = zones[0][0]
+    assert all(z[0] == res for z in zones), 'mixed-resolution chunk'
+    rings = _engine.boundaries(res, [seq for _, seq in zones])
+    return [rings[seq] for _, seq in zones]
 
 
 def enumerate_cells(res):
