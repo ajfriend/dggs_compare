@@ -110,7 +110,7 @@ not per code release. The canonical producer is CI (native linux):
 
 ```sh
 gh workflow run data-release.yml -f tag=data-vN   # generate + gate + publish
-just fetch-data data-vN                           # pull the tables (~7GB)
+just fetch-data data-vN                           # pull the tables (10s of GB)
 ```
 
 The optional `-f runner=ubuntu-24.04-arm` input switches every job in the
@@ -133,7 +133,7 @@ Every plot and globe on the published site is generated in the full job from the
 release's tables — the site is a pure function of the data artifact. A full run
 also caches the built `web/out/` (keyed per tag); `rebuild=false` restores that
 cache and only re-copies the static files (HTML/CSS/JS), so a viewer-only change
-deploys in ~30s instead of re-fetching the ~7GB of tables. The first run after a
+deploys in ~30s instead of re-fetching all the tables. The first run after a
 data release must be a full one, to seed the cache.
 
 ## Relationship to csar_py

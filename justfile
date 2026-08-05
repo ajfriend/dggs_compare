@@ -95,7 +95,7 @@ data-publish tag:
     gh release upload {{tag}} data-stage/* --clobber
 
 # Download a data release's tables into data/cells/ — the instant alternative
-# to `just gen`. (~7GB at the 1M-cell budget; grab single tables with
+# to `just gen`. (10s of GB at the 1M-cell budget; grab single tables with
 # `gh release download <tag> -p '<sys>_r<res>.parquet'` instead if that's
 # all you need.)
 fetch-data tag:
