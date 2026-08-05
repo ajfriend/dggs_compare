@@ -35,8 +35,8 @@ calibrate:
 dnc-check:
     uv run scripts/dnc_check.py
 
-# Corners-vs-edge-refined AR validation for the DGGAL grids — run when
-# admitting a new DGGAL system to the pipeline.
+# Stats-input-vs-refined-boundary AR validation for EVERY registry system —
+# the check that admits a new grid to the pipeline.
 validate-corners:
     uv run scripts/validate_corners.py
 
@@ -115,3 +115,13 @@ purge:
 
 _rm pattern:
     -@find . -name "{{pattern}}" -prune -exec rm -rf {} +
+
+# Build the DGGRID binary into .tools/dggrid (needed by the isea4t system;
+# no wheels exist anywhere — clones + cmake-builds without GDAL, ~2 min)
+install-dggrid:
+    rm -rf .tools/dggrid-src
+    git clone --depth 1 https://github.com/sahrk/dggrid.git .tools/dggrid-src
+    cmake -S .tools/dggrid-src -B .tools/dggrid-src/build -DCMAKE_BUILD_TYPE=Release
+    cmake --build .tools/dggrid-src/build --target dggrid -j 8
+    cp .tools/dggrid-src/build/src/apps/dggrid/dggrid .tools/dggrid
+    rm -rf .tools/dggrid-src

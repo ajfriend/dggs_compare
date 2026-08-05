@@ -5,11 +5,11 @@ grid, but isea3h's odd-level cells straddling an icosahedron edge kink
 there — the real boundary bulges past the corner hexagon by 100s of
 meters (ground-truthed via point->zone), so corners-only AR is off by up
 to ~4e-3 for those cells, and `just validate-corners` reports this line
-red by design. The honest fix (a `stats_ring` of edge-refined vertices,
-see the registry contract) is disabled because dggal 0.0.6's runtime
-degrades under that path's per-cell array churn — revisit per issue #25
-(upstream distortion-vertices API / dggal 0.0.7 / direct-C corners).
-Even levels are corner-exact (<2e-8), as is all of IVEA3H.
+red by design. The honest fix (a `stats_rings` override of edge-refined
+vertices, see the registry contract) is disabled because dggal 0.0.6's
+runtime degrades under that path's per-cell array churn — revisit per
+issue #25 (upstream distortion-vertices API / dggal 0.0.7 / direct-C
+corners). Even levels are corner-exact (<2e-8), as is all of IVEA3H.
 """
 
 from dggs_compare.dggal_engine import Adapter
@@ -30,16 +30,20 @@ def num_cells(res):
     return _adapter.count(res)
 
 
-def cell_at(res, lat, lng):
-    return _adapter.zone_at(res, lng, lat)
+def cells_at(res, points):
+    return _adapter.cells_at(res, points)
 
 
-def cid_str(z):
-    return _adapter.cid_str(z)
+def cid_strs(zones):
+    return _adapter.cid_strs(zones)
 
 
-def cell_boundary(z):
-    return _adapter.cell_boundary(z)
+def boundaries(res, zones):
+    return _adapter.boundaries(zones)
+
+
+def refined_boundaries(res, zones, refine):
+    return _adapter.refined_boundaries(zones, refine)
 
 
 def enumerate_cells(res):

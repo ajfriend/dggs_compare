@@ -3,13 +3,15 @@
 a5_fast's `cell_to_boundary` returns an adaptively densified ring (321
 points at res 0 down to 6 from res ~9 up). The extra points don't change the
 enclosing-cone AR — validated to max |dAR| = 3.5e-9 across resolutions by
-scripts/validate_corners_a5.py — so `cell_boundary` reduces the ring to its
+scripts/validate_corners_a5.py — so the boundary path reduces the ring to its
 corner vertices (turning-angle peaks): 5 for the pentagons, 3 for the res-1
 "quintant" triangles.
 """
 
 import a5_fast as a5
 import numpy as np
+
+from dggs_compare import stats
 
 # Exterior-angle threshold marking a corner (degrees). Densified edge points
 # turn by small fractions of a degree; true corners by tens of degrees.
@@ -24,12 +26,13 @@ def num_cells(res):
     return a5.get_num_cells(res)
 
 
-def cell_at(res, lat, lng):
-    return a5.lonlat_to_cell(lng, lat, res)   # int, hashable
+def cells_at(res, points):
+    return [a5.lonlat_to_cell(lng, lat, res)   # int, hashable
+            for lat, lng in points]
 
 
-def cid_str(z):
-    return a5.u64_to_hex(z)
+def cid_strs(zones):
+    return [a5.u64_to_hex(z) for z in zones]
 
 
 def _corners(latlng):
@@ -44,9 +47,25 @@ def _corners(latlng):
     return [latlng[i] for i in idx] if len(idx) >= 3 else latlng
 
 
-def cell_boundary(z):
+def _boundary(z):
     ring = a5.cell_to_boundary(z)   # closed ring of (lng, lat), densified
     return _corners([(lat, lng) for lng, lat in ring[:-1]])
+
+
+def boundaries(res, zones):
+    return [_boundary(z) for z in zones]
+
+
+def refined_boundaries(res, zones, refine):
+    # a5's native boundary is adaptively densified under a5's own edge
+    # model (321 points at r0 down to 6 from res ~9 up). Slerp `refine`
+    # points between the native vertices on top of that, so the reference
+    # stays strictly finer than the corner ring even at the deep
+    # resolutions where the native ring IS the corner ring.
+    return [stats.refine_geodesic(
+                [(lat, lng) for lng, lat in a5.cell_to_boundary(z)[:-1]],
+                refine)
+            for z in zones]
 
 
 def enumerate_cells(res):

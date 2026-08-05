@@ -2,6 +2,8 @@
 
 import h3
 
+from dggs_compare import stats
+
 
 def resolutions():
     return range(16)            # h3 supports 0..15
@@ -11,16 +13,28 @@ def num_cells(res):
     return h3.get_num_cells(res)
 
 
-def cell_at(res, lat, lng):
-    return h3.latlng_to_cell(lat, lng, res)
+def cells_at(res, points):
+    return [h3.latlng_to_cell(lat, lng, res) for lat, lng in points]
 
 
-def cid_str(z):
-    return str(z)
+def cid_strs(zones):
+    return [str(z) for z in zones]
 
 
-def cell_boundary(z):
-    return h3.cell_to_boundary(z)   # [(lat, lng), ...] deg, corners only
+def boundaries(res, zones):
+    return [h3.cell_to_boundary(z) for z in zones]   # (lat, lng) deg corners
+
+
+def refined_boundaries(res, zones, refine):
+    # h3 edges ARE geodesics between the boundary vertices (which already
+    # include icosahedron-edge distortion vertices), so refinement is slerp.
+    # Note: since the reference is built from the same corners under the
+    # same edge model, validate-corners reduces to a solver-numerics check
+    # here (agreement is a convexity theorem) — it cannot falsify the
+    # geodesic-edge model itself; only a point-classification ground-truth
+    # test could.
+    return [stats.refine_geodesic(h3.cell_to_boundary(z), refine)
+            for z in zones]
 
 
 def enumerate_cells(res):
