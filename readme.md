@@ -1,9 +1,10 @@
 # dggs_compare
 
 Comparing discrete global grid systems — **H3, S2, A5, ISEA7H, IVEA7H,
-ISEA3H, IVEA3H, rHEALPix, hex9** — by per-cell statistics: shape (aspect ratio via
-[csar](https://github.com/ajfriend/csar_py)'s enclosing-cone solver) and area
-(via [sparea](https://pypi.org/project/sparea/)), at area-matched resolutions.
+**ISEA3H, IVEA3H, ISEA4T, rHEALPix, hex9** — by per-cell statistics: shape (aspect
+ratio via [csar](https://github.com/ajfriend/csar_py)'s enclosing-cone
+solver) and area (via [sparea](https://pypi.org/project/sparea/)), at
+area-matched resolutions.
 
 **The products of this repo are data artifacts and web pages.** The Parquet
 tables — one row per cell, with the computed `ar` and `area` bundled next to
@@ -21,6 +22,8 @@ surfaces.
 Not listed separately: **IGEO7** is geometrically identical to ISEA7H (it is
 ISEA7H with Z7 cell indexing), so its shape/area statistics are already
 covered by the ISEA7H tables — only the cell ID strings would differ.
+**IVEA4T** has no implementation to compare against: DGGRID has no IVEA
+projection, and dggal has no triangle grids.
 
 ## Layout
 
@@ -31,6 +34,7 @@ src/dggs_compare/     the internal library (organization only, not for PyPI)
                         registry (see "Adding a grid")
   registry.py           folder discovery + lazy imports
   dggal_engine.py       shared DGGAL glue + the live-engine Adapter
+  dggrid_engine.py      DGGRID batch-subprocess engine (backs isea4t)
   stats.py              per-cell AR (csar) + area (sparea)
   cache.py              the Parquet tables: build + read (data/cells/)
   checks.py             DNC invariants (cached-ar or re-solve modes)
@@ -48,7 +52,9 @@ tricks; the registry imports a system's module on first use, so table-reading
 consumers never load a DGGS binding. One platform wrinkle: dggal 0.0.6's
 macOS arm64 wheel still bundles x86_64 dylibs, so on Apple Silicon the env
 runs x86_64 under Rosetta (one justfile line); Linux is native (CI generates
-the canonical data there).
+the canonical data there). The one system outside the env: isea4t shells out
+to a DGGRID binary (no wheels exist anywhere) — `just install-dggrid` builds
+it into `.tools/` in ~2 min; CI installs it only on the runner that needs it.
 
 ## Use
 
@@ -59,7 +65,7 @@ just calibrate         # area-match resolutions across systems
 just dnc-check         # assert the DNC invariants (pass/fail)
 just site              # build the static site into web/out/ (survey plots + globes)
 just web               # build the site, then serve it at :8000
-just validate-corners  # corners-only exactness check (per new DGGAL grid)
+just validate-corners  # stats-inputs-vs-refined-edges check, every system
 ```
 
 ## Adding a grid
@@ -67,14 +73,14 @@ just validate-corners  # corners-only exactness check (per new DGGAL grid)
 The `systems/` folder is the registry — the data-release gen matrix is
 derived from it at run time. A new DGGS touches:
 
-1. `src/dggs_compare/systems/<name>.py` — the module (mirror any existing
-   one; add `stats_ring` only if the corner ring isn't faithful).
+1. `src/dggs_compare/systems/<name>.py` — the module (the batch-first
+   contract is `registry.py`'s docstring; mirror any existing system; add
+   `stats_rings` only if the corner rings are not faithful).
 2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
    (count-match, then confirm with `just calibrate` once tables exist),
    `SYS_COLOR`.
 
-Then run `just validate-corners` (the admission gate for DGGAL-backed
-grids) and cut a data release — `just dnc-check` fails its publish gate
+Then run `just validate-corners` (the admission gate) and cut a data release — `just dnc-check` fails its publish gate
 unless every registry system has tables and `PER_SYSTEM` config.
 
 ## Table schema

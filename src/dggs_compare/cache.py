@@ -117,8 +117,9 @@ def _select_zones(sysmod, dggs, res):
                 f'{dggs} r{res}: {drawn:,} draws yielded only '
                 f'{len(zones):,}/{n:,} distinct cells')
         k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
-        for lng, lat in stats.sample_uniform_lnglat(k, rng):
-            z = sysmod.cell_at(res, float(lat), float(lng))
+        pts = stats.sample_uniform_latlng(k, rng).tolist()
+        hits = sysmod.cells_at(res, pts)
+        for (lat, lng), z in zip(pts, hits):
             if z is None:
                 # The engine couldn't resolve the point (DGGAL nullZone at
                 # rare singular points) — draw again, and log the specimen:
@@ -141,13 +142,13 @@ def build_table(dggs, res):
     any budget."""
     t0 = time.perf_counter()
     sysmod = registry.get(dggs)
-    stats_ring = getattr(sysmod, 'stats_ring', None)
+    stats_rings = getattr(sysmod, 'stats_rings', None)
     zones, mode = _select_zones(sysmod, dggs, res)
 
     # Sort by cid for a canonical, deterministic row order (independent of
     # sampling order): enables Parquet cid page-stats / range pushdown, and
     # lets DELTA_BYTE_ARRAY prefix-compress the sorted ids.
-    zones = sorted(((sysmod.cid_str(z), z) for z in zones), key=lambda cz: cz[0])
+    zones = sorted(zip(sysmod.cid_strs(zones), zones), key=lambda cz: cz[0])
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = table_path(dggs, res)
@@ -174,17 +175,18 @@ def build_table(dggs, res):
     try:
         for lo in range(0, len(zones), BATCH):
             chunk = zones[lo:lo + BATCH]
-            cids, verts, ars, areas = [], [], [], []
-            for cid, z in chunk:
-                latlng = [[float(la), float(ln)]
-                          for la, ln in open_ring(sysmod.cell_boundary(z))]
-                # A system may declare its corner ring unfit for the solvers
-                # (isea3h: odd-level cells kink at icosahedron edges) by
-                # exposing stats_ring(z); verts still stores the corners.
-                sring = stats_ring(z) if stats_ring else None
+            cids, zlist = zip(*chunk)
+            rings = sysmod.boundaries(res, zlist)
+            # A system may declare some corner rings unfit for the solvers
+            # (isea3h: odd-level cells kink at icosahedron edges) via the
+            # optional stats_rings override; verts still stores corners.
+            srings = (stats_rings(res, zlist) if stats_rings
+                      else [None] * len(chunk))
+            verts, ars, areas = [], [], []
+            for ring, sring in zip(rings, srings):
+                latlng = [[float(la), float(ln)] for la, ln in open_ring(ring)]
                 ar, area = stats.cell_stats(
                     latlng if sring is None else open_ring(sring))
-                cids.append(cid)
                 verts.append(latlng)
                 ars.append(ar)
                 areas.append(area)

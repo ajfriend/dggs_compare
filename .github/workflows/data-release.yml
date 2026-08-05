@@ -72,6 +72,13 @@ jobs:
           enable-cache: false
       - uses: extractions/setup-just@v4
       - run: just sync
+      # DGGRID-backed systems (detected from the module source, so no
+      # hand-maintained list) need the dggrid binary built into .tools/.
+      - name: install dggrid if this system needs it
+        run: |
+          if grep -q dggrid_engine "src/dggs_compare/systems/${{ matrix.system }}.py"; then
+            just install-dggrid
+          fi
       - run: just gen ${{ matrix.system }}
       - uses: actions/upload-artifact@v6
         with:

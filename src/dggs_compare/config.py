@@ -43,18 +43,16 @@ FULL_RES = {'ivea7h': (1, 2, 3, 5, 6)}
 # a module in systems/ (the folder is the registry; this is its metadata).
 TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
               'rhealpix': 9,
-              # count-matched picks (10*3^r+2 vs H3 r9); confirm with
-              # scripts/calibrate.py once the first 3H tables are generated
+              # confirmed by calibrate on the data-v4 tables (1.210x h3 r9)
               'isea3h': 18, 'ivea3h': 18,
-              # count-matched (12*9^9 = 4.65e9 vs H3 r9's 4.84e9); confirm
-              # with scripts/calibrate.py once the first hex9 tables exist
-              'hex9': 9}
+              # confirmed by calibrate on the 1M-cell tables (0.872x h3 r9)
+              'isea4t': 14}
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
              'ivea7h': 'C4', 'rhealpix': 'C5', 'isea3h': 'C6',
-             'ivea3h': 'C7', 'hex9': 'C8'}
-# S2 numbers its resolutions "levels" and hex9 "layers"; everyone else says "r".
-RES_PREFIX = {s: 'L' if s in ('s2', 'hex9') else 'r' for s in TARGET_RES}
+             'ivea3h': 'C7', 'isea4t': 'C8', 'hex9': 'C9'}
+# S2 numbers its resolutions "levels"; everyone else says "r".
+RES_PREFIX = {s: 'L' if s == 's2' else 'r' for s in TARGET_RES}
 
 # ----- globe view: area-matched resolutions -------------------------------
 # Total cell count at each resolution, per system — exact closed forms. These
@@ -69,6 +67,7 @@ CELLS_PER_RES = {
     'ivea7h':   lambda r: 10 * 7 ** r + 2,
     'isea3h':   lambda r: 10 * 3 ** r + 2,                # 12, 32, 92, 272, 812, ...
     'ivea3h':   lambda r: 10 * 3 ** r + 2,
+    'isea4t':   lambda r: 20 * 4 ** r,                    # 20, 80, 320, 1280, ...
     'rhealpix': lambda r: 6 * 9 ** r,                     # 6, 54, 486, 4374, 39366, ...
     'hex9':     lambda r: 12 * 9 ** r,                    # 12, 108, 972, 8748, ...
 }
