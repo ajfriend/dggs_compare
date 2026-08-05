@@ -28,6 +28,13 @@ solvers INSTEAD of cell_boundary(z), or None where the corner ring is
 already faithful — for systems whose corners do not always bound the cell
 (isea3h: odd-level cells kink at icosahedron edges). The tables' verts
 column always stores the corner ring.
+
+Optional batch hooks, preferred by cache.py when present — for
+subprocess-backed systems (isea4t/DGGRID) where per-cell calls would cost
+a process spawn each:
+
+    cells_at_batch(res, [(lat, lng), ...]) -> [zone-or-None, ...]
+    boundaries_batch(zones) -> {zone: open ring}   (primes cell_boundary)
 """
 
 import importlib

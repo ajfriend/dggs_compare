@@ -115,3 +115,13 @@ purge:
 
 _rm pattern:
     -@find . -name "{{pattern}}" -prune -exec rm -rf {} +
+
+# Build the DGGRID binary into .tools/dggrid (needed by the isea4t system;
+# no wheels exist anywhere — clones + cmake-builds without GDAL, ~2 min)
+install-dggrid:
+    rm -rf .tools/dggrid-src
+    git clone --depth 1 https://github.com/sahrk/dggrid.git .tools/dggrid-src
+    cmake -S .tools/dggrid-src -B .tools/dggrid-src/build -DCMAKE_BUILD_TYPE=Release
+    cmake --build .tools/dggrid-src/build --target dggrid -j 8
+    mkdir -p .tools && cp .tools/dggrid-src/build/src/apps/dggrid/dggrid .tools/dggrid
+    rm -rf .tools/dggrid-src
