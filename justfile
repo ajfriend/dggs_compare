@@ -35,8 +35,8 @@ calibrate:
 dnc-check:
     uv run scripts/dnc_check.py
 
-# Corners-vs-edge-refined AR validation for the DGGAL grids — run when
-# admitting a new DGGAL system to the pipeline.
+# Stats-input-vs-refined-boundary AR validation for EVERY registry system —
+# the check that admits a new grid to the pipeline.
 validate-corners:
     uv run scripts/validate_corners.py
 
