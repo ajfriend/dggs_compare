@@ -124,15 +124,20 @@ h2 {
 /* histogram + color bar share this width and left edge, so a cell's AR lines
    up in both. Sticky: with nine globes the grid is three rows deep, and the
    histogram would be scrolled away by row two — pin it to the viewport top
-   while the globes section is in view (it releases at the section's end). */
+   while the globes section is in view (it releases at the section's end).
+   Styled as a bordered pill so it reads as a deliberate HUD, not a clipped
+   leftover, when globes scroll past beside it. */
 .scale-viz {
   max-width: 480px;
   margin: 0 0 8px;
   position: sticky;
-  top: 0;
+  top: 8px;
   z-index: 30;
-  background: var(--bg);
-  padding: 10px 0 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 }
 .hist-head {
   display: flex;
