@@ -8,25 +8,34 @@
 // - all globes rotate/zoom together.
 import { Orb } from './vendor/ajglobe.min.js';
 
-// ---- colormaps: RGB control points (0–255), linearly interpolated ----
-const CMAPS = {
-  viridis: [[68,1,84],[72,40,120],[62,74,137],[49,104,142],[38,130,142],
-            [31,158,137],[53,183,121],[110,206,88],[181,222,43],[253,231,37]],
-  cividis: [[0,34,78],[0,55,110],[62,73,106],[112,94,100],[150,116,94],
-            [190,140,86],[230,169,73],[255,201,58],[255,233,69]],
-  magma:   [[0,0,4],[28,16,68],[79,18,123],[129,37,129],[181,54,122],
-            [229,80,100],[251,135,97],[254,194,135],[252,253,191]],
-  // CET-R2: Kovesi's perceptually uniform rainbow (stops from colorcet).
-  cetr2:   [[0,51,245],[0,78,214],[0,99,183],[0,115,154],[40,127,127],
+// ---- the two dropdown axes. One entry per option, in menu order; the FIRST
+// entry of each list is the default (labeled so in the UI at build time).
+// Adding a colormap or transform is one new object here — the dropdowns and
+// lookups all derive from these lists.
+// Colormap stops: RGB control points (0–255), linearly interpolated.
+const CMAPS = [
+  { key: 'viridis', label: 'Viridis (perceptually uniform)',
+    stops: [[68,1,84],[72,40,120],[62,74,137],[49,104,142],[38,130,142],
+            [31,158,137],[53,183,121],[110,206,88],[181,222,43],[253,231,37]] },
+  { key: 'cividis', label: 'Cividis (uniform, colorblind-optimized)',
+    stops: [[0,34,78],[0,55,110],[62,73,106],[112,94,100],[150,116,94],
+            [190,140,86],[230,169,73],[255,201,58],[255,233,69]] },
+  { key: 'magma', label: 'Magma (uniform)',
+    stops: [[0,0,4],[28,16,68],[79,18,123],[129,37,129],[181,54,122],
+            [229,80,100],[251,135,97],[254,194,135],[252,253,191]] },
+  { key: 'cetr2', label: 'CET-R2 (rainbow, perceptually uniform)',
+    // Kovesi's uniform rainbow; stops from colorcet.
+    stops: [[0,51,245],[0,78,214],[0,99,183],[0,115,154],[40,127,127],
             [57,138,101],[63,151,69],[64,162,33],[87,171,14],[116,177,19],
             [142,184,24],[167,190,29],[191,195,34],[215,201,39],[238,205,43],
             [251,198,42],[253,184,36],[254,168,30],[255,151,23],[255,135,17],
-            [255,118,10],[255,99,4],[254,77,0],[252,48,0]],
-  turbo:   [[48,18,59],[54,88,196],[36,133,237],[30,183,208],[45,224,152],
+            [255,118,10],[255,99,4],[254,77,0],[252,48,0]] },
+  { key: 'turbo', label: 'Turbo (rainbow — NOT perceptually uniform)',
+    stops: [[48,18,59],[54,88,196],[36,133,237],[30,183,208],[45,224,152],
             [122,247,79],[189,238,52],[245,197,45],[251,131,42],[226,72,28],
-            [175,31,17],[122,4,3]],
-  gray:    [[20,20,20],[245,245,245]],
-};
+            [175,31,17],[122,4,3]] },
+  { key: 'gray', label: 'Grayscale', stops: [[20,20,20],[245,245,245]] },
+];
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 function interp(stops, t) {
   t = clamp01(t) * (stops.length - 1);
@@ -34,31 +43,20 @@ function interp(stops, t) {
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 255];
 }
 const LUTS = {};
-const lutFor = (name) => (LUTS[name] ??= Array.from({ length: 256 }, (_, i) => interp(CMAPS[name], i / 255)));
+const lutFor = (cmap) => (LUTS[cmap.key] ??= Array.from({ length: 256 }, (_, i) => interp(cmap.stops, i / 255)));
 
-// ---- value transforms: aspect ratio (>= 1) -> t in [0,1] for the COLOR.
-// The AR axis (histogram + legend position) stays linear over [1, max]; only
-// the color placement changes, so a stretched scale shows saturation visibly.
-const TF = {
-  linear: (ar, d) => (ar - 1) / (d.max - 1),
-  power:  (ar, d) => Math.pow((ar - 1) / (d.max - 1), 0.4),   // the "modified" stretch
-  p99:    (ar, d) => clamp01((ar - 1) / (d.p99 - 1)),         // linear, saturates at p99
-  log:    (ar, d) => (d.max > 1 ? Math.log(ar) / Math.log(d.max) : 0),
-};
-// The two dropdowns: colors, and where along the AR axis they are spent.
-const CMAP_OPTS = [
-  { key: 'viridis', label: 'Viridis (perceptually uniform — the default)' },
-  { key: 'cividis', label: 'Cividis (uniform, colorblind-optimized)' },
-  { key: 'magma',   label: 'Magma (uniform)' },
-  { key: 'cetr2',   label: 'CET-R2 (rainbow, perceptually uniform)' },
-  { key: 'turbo',   label: 'Turbo (rainbow — NOT perceptually uniform)' },
-  { key: 'gray',    label: 'Grayscale' },
-];
-const TF_OPTS = [
-  { key: 'power',  label: 'γ0.4 stretch (the default)' },
-  { key: 'linear', label: 'linear in AR' },
-  { key: 'p99',    label: 'linear, saturates at p99' },
-  { key: 'log',    label: 'log' },
+// Value transforms: aspect ratio (>= 1) -> t in [0,1] for the COLOR. The AR
+// axis (histogram + legend position) stays linear over [1, max]; only the
+// color placement changes, so a stretched scale shows saturation visibly.
+const TFS = [
+  { key: 'power', label: 'γ0.4 stretch',
+    fn: (ar, d) => Math.pow((ar - 1) / (d.max - 1), 0.4) },
+  { key: 'linear', label: 'linear in AR',
+    fn: (ar, d) => (ar - 1) / (d.max - 1) },
+  { key: 'p99', label: 'linear, saturates at p99',
+    fn: (ar, d) => clamp01((ar - 1) / (d.p99 - 1)) },
+  { key: 'log', label: 'log',
+    fn: (ar, d) => (d.max > 1 ? Math.log(ar) / Math.log(d.max) : 0) },
 ];
 
 const DNC_GREY = [68, 68, 68, 255];
@@ -74,10 +72,10 @@ async function fetchBin(path, Ctor) {
 
 const DOMAIN = { max: 1, p99: 1 };   // shared AR domain over all globe cells
 const PANELS = [];                   // { sys, label, color, orb, layer, ar, hist }
-let scale = { cmap: 'viridis', tf: 'power' };
+let scale = { cmap: CMAPS[0], tf: TFS[0] };   // the current pick (defaults)
 
 const makeFill = (ar, sc) => {
-  const lut = lutFor(sc.cmap), tf = TF[sc.tf];
+  const lut = lutFor(sc.cmap), tf = sc.tf.fn;
   return (i) => {
     const a = ar[i];
     if (!Number.isFinite(a)) return DNC_GREY;
@@ -88,7 +86,7 @@ const makeFill = (ar, sc) => {
 function drawLegend(sc) {
   $('#legLo').textContent = '1.0';
   $('#legHi').textContent = fmt(DOMAIN.max, 2);
-  const lut = lutFor(sc.cmap), tf = TF[sc.tf], n = 96;
+  const lut = lutFor(sc.cmap), tf = sc.tf.fn, n = 96;
   const stops = Array.from({ length: n }, (_, i) => {
     const p = i / (n - 1), ar = 1 + p * (DOMAIN.max - 1);
     const c = lut[Math.min(255, (tf(ar, DOMAIN) * 255) | 0)];
@@ -97,10 +95,9 @@ function drawLegend(sc) {
   $('#legendGrad').style.background = `linear-gradient(90deg, ${stops})`;
 }
 
-function applyScale(sc) {
-  scale = sc;
-  drawLegend(sc);
-  for (const p of PANELS) p.layer.update({ fill: makeFill(p.ar, sc) });
+function applyScale() {
+  drawLegend(scale);
+  for (const p of PANELS) p.layer.update({ fill: makeFill(p.ar, scale) });
 }
 
 // ---- shared AR domain + per-globe histograms (bars are scale-independent) ----
@@ -265,20 +262,23 @@ async function main() {
   initHist();
 
   const cmapSel = $('#cmapSelect'), tfSel = $('#tfSelect');
-  CMAP_OPTS.forEach((o) => cmapSel.add(new Option(o.label, o.key)));
-  TF_OPTS.forEach((o) => tfSel.add(new Option(o.label, o.key)));
-  cmapSel.value = scale.cmap;
-  tfSel.value = scale.tf;
+  const onPick = () => {
+    scale = { cmap: CMAPS.find((c) => c.key === cmapSel.value),
+              tf: TFS.find((t) => t.key === tfSel.value) };
+    applyScale();
+  };
+  for (const [sel, opts] of [[cmapSel, CMAPS], [tfSel, TFS]]) {
+    opts.forEach((o, i) =>
+      sel.add(new Option(i ? o.label : `${o.label} — the default`, o.key)));
+    sel.addEventListener('change', onPick);
+  }
+  // a fresh <select> starts on its first option, which IS the default
 
   DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
   DOMAIN.p99 = DOMAIN.max;
   for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
   computeDomainAndHists();
-  applyScale(scale);
+  onPick();                           // apply the selects' current state
   drawHist(PANELS[0], null);          // seed the histogram before any hover
-
-  const onPick = () => applyScale({ cmap: cmapSel.value, tf: tfSel.value });
-  cmapSel.addEventListener('change', onPick);
-  tfSel.addEventListener('change', onPick);
 }
 main();
