@@ -8,33 +8,31 @@ so `import dggs_compare` and the table-reading consumers never load a DGGS
 binding (or spin up the DGGAL engine); inside a system module, its binding
 is a plain top-level import.
 
-Every systems/ module implements:
+The contract is batch-first: subprocess-backed systems (isea4t/DGGRID)
+resolve a whole chunk per call, and in-process backends just loop — the
+reverse adaptation (batch on top of per-cell) is what stateful hacks are
+made of. Every systems/ module implements:
 
-    resolutions()            -> range of generatable resolutions (0..finest)
-    num_cells(res)           -> int, total cells at `res`
-    cell_at(res, lat, lng)   -> native cell id (hashable) at the point, or
-                                None when the engine can't resolve it (rare
-                                DGGAL deep-level singular points) — samplers
-                                skip and draw again
-    cid_str(z)               -> str text id stored in the tables
-    cell_boundary(z)         -> [(lat, lng), ...] degrees, open corner ring
+    resolutions()          -> range of generatable resolutions (0..finest)
+    num_cells(res)         -> int, total cells at `res`
+    cells_at(res, points)  -> [zone or None, ...] for [(lat, lng), ...];
+                              zones are opaque hashables; None = the engine
+                              couldn't resolve the point (rare DGGAL
+                              deep-level singular points) — samplers skip
+                              and draw again
+    cid_str(z)             -> str text id stored in the tables
+    boundaries(zones)      -> [[(lat, lng), ...] open corner ring, ...]
+                              aligned with `zones`, degrees
+    enumerate_cells(res)   -> iterator of every zone at `res`
 
 DGGAL-backed modules additionally expose `adapter()` — the live-engine
 `dggal_engine.Adapter` (neighbors, edge-refined vertices, …) for analyses
 that need more than a bag of cells.
 
-Optional: `stats_ring(z)` -> [(lat, lng), ...] open ring fed to the AR/area
-solvers INSTEAD of cell_boundary(z), or None where the corner ring is
-already faithful — for systems whose corners do not always bound the cell
-(isea3h: odd-level cells kink at icosahedron edges). The tables' verts
-column always stores the corner ring.
-
-Optional batch hooks, preferred by cache.py when present — for
-subprocess-backed systems (isea4t/DGGRID) where per-cell calls would cost
-a process spawn each:
-
-    cells_at_batch(res, [(lat, lng), ...]) -> [zone-or-None, ...]
-    boundaries_batch(zones) -> {zone: open ring}   (primes cell_boundary)
+Optional: `stats_rings(zones)` -> [ring or None, ...] fed to the AR/area
+solvers INSTEAD of the corner rings where not None — for systems whose
+corners do not always bound the cell (isea3h: odd-level cells kink at
+icosahedron edges). The tables' verts column always stores corner rings.
 """
 
 import importlib

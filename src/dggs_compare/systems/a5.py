@@ -24,8 +24,9 @@ def num_cells(res):
     return a5.get_num_cells(res)
 
 
-def cell_at(res, lat, lng):
-    return a5.lonlat_to_cell(lng, lat, res)   # int, hashable
+def cells_at(res, points):
+    return [a5.lonlat_to_cell(lng, lat, res)   # int, hashable
+            for lat, lng in points]
 
 
 def cid_str(z):
@@ -44,9 +45,13 @@ def _corners(latlng):
     return [latlng[i] for i in idx] if len(idx) >= 3 else latlng
 
 
-def cell_boundary(z):
+def _boundary(z):
     ring = a5.cell_to_boundary(z)   # closed ring of (lng, lat), densified
     return _corners([(lat, lng) for lng, lat in ring[:-1]])
+
+
+def boundaries(zones):
+    return [_boundary(z) for z in zones]
 
 
 def enumerate_cells(res):

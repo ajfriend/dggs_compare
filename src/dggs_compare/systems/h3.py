@@ -11,16 +11,16 @@ def num_cells(res):
     return h3.get_num_cells(res)
 
 
-def cell_at(res, lat, lng):
-    return h3.latlng_to_cell(lat, lng, res)
+def cells_at(res, points):
+    return [h3.latlng_to_cell(lat, lng, res) for lat, lng in points]
 
 
 def cid_str(z):
     return str(z)
 
 
-def cell_boundary(z):
-    return h3.cell_to_boundary(z)   # [(lat, lng), ...] deg, corners only
+def boundaries(zones):
+    return [h3.cell_to_boundary(z) for z in zones]   # (lat, lng) deg corners
 
 
 def enumerate_cells(res):

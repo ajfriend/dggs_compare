@@ -5,9 +5,9 @@ edges that's exact: the min-enclosing ellipse of the corners already contains
 them (convexity). The equal-area DGGAL grids have slightly *non-geodesic*
 edges that could bow outward at coarse levels — and isea3h's odd-level cells
 genuinely kink at icosahedron edges, which is why that system feeds the
-solvers an edge-refined `stats_ring` instead. So this checks, for every
+solvers edge-refined `stats_rings` instead. So this checks, for every
 DGGAL-backed system in the registry, whatever ring the pipeline ACTUALLY
-feeds csar (corners, or the system's stats_ring override) against a
+feeds csar (corners, or the system's stats_rings override) against a
 doubly-refined reference boundary, across levels — including the coarsest
 and the 12 pentagons (level 0). If the max delta is within solver tolerance,
 the stats input is confirmed faithful.
@@ -52,10 +52,10 @@ def cells_for_level(ad, level, rng):
     return out
 
 
-def check(name, ad, stats_ring=None):
+def check(name, ad, stats_rings=None):
     """Report stats-ring-vs-reference max |dAR| per level; return the max."""
     rng = np.random.default_rng(SEED)
-    src = 'corners' if stats_ring is None else 'stats_ring'
+    src = 'corners' if stats_rings is None else 'stats_rings'
     print(f'\n{name} {src}-vs-refined (edgeRefinement={REF_REFINE})')
     print(f'{"lvl":>3} {"cells":>6} {"pents":>6} {"max|dAR|":>10} '
           f'{"max_rel":>10} {"stats_AR_range":>22}')
@@ -71,7 +71,7 @@ def check(name, ad, stats_ring=None):
             corners = ad.verts(z)
             if corners.shape[0] == 5:
                 npent += 1
-            ring = stats_ring(z) if stats_ring else None
+            ring = stats_rings([z])[0] if stats_rings else None
             stats_in = corners if ring is None else csar.to_vec3(
                 ring, geo='latlng_deg')
             a_c = ar(stats_in)
@@ -97,7 +97,7 @@ def main():
         if not hasattr(sysmod, 'adapter'):     # DGGAL-backed systems only
             continue
         worst = max(worst, check(name, sysmod.adapter(),
-                                 getattr(sysmod, 'stats_ring', None)))
+                                 getattr(sysmod, 'stats_rings', None)))
     print(f'\noverall max |dAR| across all grids = {worst:.3e}')
     print('stats input CONFIRMED (within solver tolerance)' if worst < 1e-3
           else 'stats-input delta NOT negligible — investigate')

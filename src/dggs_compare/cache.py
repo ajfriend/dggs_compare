@@ -108,10 +108,6 @@ def _select_zones(sysmod, dggs, res):
         idx = rng.choice(len(zones), n, replace=False)
         return [zones[i] for i in idx], 'subsam'
 
-    # Batch-native backends (DGGRID subprocess) resolve a whole chunk of
-    # points per call; per-point cell_at stays the default for in-process
-    # libraries.
-    cells_at_batch = getattr(sysmod, 'cells_at_batch', None)
     seen, zones = set(), []
     drawn = 0
     while len(zones) < n:
@@ -121,12 +117,8 @@ def _select_zones(sysmod, dggs, res):
                 f'{len(zones):,}/{n:,} distinct cells')
         k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
         pts = stats.sample_uniform_lnglat(k, rng)
-        if cells_at_batch is not None:
-            hits = cells_at_batch(res, [(float(la), float(ln))
-                                        for ln, la in pts])
-        else:
-            hits = (sysmod.cell_at(res, float(lat), float(lng))
-                    for lng, lat in pts)
+        hits = sysmod.cells_at(res, [(float(la), float(ln))
+                                     for ln, la in pts])
         for (lng, lat), z in zip(pts, hits):
             if z is None:
                 # The engine couldn't resolve the point (DGGAL nullZone at
@@ -150,7 +142,7 @@ def build_table(dggs, res):
     any budget."""
     t0 = time.perf_counter()
     sysmod = registry.get(dggs)
-    stats_ring = getattr(sysmod, 'stats_ring', None)
+    stats_rings = getattr(sysmod, 'stats_rings', None)
     zones, mode = _select_zones(sysmod, dggs, res)
 
     # Sort by cid for a canonical, deterministic row order (independent of
@@ -181,21 +173,19 @@ def build_table(dggs, res):
     )
     dnc = 0
     try:
-        boundaries_batch = getattr(sysmod, 'boundaries_batch', None)
         for lo in range(0, len(zones), BATCH):
             chunk = zones[lo:lo + BATCH]
-            # Batch-native backends fetch the whole chunk's rings in one
-            # subprocess call; cell_boundary then serves from that batch.
-            if boundaries_batch is not None:
-                boundaries_batch([z for _, z in chunk])
+            zlist = [z for _, z in chunk]
+            rings = sysmod.boundaries(zlist)
+            # A system may declare some corner rings unfit for the solvers
+            # (isea3h: odd-level cells kink at icosahedron edges) via the
+            # optional stats_rings override; verts still stores corners.
+            srings = stats_rings(zlist) if stats_rings else None
             cids, verts, ars, areas = [], [], [], []
-            for cid, z in chunk:
+            for i, (cid, z) in enumerate(chunk):
                 latlng = [[float(la), float(ln)]
-                          for la, ln in open_ring(sysmod.cell_boundary(z))]
-                # A system may declare its corner ring unfit for the solvers
-                # (isea3h: odd-level cells kink at icosahedron edges) by
-                # exposing stats_ring(z); verts still stores the corners.
-                sring = stats_ring(z) if stats_ring else None
+                          for la, ln in open_ring(rings[i])]
+                sring = srings[i] if srings else None
                 ar, area = stats.cell_stats(
                     latlng if sring is None else open_ring(sring))
                 cids.append(cid)

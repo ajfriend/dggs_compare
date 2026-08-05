@@ -18,16 +18,16 @@ def num_cells(res):
     return _adapter.count(res)
 
 
-def cell_at(res, lat, lng):
-    return _adapter.zone_at(res, lng, lat)
+def cells_at(res, points):
+    return [_adapter.zone_at(res, lng, lat) for lat, lng in points]
 
 
 def cid_str(z):
     return _adapter.cid_str(z)
 
 
-def cell_boundary(z):
-    return _adapter.cell_boundary(z)
+def boundaries(zones):
+    return [_adapter.cell_boundary(z) for z in zones]
 
 
 def enumerate_cells(res):
