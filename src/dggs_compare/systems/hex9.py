@@ -26,9 +26,16 @@ import math
 import hex9
 import numpy as np
 
+# The binding supports layers 0..30, but aperture 9 descends so fast that
+# r19 cells (~0.3 cm^2) are already smaller than ANY other system's finest
+# (s2 L30 ~ 0.74 cm^2), and past r19 the f64 solver floor takes over: r20 is
+# ~96% DNC and exposes a csar edge-case crash. Nothing beyond r19 is
+# numerically meaningful, so the pipeline stops there.
+MAX_RES = 19
+
 
 def resolutions():
-    return range(hex9.lmax() + 1)   # layers 0..30
+    return range(MAX_RES + 1)
 
 
 def num_cells(res):

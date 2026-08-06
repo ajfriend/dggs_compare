@@ -41,9 +41,17 @@ def missing_systems():
 
 
 def sweep_system(name, *, resolve=False):
-    """[(res, tested, dnc, [example cids])] over the system's tables."""
+    """[(res, tested, dnc, [example cids])] over the system's tables.
+
+    Sweeps the intersection of the tables on disk and the module's declared
+    resolutions() — a stale table outside the contract (e.g. left behind
+    when a system's MAX_RES was lowered) must not enter the invariants.
+    """
+    declared = set(registry.get(name).resolutions())
     rows = []
     for res in cache.available_resolutions(name):
+        if res not in declared:
+            continue
         if resolve:
             import csar
             tested = dnc = 0
