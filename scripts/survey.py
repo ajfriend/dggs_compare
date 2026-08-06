@@ -1,15 +1,29 @@
-"""DGGS aspect-ratio survey — reads the `ar` column of the tables (no
-solving) and writes the comparison plots to out/:
+"""DGGS aspect-ratio + authalicity survey — reads the `ar` and `area`
+columns of the tables (no solving) and writes the comparison plots to out/:
 
   histograms.png     cross-system AR distributions at the working resolutions
   extremes.png       best/worst cell per system, drawn with its ellipse
   by_res_<sys>.png   per-system AR distribution stacked by resolution
+  authalicity.png    cross-system cell-area ratio distributions
 
 Aspect ratio (AR) = major/minor semi-axis ratio (a/b, a>=1) of each cell's
 enclosing-cone ellipse — the discrete, per-cell analogue of Tissot's
 indicatrix. AR == 1 is isotropic; AR > 1 is anisotropic ("squished"). For an
 equal-area DGGS the areal factor a*b is ~fixed by construction, so AR is
 where the unavoidable distortion shows up.
+
+Authalicity: each cell's area as a ratio to the ideal equal-area share,
+area * N(res) / 4pi, with N(res) from the closed-form counts. Ratio 1 is
+perfect equal-area; the spread (CV%, max/min) is the areal counterpart of
+the AR story. Two honesty notes, both handled below: (1) the tables' `area`
+is measured on the coordinate sphere (geodetic lat/lng read as spherical) —
+a shared datum, but the systems that address the WGS84 authalic sphere or
+ellipsoid internally pick up ~0.1-0.4% of apparent CV that is datum
+mismatch, not grid distortion, so a native-datum CV (geodetic->authalic
+latitudes, exact closed form) is reported alongside; (2) point-sampled
+tables include cells with probability ~proportional to area, so their raw
+mean ratio sits at ~1+CV^2 — sampled-regime stats are inverse-area weighted
+back to per-cell uniform.
 
 Run with:  just survey
 No CLI args (project convention).
@@ -37,6 +51,14 @@ SYS_COLOR = config.SYS_COLOR
 OUT_DIR = Path(__file__).resolve().parent.parent / 'out'
 N_BINS = 60
 DPI = 200
+# Systems whose native addressing surface IS the coordinate sphere. Everyone
+# else converts geodetic latitude internally and does its equal-area work on
+# the WGS84 authalic sphere (dggal's Snyder family, DGGRID's ISEA4T, hex9)
+# or the ellipsoid (a5) — for those the native-datum column re-reads the
+# boundary through the exact authalic latitude, which also covers the
+# ellipsoid case (the authalic sphere preserves ellipsoidal areas, and the
+# ratio normalization cancels the radius).
+SPHERE_NATIVE = frozenset({'h3', 's2'})
 # -------------------------------------------------------------------------
 
 
@@ -62,6 +84,129 @@ def sweep_system(name):
     return {'by_res': by_res,
             'best': record(int(np.nanargmin(cols['ar']))),
             'worst': record(int(np.nanargmax(cols['ar'])))}
+
+
+# ----- authalicity -------------------------------------------------------
+_E2 = 0.00669437999014133                # WGS84 first eccentricity squared
+
+
+def _authalic_lat(lat_deg):
+    """Exact authalic latitude (degrees), closed-form q-function."""
+    e = np.sqrt(_E2)
+
+    def q(s):
+        return (1 - _E2) * (s / (1 - _E2 * s * s)
+                            - (0.5 / e) * np.log((1 - e * s) / (1 + e * s)))
+
+    s = np.sin(np.radians(lat_deg))
+    return np.degrees(np.arcsin(np.clip(q(s) / q(1.0), -1.0, 1.0)))
+
+
+def _chord_areas(verts_list, authalic):
+    """Cell areas (steradians) from corner rings, vectorized by ring length.
+
+    Planar 3D-polygon area 0.5*|sum(w_i x w_i+1)| with vertices centred on
+    the ring mean — at working-resolution cell sizes this matches the
+    spherical area to ~1e-15 relative while staying at full precision (the
+    centring keeps the edge vectors O(cell size), not O(1)). With
+    `authalic`, latitudes are mapped geodetic->authalic first — the sphere
+    the non-SPHERE_NATIVE systems actually address.
+    """
+    out = np.empty(len(verts_list))
+    by_len = {}
+    for i, v in enumerate(verts_list):
+        by_len.setdefault(len(v), []).append(i)
+    for _, idx in by_len.items():
+        v = np.asarray([verts_list[i] for i in idx], float)   # (m, k, 2)
+        lat = _authalic_lat(v[..., 0]) if authalic else v[..., 0]
+        la, lo = np.radians(lat), np.radians(v[..., 1])
+        xyz = np.stack([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo),
+                        np.sin(la)], axis=-1)
+        w = xyz - xyz.mean(axis=1, keepdims=True)
+        cr = np.cross(w, np.roll(w, -1, axis=1)).sum(axis=1)
+        out[np.asarray(idx)] = 0.5 * np.linalg.norm(cr, axis=1)
+    return out
+
+
+def sweep_area(name):
+    """The target-resolution cell-area ratios (area / ideal equal-area share)
+    plus per-cell weights and the native-datum CV.
+
+    Weights: the point-draw selection regime includes a cell with probability
+    ~proportional to its area, so those tables are inverse-area weighted back
+    to per-cell uniform (raw mean sits at ~1+CV^2 otherwise). Enumerated and
+    subsampled tables (total <= SUBSAMPLE_MAX_RATIO * N_CELLS) are already
+    uniform — the regime is derivable from the closed-form count.
+    """
+    res = RES[name]
+    total = config.CELLS_PER_RES[name](res)
+    cols = cache.load_columns(name, res, ['area', 'verts'])
+    ratio = cols['area'] * total / (4.0 * np.pi)
+    sampled = total > config.SUBSAMPLE_MAX_RATIO * config.N_CELLS
+    w = 1.0 / ratio if sampled else np.ones_like(ratio)
+    native_cv = None
+    if name not in SPHERE_NATIVE:
+        nat = _chord_areas(cols['verts'], authalic=True)
+        nr = nat * total / (4.0 * np.pi)
+        mu = np.average(nr, weights=w)
+        native_cv = 100.0 * np.sqrt(np.average((nr - mu) ** 2, weights=w)) / mu
+    return {'ratio': ratio, 'w': w, 'sampled': sampled, 'native_cv': native_cv}
+
+
+def plot_authalicity(area_results):
+    """Cross-system cell-area-ratio distributions at the working resolutions,
+    stacked on shared log2 bins (the spreads differ by ~100x across systems,
+    so linear shared bins would flatten the tight ones)."""
+    lo = min(float(d['ratio'].min()) for d in area_results.values())
+    hi = max(float(d['ratio'].max()) for d in area_results.values())
+    bins = np.geomspace(lo * 0.999, hi * 1.001, N_BINS + 1)
+
+    print(f'\n{"sys":5} {"n":>8} {"mean":>8} {"cv%":>8} {"natCV%":>8} '
+          f'{"min":>8} {"median":>8} {"max":>8} {"max/min":>8}')
+    for s in SYSTEMS:
+        d = area_results[s]
+        r, w = d['ratio'], d['w']
+        mu = np.average(r, weights=w)
+        cv = 100.0 * np.sqrt(np.average((r - mu) ** 2, weights=w)) / mu
+        nat = f'{d["native_cv"]:>7.4f}†' if d['native_cv'] is not None else f'{cv:>7.4f} '
+        print(f'{s:5} {r.size:>8} {mu:>8.5f} {cv:>8.4f} {nat} '
+              f'{r.min():>8.4f} {np.median(r):>8.4f} {r.max():>8.4f} '
+              f'{r.max() / r.min():>8.4f}')
+    print('† native-datum CV: boundary re-read through the exact authalic '
+          'latitude —\n  the surface these grids address internally; the '
+          'plain cv% keeps the shared\n  coordinate-sphere datum for '
+          'comparability.')
+
+    fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
+    for ax, s in zip(axes, SYSTEMS):
+        d = area_results[s]
+        r, w = d['ratio'], d['w']
+        mu = np.average(r, weights=w)
+        cv = 100.0 * np.sqrt(np.average((r - mu) ** 2, weights=w)) / mu
+        ax.hist(r, bins=bins, weights=w, color=SYS_COLOR[s],
+                edgecolor='white', linewidth=0.3)
+        ax.axvline(1.0, color='0.25', lw=0.8, ls='--', alpha=0.7)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_ylabel('count (log)')
+        nat = (f', native CV {d["native_cv"]:.3f}%'
+               if d['native_cv'] is not None else '')
+        ax.set_title(f'{SYS_LABEL[s]}  (CV {cv:.3f}%{nat}, '
+                     f'max/min {r.max() / r.min():.4f})', fontsize=10)
+        ax.grid(True, alpha=0.3, which='both')
+    ticks = [t for t in (0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.4)
+             if lo * 0.99 <= t <= hi * 1.01]
+    axes[-1].set_xticks(ticks, [f'{t:g}' for t in ticks])
+    axes[-1].xaxis.set_minor_formatter(NullFormatter())
+    axes[-1].set_xlabel('cell area / ideal equal-area share  '
+                        '(shared log bins; 1.0 = perfect)')
+    fig.suptitle('DGGS cell-area ratio distributions (~H3 r9 cell size)',
+                 fontsize=12)
+    fig.tight_layout()
+    out = OUT_DIR / 'authalicity.png'
+    fig.savefig(out, dpi=DPI)
+    plt.close(fig)
+    print(f'wrote {out}')
 
 
 # ----- plotting ----------------------------------------------------------
@@ -204,6 +349,13 @@ def main():
     plot_extremes(results)
     for s in SYSTEMS:
         plot_by_resolution(s, results[s]['by_res'])
+
+    area_results = {}
+    for s in SYSTEMS:
+        t0 = time.perf_counter()
+        area_results[s] = sweep_area(s)
+        print(f'[{s}] area sweep in {time.perf_counter() - t0:.1f}s')
+    plot_authalicity(area_results)
 
 
 if __name__ == '__main__':

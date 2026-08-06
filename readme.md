@@ -60,7 +60,7 @@ it into `.tools/` in ~2 min; CI installs it only on the runner that needs it.
 
 ```sh
 just gen               # build all tables: geometry + stats, one pass (~min)
-just survey            # AR comparison plots -> out/
+just survey            # AR + authalicity comparison plots -> out/
 just calibrate         # area-match resolutions across systems (closed-form)
 just dnc-check         # assert the DNC invariants (pass/fail)
 just site              # build the static site into web/out/ (survey plots + globes)

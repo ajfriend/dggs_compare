@@ -32,8 +32,9 @@ sync:
 gen system="all":
     DGGS_COMPARE_GEN={{system}} uv run scripts/gen.py
 
-# Aspect-ratio survey: reads the ar column (no solving) -> out/histograms.png,
-# extremes.png, by_res_<system>.png.
+# Aspect-ratio + authalicity survey: reads the ar and area columns (no
+# solving) -> out/histograms.png, extremes.png, by_res_<system>.png,
+# authalicity.png.
 survey:
     uv run scripts/survey.py
 
@@ -64,10 +65,10 @@ web-data:
 # AND the ajglobe globe binaries + manifest. This is the single command the
 # published site runs (pages.yml) after fetching a data release, so every plot
 # on the site is generated from that release's tables — not from anything on
-# disk. Reads the `ar` column; nothing is solved but the two extreme cells the
-# survey re-draws per system.
+# disk. Reads the `ar` and `area` columns; nothing is solved but the two
+# extreme cells the survey re-draws per system.
 site: survey web-data
-    cp out/histograms.png out/extremes.png out/by_res_*.png web/out/
+    cp out/histograms.png out/extremes.png out/authalicity.png out/by_res_*.png web/out/
 
 # Serve the static site at http://localhost:8000 (builds it first).
 web: site
