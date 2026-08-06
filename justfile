@@ -14,6 +14,13 @@ _:
 # wheels genuinely work), mac x86_64 3.13 (a5 wheel + hex9 sdist).
 python := if os() == "macos" { "cpython-3.13-macos-x86_64-none" } else { "3.12" }
 
+# Exported so EVERY `uv run` in these recipes uses the platform pin: a bare
+# `uv run` otherwise consults .python-version (3.13 — correct for mac dev,
+# wrong for linux) and silently RECREATES the venv on the wrong interpreter,
+# which is exactly how the first data-v6 runs reinstalled the broken hex9
+# wheel after `just sync` had built a good 3.12 env. Env var beats the file.
+export UV_PYTHON := python
+
 sync:
     uv sync --python {{python}}
 
