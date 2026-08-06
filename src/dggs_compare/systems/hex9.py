@@ -8,10 +8,9 @@ seam, so no pentagon special-casing is needed here.
 
 Zone handles are `(layer, uuid_bytes)` tuples: a hex9 bin uuid does not
 encode its layer, and `cid_strs` (which gets no `res`) needs it for
-labeling. The cid is the canonical keyed label ("<digits>.<key>") — its
-hierarchical digits make the tables' text sort spatially coherent, it is
-fixed-width within a resolution, and it round-trips exactly via
-hex9.parse_label (bare labels are ambiguous at split-hex bodies).
+labeling. The cid is the canonical keyed label ("<digits>.<key>"), which
+round-trips exactly via hex9.parse_label — bare labels are ambiguous at
+split-hex bodies.
 
 Cell edges are straight in the octahedral face plane, not sphere geodesics —
 but the corner ring is still faithful for the solvers (the edges never bow
@@ -20,8 +19,6 @@ is needed. `refined_boundaries` traces the true hex9 edges via the
 binding's native densification, so `just validate-corners` checks
 corners-vs-refined for hex9 like every other system.
 """
-
-import math
 
 import hex9
 import numpy as np
@@ -55,14 +52,20 @@ def cells_at(res, points):
 
 
 def cid_strs(zones):
-    return [hex9.label(_u(z), z[0], True) for z in zones]
+    # One batch label() call (a scalar call per zone costs ~2x). The batch
+    # form takes a single layer; callers pass single-resolution batches.
+    layer = zones[0][0]
+    assert all(z[0] == layer for z in zones)
+    arr = np.frombuffer(b''.join(b for _, b in zones), np.uint8).reshape(-1, 16)
+    return hex9.label(arr, layer, True)
 
 
 def _ring(z, d=0):
     # hex9 winds its rings clockwise seen from outside; sparea needs CCW
-    # (a CW ring reads as the 4pi-complement polygon), hence the reversal.
-    ring = hex9.cell(_u(z), z[0], d)   # closed (lng, lat) ring
-    return [(float(la), float(lo)) for lo, la in ring[-2::-1]]
+    # (a CW ring reads as the 4pi-complement polygon): the row slice drops
+    # the closing vertex and reverses, the column flip swaps (lng, lat) ->
+    # (lat, lng), all before the one C-speed tolist().
+    return hex9.cell(_u(z), z[0], d)[-2::-1, ::-1].tolist()
 
 
 def boundaries(res, zones):
@@ -70,9 +73,10 @@ def boundaries(res, zones):
 
 
 def refined_boundaries(res, zones, refine):
-    # densify=d inserts 3^d - 1 points per edge along the true hex9 edge
-    # (straight in the octahedral face plane — hex9's own edge model).
-    d = max(1, math.ceil(math.log(refine + 1) / math.log(3)))
+    # smallest d with 3^d - 1 densification points per edge >= refine
+    d = 1
+    while 3 ** d - 1 < refine:
+        d += 1
     return [_ring(z, d) for z in zones]
 
 
