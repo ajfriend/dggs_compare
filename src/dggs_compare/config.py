@@ -50,7 +50,7 @@ TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
              'ivea7h': 'C4', 'rhealpix': 'C5', 'isea3h': 'C6',
-             'ivea3h': 'C7', 'isea4t': 'C8'}
+             'ivea3h': 'C7', 'isea4t': 'C8', 'hex9': 'C9'}
 # S2 numbers its resolutions "levels"; everyone else says "r".
 RES_PREFIX = {s: 'L' if s == 's2' else 'r' for s in TARGET_RES}
 
@@ -69,6 +69,7 @@ CELLS_PER_RES = {
     'ivea3h':   lambda r: 10 * 3 ** r + 2,
     'isea4t':   lambda r: 20 * 4 ** r,                    # 20, 80, 320, 1280, ...
     'rhealpix': lambda r: 6 * 9 ** r,                     # 6, 54, 486, 4374, 39366, ...
+    'hex9':     lambda r: 12 * 9 ** r,                    # 12, 108, 972, 8748, ...
 }
 # Every per-system dict a new grid must appear in. The dnc-check release
 # gate asserts each registry system is present in all of these, so adding

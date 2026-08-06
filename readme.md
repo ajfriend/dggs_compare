@@ -1,7 +1,7 @@
 # dggs_compare
 
 Comparing discrete global grid systems — **H3, S2, A5, ISEA7H, IVEA7H,
-ISEA3H, IVEA3H, ISEA4T, rHEALPix** — by per-cell statistics: shape (aspect
+**ISEA3H, IVEA3H, ISEA4T, rHEALPix, hex9** — by per-cell statistics: shape (aspect
 ratio via [csar](https://github.com/ajfriend/csar_py)'s enclosing-cone
 solver) and area (via [sparea](https://pypi.org/project/sparea/)), at
 area-matched resolutions.

@@ -24,6 +24,7 @@ dependencies = [
     "s2sphere",
     "a5_fast",
     "dggal>=0.0.6",
+    "hex9>=2.2.1",
 ]
 
 [dependency-groups]
