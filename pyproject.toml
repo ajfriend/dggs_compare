@@ -24,7 +24,9 @@ dependencies = [
     "s2sphere",
     "a5_fast",
     "dggal>=0.0.6",
-    "hex9>=2.2.1",
+    # 2.3.1+ only: earlier releases tagged their wheels abi3 while shipping a
+    # cpython-312-only extension, which 3.13 cannot import (failed data-v6).
+    "hex9>=2.3.1",
 ]
 
 [dependency-groups]

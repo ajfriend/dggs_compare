@@ -1,24 +1,23 @@
 _:
     just --list
 
-# ONE env for everything — no per-script envs, no re-exec tricks. Two
-# wrinkles: (1) dggal 0.0.6's macOS arm64 wheel is still half-broken (the
+# ONE env for everything — no per-script envs, no re-exec tricks. One
+# wrinkle: dggal 0.0.6's macOS arm64 wheel is still half-broken (the
 # Python extension is arm64 but the bundled libecrt/libdggal dylibs are
 # x86_64), so on Apple Silicon the whole env runs x86_64 under Rosetta;
 # Linux wheels are correct — CI generates the canonical data natively on
-# ubuntu. (2) The versions differ by platform because of two wheel gaps
-# that happen to interlock: hex9's wheels are tagged abi3 but ship a
-# cpython-312-ONLY extension (broken on 3.13 — the mac x86_64 path is
-# immune since no wheel exists there and the sdist builds correctly),
-# while a5_fast ships mac wheels only for cp313. So: linux 3.12 (all
-# wheels genuinely work), mac x86_64 3.13 (a5 wheel + hex9 sdist).
-python := if os() == "macos" { "cpython-3.13-macos-x86_64-none" } else { "3.12" }
+# ubuntu. Everything is 3.13 again: hex9 2.3.1's wheels are genuinely
+# abi3 (the cpython-312-only extension that forced linux down to 3.12
+# is fixed, and pyproject now floors hex9 there), and a5_fast's mac
+# wheels are cp313.
+python := if os() == "macos" { "cpython-3.13-macos-x86_64-none" } else { "3.13" }
 
 # Exported so EVERY `uv run` in these recipes uses the platform pin: a bare
-# `uv run` otherwise consults .python-version (3.13 — correct for mac dev,
-# wrong for linux) and silently RECREATES the venv on the wrong interpreter,
-# which is exactly how the first data-v6 runs reinstalled the broken hex9
-# wheel after `just sync` had built a good 3.12 env. Env var beats the file.
+# `uv run` otherwise consults .python-version, which knows the version but
+# not the macOS ARCH — on Apple Silicon it would silently RECREATE the venv
+# on native arm64 (dggal's broken dylibs). The same slip on linux is how
+# the first data-v6 runs reinstalled a broken hex9 wheel after `just sync`
+# had built a good env. Env var beats the file.
 export UV_PYTHON := python
 
 sync:
