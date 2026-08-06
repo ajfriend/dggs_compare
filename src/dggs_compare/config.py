@@ -6,6 +6,8 @@ the tables contain, which is exactly the trigger for cutting a new data
 release (see readme).
 """
 
+import math
+
 # ----- sampling ----------------------------------------------------------
 SEED = 0xDECAF   # data-v3+ (data-v1/v2 used 0xC0FFEE); changing the seed is
                  # a data-release trigger — fresh sample points everywhere,
@@ -38,16 +40,13 @@ SUBSAMPLE_MAX_RATIO = 4
 FULL_RES = {'ivea7h': (1, 2, 3, 5, 6)}
 
 # ----- per-system registry metadata ---------------------------------------
-# Working ("target") resolution per system: the finest in actual use, matched
-# to an H3 r9 cell by scripts/calibrate.py. Systems appear here iff they have
-# a module in systems/ (the folder is the registry; this is its metadata).
+# Working ("target") resolution per system: the finest in actual use, count-
+# matched to an H3 r9 cell by scripts/calibrate.py (closed-form, no tables;
+# it flags any entry here that disagrees with its pick). Systems appear here
+# iff they have a module in systems/ (the folder is the registry; this is
+# its metadata).
 TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
-              'rhealpix': 9,
-              # confirmed by calibrate on the data-v4 tables (1.210x h3 r9)
-              'isea3h': 18, 'ivea3h': 18,
-              # confirmed by calibrate on the 1M-cell tables (0.872x h3 r9)
-              'isea4t': 14,
-              # confirmed by calibrate on the 1M-cell tables (1.008x h3 r9)
+              'rhealpix': 9, 'isea3h': 18, 'ivea3h': 18, 'isea4t': 14,
               'hex9': 9}
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
@@ -56,11 +55,12 @@ SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
 # S2 numbers its resolutions "levels"; everyone else says "r".
 RES_PREFIX = {s: 'L' if s == 's2' else 'r' for s in TARGET_RES}
 
-# ----- globe view: area-matched resolutions -------------------------------
-# Total cell count at each resolution, per system — exact closed forms. These
-# grids are ~equal-area, so a cell's average area is 4*pi*R^2 / N(res); matching
-# cell COUNTS across systems therefore matches average cell SIZE. This is the
-# cheap, table-free way to area-match (no reading areas, no medians).
+# ----- cell counts: the area-matching currency ----------------------------
+# Total cell count at each resolution, per system — exact closed forms. Cells
+# partition the sphere, so a cell's average area is exactly 4*pi*R^2 / N(res);
+# matching cell COUNTS across systems therefore matches average cell SIZE with
+# no tables read (no areas, no medians). Both calibrate (TARGET_RES picks) and
+# the globe view below match this way.
 CELLS_PER_RES = {
     'h3':       lambda r: 2 + 120 * 7 ** r,               # 122, 842, 5882, 41162, ...
     's2':       lambda r: 6 * 4 ** r,                     # 6, 24, 96, ...
@@ -73,6 +73,17 @@ CELLS_PER_RES = {
     'rhealpix': lambda r: 6 * 9 ** r,                     # 6, 54, 486, 4374, 39366, ...
     'hex9':     lambda r: 12 * 9 ** r,                    # 12, 108, 972, 8748, ...
 }
+# THE matching criterion (issue #32): the resolution whose cell count is
+# closest to `anchor_n` in log-ratio — the symmetric size mismatch (2x too
+# big == 2x too small); a plain count difference would bias coarse. Both
+# calibrate (TARGET_RES, the dnc-check gate asserts agreement) and the
+# globe view use this. The default candidate range is generous: even the
+# slowest-growing family (3^r) crosses any sane anchor well inside it.
+def count_match_res(sys, anchor_n, resolutions=range(40)):
+    n_of = CELLS_PER_RES[sys]
+    return min(resolutions, key=lambda r: abs(math.log(n_of(r) / anchor_n)))
+
+
 # Every per-system dict a new grid must appear in. The dnc-check release
 # gate asserts each registry system is present in all of these, so adding
 # a dict here extends the gate for free (FULL_RES stays optional;

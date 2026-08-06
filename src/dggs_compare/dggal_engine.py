@@ -24,9 +24,7 @@ import os
 
 import numpy as np
 import csar
-import sparea
 
-from . import config
 from .stats import orient_ccw
 
 
@@ -210,12 +208,3 @@ class Adapter:
                 continue
             seen.add(zone)
             yield self.cid_str(zone), self.verts(zone)
-
-    # ----- calibrate ----------------------------------------------------
-    def area_km2(self, level, n, seed):
-        """Median cell area (km^2) over `n` sampled cells."""
-        rng = np.random.default_rng(seed)
-        a = [sparea.area(self.cell_boundary(self.zone_at(level, lng, lat)),
-                         geo='latlng')
-             for lng, lat in sample_uniform_lnglat(n, rng)]
-        return float(np.median(a)) * config.SR2KM2

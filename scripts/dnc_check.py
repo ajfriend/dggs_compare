@@ -71,6 +71,11 @@ def main():
         print(f'FAIL — tables outside their system\'s declared resolutions: '
               f'{stale} (stale cap or partial write — delete or rebuild)')
         sys.exit(1)
+    bad_targets = checks.target_res_problems()
+    if bad_targets:
+        print(f'FAIL — config.TARGET_RES problems: {bad_targets} '
+              '(run `just calibrate`)')
+        sys.exit(1)
 
     print(f'{"system":8} {"onset":>6} {"finest %DNC":>12} {"result":>8}')
     all_failures = []
