@@ -61,7 +61,7 @@ it into `.tools/` in ~2 min; CI installs it only on the runner that needs it.
 ```sh
 just gen               # build all tables: geometry + stats, one pass (~min)
 just survey            # AR comparison plots -> out/
-just calibrate         # area-match resolutions across systems
+just calibrate         # area-match resolutions across systems (closed-form)
 just dnc-check         # assert the DNC invariants (pass/fail)
 just site              # build the static site into web/out/ (survey plots + globes)
 just web               # build the site, then serve it at :8000
@@ -77,8 +77,8 @@ derived from it at run time. A new DGGS touches:
    contract is `registry.py`'s docstring; mirror any existing system; add
    `stats_rings` only if the corner rings are not faithful).
 2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
-   (count-match, then confirm with `just calibrate` once tables exist),
-   `SYS_COLOR`.
+   (`just calibrate` picks it from the closed-form counts — no tables
+   needed), `SYS_COLOR`.
 
 Then run `just validate-corners` (the admission gate) and cut a data release — `just dnc-check` fails its publish gate
 unless every registry system has tables and `PER_SYSTEM` config.

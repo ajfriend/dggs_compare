@@ -24,8 +24,8 @@ gen system="all":
 survey:
     uv run scripts/survey.py
 
-# Match each system's resolution to an H3-r9 cell by area (reads the area
-# column). Bake picks into dggs_compare.config.TARGET_RES.
+# Match each system's working resolution to an H3-r9 cell by cell count
+# (closed forms, no tables). Bake picks into dggs_compare.config.TARGET_RES.
 calibrate:
     uv run scripts/calibrate.py
 
