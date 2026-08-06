@@ -40,6 +40,23 @@ def missing_systems():
     return no_tables, no_config
 
 
+def stale_tables():
+    """Tables on disk OUTSIDE their system's declared resolutions().
+
+    Disk == contract is an invariant every table consumer (survey,
+    calibrate, webdata, the sweeps below) relies on without checking — a
+    stale table (e.g. left behind when a system's MAX_RES was lowered, or
+    a partial write from a crashed run) silently pollutes all of them, so
+    the gate fails loudly on any rather than one consumer filtering.
+    Costs a lazy module import per system, so gate-only.
+    """
+    return [f'{name}_r{res}.parquet'
+            for name in cache.available_systems()
+            for declared in [set(registry.get(name).resolutions())]
+            for res in cache.available_resolutions(name)
+            if res not in declared]
+
+
 def sweep_system(name, *, resolve=False):
     """[(res, tested, dnc, [example cids])] over the system's tables."""
     rows = []
@@ -78,9 +95,13 @@ def check_system(name, rows):
          and the fraction never meaningfully drops as resolution rises.
     """
     target = config.TARGET_RES[name]
-    frac = {res: dnc / tested for res, tested, dnc, _ in rows}
+    # An empty table (a truncated/failed write) is its own failure; count it
+    # as all-DNC so the monotonicity logic needs no special cases.
+    frac = {res: dnc / tested if tested else 1.0
+            for res, tested, dnc, _ in rows}
     reslist = [res for res, *_ in rows]
-    failures = []
+    failures = [f'r{res}: empty table' for res, tested, _, _ in rows
+                if not tested]
 
     for i, (res, tested, dnc, ex) in enumerate(rows):
         if res <= target and dnc:
@@ -97,5 +118,4 @@ def check_system(name, rows):
                                 f'{100*frac[res]:.1f}% (non-monotone drop)')
 
     onset = next((res for res, _, dnc, _ in rows if dnc), None)
-    finest_res, finest_tested, finest_dnc, _ = rows[-1]
-    return failures, onset, finest_dnc / finest_tested
+    return failures, onset, frac[reslist[-1]]

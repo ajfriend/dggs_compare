@@ -66,6 +66,11 @@ def main():
         print(f'FAIL — missing config.PER_SYSTEM entries: {no_config}')
     if no_tables or no_config:
         sys.exit(1)
+    stale = checks.stale_tables()
+    if stale:
+        print(f'FAIL — tables outside their system\'s declared resolutions: '
+              f'{stale} (stale cap or partial write — delete or rebuild)')
+        sys.exit(1)
 
     print(f'{"system":8} {"onset":>6} {"finest %DNC":>12} {"result":>8}')
     all_failures = []

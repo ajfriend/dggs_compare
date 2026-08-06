@@ -46,7 +46,9 @@ TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
               # confirmed by calibrate on the data-v4 tables (1.210x h3 r9)
               'isea3h': 18, 'ivea3h': 18,
               # confirmed by calibrate on the 1M-cell tables (0.872x h3 r9)
-              'isea4t': 14}
+              'isea4t': 14,
+              # confirmed by calibrate on the 1M-cell tables (1.008x h3 r9)
+              'hex9': 9}
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
              'ivea7h': 'C4', 'rhealpix': 'C5', 'isea3h': 'C6',
