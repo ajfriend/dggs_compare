@@ -1,10 +1,11 @@
 """Match each system's working resolution to an H3-res-9 cell, by cell count.
 
-Cells partition the sphere, so a resolution's MEAN cell area is exactly
-4*pi/N(res) — matching counts matches average cell size, no tables needed
-(issue #32): config.CELLS_PER_RES holds closed-form counts for every
-system. The pick is argmin_r |log(N_sys(r)/N_h3(9))| — the symmetric
-size-ratio; a plain count difference would bias toward coarser picks.
+Matching counts matches mean cell area with no tables read (see the
+config.CELLS_PER_RES comment for the derivation and config.count_match_res
+for the criterion — issue #32). Prints each pick next to the baked
+config.TARGET_RES and flags disagreements; the dnc-check gate asserts the
+same agreement, so this script is the human-readable view, not the
+enforcement.
 
 Adding a new DGGS: add its count formula to config.CELLS_PER_RES, run
 this, bake the pick into config.TARGET_RES — before any tables exist.
@@ -32,15 +33,8 @@ def main():
     for s, n_of in config.CELLS_PER_RES.items():
         if s == tsys:                        # the reference, not a candidate
             continue
-
-        def mismatch(r):
-            return abs(math.log(n_of(r) / anchor))
-
-        best = 0
-        while mismatch(best + 1) < mismatch(best):   # unimodal: walk down
-            best += 1
-
-        print(f'--- {s} (target {tsys} r{tres}) ---')
+        best = config.count_match_res(s, anchor)
+        print(f'--- {s} ---')
         print(f'{"res":>4} {"cells":>18} {"area_ratio":>10}')
         for r in range(max(0, best - PRINT_WINDOW), best + PRINT_WINDOW + 1):
             mark = '  <== pick' if r == best else ''

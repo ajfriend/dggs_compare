@@ -57,6 +57,29 @@ def stale_tables():
             if res not in declared]
 
 
+def target_res_problems():
+    """TARGET_RES entries that are drifted, out of contract, or untabled.
+
+    TARGET_RES has a defined correct answer (the count match, issue #32) and
+    three consumers that trust it blindly (check_system's clean-where-used
+    bound, the site manifest, survey) — so the gate asserts it rather than
+    relying on someone reading calibrate's output. Also requires the entry
+    to be a declared, on-disk resolution: a target finer than the finest
+    table would make the DNC invariant pass vacuously.
+    """
+    anchor = config.CELLS_PER_RES['h3'](config.TARGET_RES['h3'])
+    problems = []
+    for s, baked in config.TARGET_RES.items():
+        if s != 'h3' and baked != (pick := config.count_match_res(s, anchor)):
+            problems.append(f'{s}: TARGET_RES r{baked} != count-match r{pick}')
+        if baked not in registry.get(s).resolutions():
+            problems.append(f'{s}: TARGET_RES r{baked} outside declared '
+                            f'resolutions')
+        elif baked not in cache.available_resolutions(s):
+            problems.append(f'{s}: no table at TARGET_RES r{baked}')
+    return problems
+
+
 def sweep_system(name, *, resolve=False):
     """[(res, tested, dnc, [example cids])] over the system's tables."""
     rows = []

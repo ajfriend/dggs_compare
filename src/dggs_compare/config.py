@@ -6,6 +6,8 @@ the tables contain, which is exactly the trigger for cutting a new data
 release (see readme).
 """
 
+import math
+
 # ----- sampling ----------------------------------------------------------
 SEED = 0xDECAF   # data-v3+ (data-v1/v2 used 0xC0FFEE); changing the seed is
                  # a data-release trigger — fresh sample points everywhere,
@@ -71,6 +73,17 @@ CELLS_PER_RES = {
     'rhealpix': lambda r: 6 * 9 ** r,                     # 6, 54, 486, 4374, 39366, ...
     'hex9':     lambda r: 12 * 9 ** r,                    # 12, 108, 972, 8748, ...
 }
+# THE matching criterion (issue #32): the resolution whose cell count is
+# closest to `anchor_n` in log-ratio — the symmetric size mismatch (2x too
+# big == 2x too small); a plain count difference would bias coarse. Both
+# calibrate (TARGET_RES, the dnc-check gate asserts agreement) and the
+# globe view use this. The default candidate range is generous: even the
+# slowest-growing family (3^r) crosses any sane anchor well inside it.
+def count_match_res(sys, anchor_n, resolutions=range(40)):
+    n_of = CELLS_PER_RES[sys]
+    return min(resolutions, key=lambda r: abs(math.log(n_of(r) / anchor_n)))
+
+
 # Every per-system dict a new grid must appear in. The dnc-check release
 # gate asserts each registry system is present in all of these, so adding
 # a dict here extends the gate for free (FULL_RES stays optional;

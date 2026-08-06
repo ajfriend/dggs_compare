@@ -16,7 +16,6 @@ web/out/ (gitignored):
 """
 
 import json
-import math
 import os
 from pathlib import Path
 
@@ -36,14 +35,10 @@ def systems():
 
 
 def globe_res_for(sys, anchor_n):
-    """The resolution whose (true) cell count is closest — in log-ratio — to
-    `anchor_n`, over the system's available resolutions. Area-match: these are
-    equal-area grids, so avg cell area = 4*pi*R^2 / N(res), and matching N
-    matches cell size. Uses the closed-form counts (config.CELLS_PER_RES), so a
-    *sampled* fine-resolution table can never masquerade as a coarse one."""
-    n_of = config.CELLS_PER_RES[sys]
-    return min(cache.available_resolutions(sys),
-               key=lambda r: abs(math.log(n_of(r) / anchor_n)))
+    """The available-on-disk resolution area-matched to `anchor_n` cells
+    (config.count_match_res over the closed-form counts, so a *sampled*
+    fine-resolution table can never masquerade as a coarse one)."""
+    return config.count_match_res(sys, anchor_n, cache.available_resolutions(sys))
 
 
 def build_globe():
