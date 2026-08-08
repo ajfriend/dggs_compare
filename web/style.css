@@ -47,6 +47,19 @@ h1 {
 }
 .lede b { color: var(--ink); font-weight: 600; }
 
+.admonition {
+  margin: 20px 0 0;
+  max-width: 760px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid #e0b357;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.admonition b { color: var(--ink); }
+
 section {
   margin: 48px 0;
   padding-top: 28px;
