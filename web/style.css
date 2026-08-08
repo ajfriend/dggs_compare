@@ -50,15 +50,15 @@ h1 {
 .admonition {
   margin: 20px 0 0;
   max-width: 760px;
-  padding: 10px 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-left: 3px solid #e0b357;
+  padding: 12px 16px;
+  background: #f2cc5f;
+  border: 1px solid #8a6d1f;
   border-radius: 8px;
-  color: var(--muted);
-  font-size: 14px;
+  color: #1c1c1c;
+  font-size: 15px;
 }
-.admonition b { color: var(--ink); }
+.admonition b { color: #000; }
+.admonition a { color: #1d4ed8; font-weight: 600; text-decoration: underline; }
 
 section {
   margin: 48px 0;
