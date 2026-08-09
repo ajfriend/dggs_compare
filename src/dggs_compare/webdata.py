@@ -1,7 +1,7 @@
 """Build the static site's globe data from the Parquet tables.
 
 A cheap column reshape — the stats were computed at generation time, so
-nothing is solved here. The site's distribution plots are the matplotlib PNGs
+nothing is measured here. The site's distribution plots are the matplotlib PNGs
 from `scripts/survey.py`; this module only emits the globe layer, into
 web/out/ (gitignored):
 
@@ -11,7 +11,7 @@ web/out/ (gitignored):
   Equal-area grids -> matching cell count matches average cell area, so this is
   an area match computed from the closed-form counts (no table reads).
 - manifest.json — the data-release tag, per-system web colors/labels, the
-  chosen globe resolution per system, the solve tolerance, and the shared globe
+  chosen globe resolution per system, csar's gap tolerance, and the shared globe
   AR max (so every globe colors on one comparable scale).
 """
 

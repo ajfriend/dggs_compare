@@ -34,7 +34,7 @@ src/dggs_compare/     the internal library (organization only, not for PyPI;
   interface.py          the implementation contract (GridImpl)
   runner.py             stage 1: GridImpl -> raw geometry (data/raw/)
   metrics.py            stage 2: raw -> published tables, binding-free
-  stats.py              solvers (csar AR, sparea area) + sphere helpers
+  stats.py              measurement code (csar AR, sparea area) + sphere helpers
   cache.py              the published tables: IO + readers (data/cells/)
   checks.py             DNC invariants + artifact/config coherence
   webdata.py            web-viewer artifacts from the tables
@@ -68,7 +68,7 @@ shells out to a DGGRID binary (no wheels exist anywhere) —
 ```sh
 just gen               # stage 1: raw geometry, one env per system -> data/raw/
 just gen hex9-hex9     # ... just one implementation
-just metrics           # stage 2: solve + gate -> the tables in data/cells/
+just metrics           # stage 2: measure + gate -> the tables in data/cells/
 just survey            # AR comparison plots -> out/
 just calibrate         # area-match resolutions across systems (closed-form)
 just dnc-check         # assert the DNC invariants (pass/fail)
@@ -95,9 +95,9 @@ matrix is derived from it. A new implementation touches:
    needed), `SYS_COLOR`, `PRIMARY_IMPL`.
 
 `just metrics` then applies the convergence admission gate (density-0
-vertex lists must be faithful solver inputs), and `just dnc-check` fails
-its publish gate unless every registry implementation has tables and every
-grid has `PER_SYSTEM` config.
+vertex lists must be faithful inputs to the AR measurement), and
+`just dnc-check` fails its publish gate unless every registry
+implementation has tables and every grid has `PER_SYSTEM` config.
 
 ## Table schema
 
@@ -121,7 +121,7 @@ area-preserving authalic latitude (`stats.authalic_rings`), so a system
 that is exactly equal-area on its declared surface measures exactly
 equal-area here (the methodology issue: #42).
 
-Provenance (seed policy, budgets, solver settings, library versions) rides in
+Provenance (seed policy, budgets, csar settings, library versions) rides in
 each file's Parquet metadata. Coarse resolutions are enumerated in full;
 finer ones hold exactly 1,000,000 sampled cells (enumerate-and-subsample
 near the cap, draw-until-n beyond it — see `config.N_CELLS`).
@@ -130,7 +130,7 @@ near the cap, draw-until-n beyond it — see `config.N_CELLS`).
 
 The tables + the viewer's derived files are published as **decoupled GitHub
 releases** (`data-v1`, `data-v2`, …) — cut when the *inputs* change
-(seed/budgets, the grid set, calibration, a solver bump worth reflecting),
+(seed/budgets, the grid set, calibration, a measurement-code bump worth reflecting),
 not per code release. The canonical producer is CI (native linux):
 
 ```sh

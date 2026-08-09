@@ -17,8 +17,8 @@ GitHub data releases, one asset per table). Written by the metrics stage
 (see metrics.py); provenance travels in each file's Parquet metadata.
 
 Downstream consumers (survey, dnc-check, web data, DuckDB/pandas users)
-read columns — no solver in the read path. The readers here are keyed by
-GRID; a grid with several implementations resolves through
+read columns — no measurement code in the read path. The readers here
+are keyed by GRID; a grid with several implementations resolves through
 config.PRIMARY_IMPL.
 """
 
