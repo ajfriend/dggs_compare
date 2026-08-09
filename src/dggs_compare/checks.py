@@ -1,7 +1,7 @@
 """Data-quality checks: the DNC invariants and the corners-only validation.
 
 Both are library functions returning structured results; the thin
-scripts/dnc_check.py and scripts/validate_corners.py print/plot and set exit
+scripts/dnc_check.py and scripts/convergence.py print/plot and set exit
 codes.
 
 DNC sweep modes (`resolve=`):

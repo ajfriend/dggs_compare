@@ -1,15 +1,15 @@
 """ISEA3H — Snyder equal-area icosahedral aperture-3 hex (via DGGAL).
 
-KNOWN APPROXIMATION (issue #25): stats are corners-only, like every other
-grid, but isea3h's odd-level cells straddling an icosahedron edge kink
-there — the real boundary bulges past the corner hexagon by 100s of
-meters (ground-truthed via point->zone), so corners-only AR is off by up
-to ~4e-3 for those cells, and `just validate-corners` reports this line
-red by design. The honest fix (a `stats_rings` override of edge-refined
-vertices, see the registry contract) is disabled because dggal 0.0.6's
-runtime degrades under that path's per-cell array churn — revisit per
-issue #25 (upstream distortion-vertices API / dggal 0.0.7 / direct-C
-corners). Even levels are corner-exact (<2e-8), as is all of IVEA3H.
+KNOWN APPROXIMATION (issue #25): stats use density-0 vertices, like every
+other grid, but isea3h's odd-level cells straddling an icosahedron edge
+kink there — the real boundary bulges past the density-0 hexagon by 100s
+of meters (ground-truthed via point->cell), so density-0 AR is off by up
+to ~4e-3 for those cells, and the convergence check reports this line red
+by design. The honest fix (solving on densely sampled vertices) is
+disabled because dggal 0.0.6's runtime degrades under that path's
+per-cell array churn — revisit per issue #25 (upstream
+distortion-vertices API / dggal 0.0.7 / direct-C vertices). Even levels
+are exact at density 0 (<2e-8), as is all of IVEA3H.
 """
 
 from dggs_compare.dggal_engine import Adapter
@@ -34,16 +34,12 @@ def cells_at(res, points):
     return _adapter.cells_at(res, points)
 
 
-def cid_strs(zones):
-    return _adapter.cid_strs(zones)
+def cid_strs(cells):
+    return _adapter.cid_strs(cells)
 
 
-def boundaries(res, zones):
-    return _adapter.boundaries(zones)
-
-
-def refined_boundaries(res, zones, refine):
-    return _adapter.refined_boundaries(zones, refine)
+def boundaries(res, cells, samples_per_edge=0):
+    return _adapter.boundaries(cells, samples_per_edge)
 
 
 def enumerate_cells(res):

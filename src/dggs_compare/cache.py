@@ -92,10 +92,10 @@ BATCH = 50_000        # cells per streamed row group (bounds build memory)
 MAX_DRAW_FACTOR = 60  # safety cap on point draws in the sample regime
 
 
-def _select_zones(sysmod, dggs, res):
+def _select_cells(sysmod, dggs, res):
     """The resolution's cell set: exactly N_CELLS cells (or every cell where
     fewer exist / config.FULL_RES demands complete coverage). Three regimes —
-    see the config.N_CELLS comment. Returns (zones, mode)."""
+    see the config.N_CELLS comment. Returns (cells, mode)."""
     n = config.N_CELLS
     total = sysmod.num_cells(res)
     rng = np.random.default_rng(
@@ -105,35 +105,35 @@ def _select_zones(sysmod, dggs, res):
         return list(sysmod.enumerate_cells(res)), 'all'
 
     if total <= config.SUBSAMPLE_MAX_RATIO * n:
-        zones = list(sysmod.enumerate_cells(res))
-        idx = rng.choice(len(zones), n, replace=False)
-        return [zones[i] for i in idx], 'subsam'
+        cells = list(sysmod.enumerate_cells(res))
+        idx = rng.choice(len(cells), n, replace=False)
+        return [cells[i] for i in idx], 'subsam'
 
-    seen, zones = set(), []
+    seen, cells = set(), []
     drawn = 0
-    while len(zones) < n:
+    while len(cells) < n:
         if drawn >= MAX_DRAW_FACTOR * n:
             raise RuntimeError(
                 f'{dggs} r{res}: {drawn:,} draws yielded only '
-                f'{len(zones):,}/{n:,} distinct cells')
+                f'{len(cells):,}/{n:,} distinct cells')
         k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
         pts = stats.sample_uniform_latlng(k, rng).tolist()
         hits = sysmod.cells_at(res, pts)
-        for (lat, lng), z in zip(pts, hits):
-            if z is None:
+        for (lat, lng), c in zip(pts, hits):
+            if c is None:
                 # The engine couldn't resolve the point (DGGAL nullZone at
                 # rare singular points) — draw again, and log the specimen:
                 # each one is a concrete example for the upstream report.
                 print(f'    nullZone skip: ({lat:.6f}, {lng:.6f}) '
                       f'[{dggs} r{res}]', flush=True)
                 continue
-            if z not in seen:
-                seen.add(z)
-                zones.append(z)
-                if len(zones) == n:
+            if c not in seen:
+                seen.add(c)
+                cells.append(c)
+                if len(cells) == n:
                     break
         drawn += k
-    return zones, 'sample'
+    return cells, 'sample'
 
 
 def build_table(dggs, res):
@@ -142,13 +142,12 @@ def build_table(dggs, res):
     any budget."""
     t0 = time.perf_counter()
     sysmod = registry.get(dggs)
-    stats_rings = getattr(sysmod, 'stats_rings', None)
-    zones, mode = _select_zones(sysmod, dggs, res)
+    cells, mode = _select_cells(sysmod, dggs, res)
 
     # Sort by cid for a canonical, deterministic row order (independent of
     # sampling order): enables Parquet cid page-stats / range pushdown, and
     # lets DELTA_BYTE_ARRAY prefix-compress the sorted ids.
-    zones = sorted(zip(sysmod.cid_strs(zones), zones), key=lambda cz: cz[0])
+    cells = sorted(zip(sysmod.cid_strs(cells), cells), key=lambda cc: cc[0])
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = table_path(dggs, res)
@@ -173,20 +172,14 @@ def build_table(dggs, res):
     )
     dnc = 0
     try:
-        for lo in range(0, len(zones), BATCH):
-            chunk = zones[lo:lo + BATCH]
-            cids, zlist = zip(*chunk)
-            rings = sysmod.boundaries(res, zlist)
-            # A system may declare some corner rings unfit for the solvers
-            # (isea3h: odd-level cells kink at icosahedron edges) via the
-            # optional stats_rings override; verts still stores corners.
-            srings = (stats_rings(res, zlist) if stats_rings
-                      else [None] * len(chunk))
+        for lo in range(0, len(cells), BATCH):
+            chunk = cells[lo:lo + BATCH]
+            cids, clist = zip(*chunk)
+            boundaries = sysmod.boundaries(res, clist)
             verts, ars, areas = [], [], []
-            for ring, sring in zip(rings, srings):
-                latlng = [[float(la), float(ln)] for la, ln in open_ring(ring)]
-                ar, area = stats.cell_stats(
-                    latlng if sring is None else open_ring(sring))
+            for vlist in boundaries:
+                latlng = [[float(la), float(ln)] for la, ln in open_ring(vlist)]
+                ar, area = stats.cell_stats(latlng)
                 verts.append(latlng)
                 ars.append(ar)
                 areas.append(area)
@@ -203,7 +196,7 @@ def build_table(dggs, res):
         writer.close()
 
     kb = os.path.getsize(path) / 1024
-    print(f'[{dggs} r{res:<2}] {mode:>6} {len(zones):>8} cells '
+    print(f'[{dggs} r{res:<2}] {mode:>6} {len(cells):>8} cells '
           f'(DNC {dnc}) -> {path.name} ({kb:.0f} KiB) '
           f'[{time.perf_counter() - t0:.0f}s]', flush=True)
     return path

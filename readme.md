@@ -40,7 +40,7 @@ src/dggs_compare/     the internal library (organization only, not for PyPI)
   checks.py             DNC invariants (cached-ar or re-solve modes)
   webdata.py            web-viewer artifacts from the tables
 scripts/              thin callers: gen, survey, calibrate, dnc_check,
-                      validate_corners, web_*, explorations/
+                      convergence, web_*, explorations/
 web/                  the static comparison site (survey plots + ajglobe
                       globes colored by AR); data from web/out/
 data/cells/           the tables (gitignored; published as data releases)
@@ -65,7 +65,7 @@ just calibrate         # area-match resolutions across systems (closed-form)
 just dnc-check         # assert the DNC invariants (pass/fail)
 just site              # build the static site into web/out/ (survey plots + globes)
 just web               # build the site, then serve it at :8000
-just validate-corners  # stats-inputs-vs-refined-edges check, every system
+just convergence       # metrics converged in edge-sampling density, every system
 ```
 
 ## Adding a grid
@@ -74,13 +74,12 @@ The `systems/` folder is the registry — the data-release gen matrix is
 derived from it at run time. A new DGGS touches:
 
 1. `src/dggs_compare/systems/<name>.py` — the module (the batch-first
-   contract is `registry.py`'s docstring; mirror any existing system; add
-   `stats_rings` only if the corner rings are not faithful).
+   contract is `registry.py`'s docstring; mirror any existing system).
 2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
    (`just calibrate` picks it from the closed-form counts — no tables
    needed), `SYS_COLOR`.
 
-Then run `just validate-corners` (the admission gate) and cut a data release — `just dnc-check` fails its publish gate
+Then run `just convergence` (the admission gate) and cut a data release — `just dnc-check` fails its publish gate
 unless every registry system has tables and `PER_SYSTEM` config.
 
 ## Table schema

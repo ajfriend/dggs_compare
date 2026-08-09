@@ -22,16 +22,12 @@ def cells_at(res, points):
     return _adapter.cells_at(res, points)
 
 
-def cid_strs(zones):
-    return _adapter.cid_strs(zones)
+def cid_strs(cells):
+    return _adapter.cid_strs(cells)
 
 
-def boundaries(res, zones):
-    return _adapter.boundaries(zones)
-
-
-def refined_boundaries(res, zones, refine):
-    return _adapter.refined_boundaries(zones, refine)
+def boundaries(res, cells, samples_per_edge=0):
+    return _adapter.boundaries(cells, samples_per_edge)
 
 
 def enumerate_cells(res):

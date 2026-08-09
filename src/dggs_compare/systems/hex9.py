@@ -6,18 +6,18 @@ hexagons at every layer — the 12 topological pentagons (two per octahedral
 vertex) are represented as 6-vertex rings with a reflected half-hex across the
 seam, so no pentagon special-casing is needed here.
 
-Zone handles are `(layer, uuid_bytes)` tuples: a hex9 bin uuid does not
+Cell handles are `(layer, uuid_bytes)` tuples: a hex9 bin uuid does not
 encode its layer, and `cid_strs` (which gets no `res`) needs it for
 labeling. The cid is the canonical keyed label ("<digits>.<key>"), which
 round-trips exactly via hex9.parse_label — bare labels are ambiguous at
 split-hex bodies.
 
-Cell edges are straight in the octahedral face plane, not sphere geodesics —
-but the corner ring is still faithful for the solvers (the edges never bow
-outside the corner-determined enclosing cone), so no `stats_rings` override
-is needed. `refined_boundaries` traces the true hex9 edges via the
-binding's native densification, so `just validate-corners` checks
-corners-vs-refined for hex9 like every other system.
+Cell edges are straight in the octahedral face plane, not sphere
+geodesics, but the density-0 vertex list is still faithful for the
+solvers: the edges never bow outside the vertex-determined enclosing
+cone. Higher sampling densities trace the true hex9 edges via the
+binding's native densification, which is what the convergence check
+verifies against.
 """
 
 import hex9
@@ -40,7 +40,7 @@ def num_cells(res):
 
 
 def _u(z):
-    """The (layer, bytes) zone handle's uuid as the uint8[16] hex9 expects."""
+    """The (layer, bytes) cell handle's uuid as the uint8[16] hex9 expects."""
     return np.frombuffer(z[1], dtype=np.uint8)
 
 
@@ -51,33 +51,31 @@ def cells_at(res, points):
     return [(res, b.tobytes()) for b in hex9.bin(full, res)]
 
 
-def cid_strs(zones):
-    # One batch label() call (a scalar call per zone costs ~2x). The batch
+def cid_strs(cells):
+    # One batch label() call (a scalar call per cell costs ~2x). The batch
     # form takes a single layer; callers pass single-resolution batches.
-    layer = zones[0][0]
-    assert all(z[0] == layer for z in zones)
-    arr = np.frombuffer(b''.join(b for _, b in zones), np.uint8).reshape(-1, 16)
+    layer = cells[0][0]
+    assert all(c[0] == layer for c in cells)
+    arr = np.frombuffer(b''.join(b for _, b in cells), np.uint8).reshape(-1, 16)
     return hex9.label(arr, layer, True)
 
 
-def _ring(z, d=0):
-    # hex9 winds its rings clockwise seen from outside; sparea needs CCW
-    # (a CW ring reads as the 4pi-complement polygon): the row slice drops
-    # the closing vertex and reverses, the column flip swaps (lng, lat) ->
-    # (lat, lng), all before the one C-speed tolist().
-    return hex9.cell(_u(z), z[0], d)[-2::-1, ::-1].tolist()
+def _verts(c, d=0):
+    # hex9 winds its vertex lists clockwise seen from outside; sparea needs
+    # CCW (a CW list reads as the 4pi-complement polygon): the row slice
+    # drops the closing vertex and reverses, the column flip swaps
+    # (lng, lat) -> (lat, lng), all before the one C-speed tolist().
+    return hex9.cell(_u(c), c[0], d)[-2::-1, ::-1].tolist()
 
 
-def boundaries(res, zones):
-    return [_ring(z) for z in zones]
-
-
-def refined_boundaries(res, zones, refine):
-    # smallest d with 3^d - 1 densification points per edge >= refine
-    d = 1
-    while 3 ** d - 1 < refine:
+def boundaries(res, cells, samples_per_edge=0):
+    # hex9's densify=d samples 3^d - 1 vertices per edge along the true
+    # hex9 edge (straight in the octahedral face plane): the smallest d
+    # meeting the requested density.
+    d = 0
+    while 3 ** d - 1 < samples_per_edge:
         d += 1
-    return [_ring(z, d) for z in zones]
+    return [_verts(c, d) for c in cells]
 
 
 def enumerate_cells(res):
