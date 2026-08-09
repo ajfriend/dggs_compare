@@ -23,30 +23,30 @@ def cells_at(res, points):
     return [_cell_at(res, lat, lng) for lat, lng in points]
 
 
-def cid_strs(zones):
-    return [format(z, '016x') for z in zones]
+def cid_strs(cells):
+    return [format(c, '016x') for c in cells]
 
 
-def _boundary(z):
-    cell = s2sphere.Cell(s2sphere.CellId(z))
-    ring = []
+def _boundary(c):
+    cell = s2sphere.Cell(s2sphere.CellId(c))
+    verts = []
     for i in range(4):
         ll = s2sphere.LatLng.from_point(cell.get_vertex(i))
-        ring.append((ll.lat().degrees, ll.lng().degrees))
-    return ring
+        verts.append((ll.lat().degrees, ll.lng().degrees))
+    return verts
 
 
-def boundaries(res, zones):
-    return [_boundary(z) for z in zones]
-
-
-def refined_boundaries(res, zones, refine):
+def boundaries(res, cells, samples_per_edge=0):
     # s2 cell edges lie in planes through the origin (constant-u/v lines on
-    # the cube), i.e. great circles — refinement is slerp between corners.
-    # Here that's definitional (s2sphere's own containment uses these great
-    # circles), so validate-corners reduces to a solver-numerics check:
-    # agreement is a convexity theorem, not an empirical finding.
-    return [stats.refine_geodesic(_boundary(z), refine) for z in zones]
+    # the cube), i.e. great circles — higher sampling density is slerp
+    # between the vertices. Here that's definitional (s2sphere's own
+    # containment uses these great circles), so the convergence check
+    # reduces to solver numerics: agreement is a convexity theorem, not an
+    # empirical finding.
+    if samples_per_edge:
+        return [stats.refine_geodesic(_boundary(c), samples_per_edge)
+                for c in cells]
+    return [_boundary(c) for c in cells]
 
 
 def enumerate_cells(res):

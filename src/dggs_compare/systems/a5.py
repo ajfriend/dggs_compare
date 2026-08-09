@@ -31,8 +31,8 @@ def cells_at(res, points):
             for lat, lng in points]
 
 
-def cid_strs(zones):
-    return [a5.u64_to_hex(z) for z in zones]
+def cid_strs(cells):
+    return [a5.u64_to_hex(c) for c in cells]
 
 
 def _corners(latlng):
@@ -47,25 +47,23 @@ def _corners(latlng):
     return [latlng[i] for i in idx] if len(idx) >= 3 else latlng
 
 
-def _boundary(z):
-    ring = a5.cell_to_boundary(z)   # closed ring of (lng, lat), densified
-    return _corners([(lat, lng) for lng, lat in ring[:-1]])
+def _boundary(c):
+    verts = a5.cell_to_boundary(c)   # closed (lng, lat) list, densified
+    return _corners([(lat, lng) for lng, lat in verts[:-1]])
 
 
-def boundaries(res, zones):
-    return [_boundary(z) for z in zones]
-
-
-def refined_boundaries(res, zones, refine):
-    # a5's native boundary is adaptively densified under a5's own edge
-    # model (321 points at r0 down to 6 from res ~9 up). Slerp `refine`
-    # points between the native vertices on top of that, so the reference
-    # stays strictly finer than the corner ring even at the deep
-    # resolutions where the native ring IS the corner ring.
-    return [stats.refine_geodesic(
-                [(lat, lng) for lng, lat in a5.cell_to_boundary(z)[:-1]],
-                refine)
-            for z in zones]
+def boundaries(res, cells, samples_per_edge=0):
+    # Density 0 reduces a5's native vertex list to its turning points (see
+    # module docstring). Higher density slerps between a5's OWN adaptively
+    # sampled vertices (321 points at r0 down to 6 from res ~9 up), so the
+    # result stays strictly denser than the minimal vertex set even at the
+    # deep resolutions where the native list IS the minimal set.
+    if samples_per_edge:
+        return [stats.refine_geodesic(
+                    [(lat, lng) for lng, lat in a5.cell_to_boundary(c)[:-1]],
+                    samples_per_edge)
+                for c in cells]
+    return [_boundary(c) for c in cells]
 
 
 def enumerate_cells(res):

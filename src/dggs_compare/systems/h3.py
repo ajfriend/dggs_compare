@@ -17,24 +17,22 @@ def cells_at(res, points):
     return [h3.latlng_to_cell(lat, lng, res) for lat, lng in points]
 
 
-def cid_strs(zones):
-    return [str(z) for z in zones]
+def cid_strs(cells):
+    return [str(c) for c in cells]
 
 
-def boundaries(res, zones):
-    return [h3.cell_to_boundary(z) for z in zones]   # (lat, lng) deg corners
-
-
-def refined_boundaries(res, zones, refine):
+def boundaries(res, cells, samples_per_edge=0):
     # h3 edges ARE geodesics between the boundary vertices (which already
-    # include icosahedron-edge distortion vertices), so refinement is slerp.
-    # Note: since the reference is built from the same corners under the
-    # same edge model, validate-corners reduces to a solver-numerics check
+    # include icosahedron-edge distortion vertices), so higher sampling
+    # density is slerp between them. Note: since denser vertices come from
+    # the same edge model, the convergence check reduces to solver numerics
     # here (agreement is a convexity theorem) — it cannot falsify the
     # geodesic-edge model itself; only a point-classification ground-truth
     # test could.
-    return [stats.refine_geodesic(h3.cell_to_boundary(z), refine)
-            for z in zones]
+    if samples_per_edge:
+        return [stats.refine_geodesic(h3.cell_to_boundary(c), samples_per_edge)
+                for c in cells]
+    return [h3.cell_to_boundary(c) for c in cells]   # (lat, lng) degrees
 
 
 def enumerate_cells(res):

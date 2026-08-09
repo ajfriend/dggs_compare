@@ -11,37 +11,38 @@ is a plain top-level import.
 The contract is batch-first: subprocess-backed systems (isea4t/DGGRID)
 resolve a whole chunk per call, and in-process backends just loop — the
 reverse adaptation (batch on top of per-cell) is what stateful hacks are
-made of. Zone handles are plain hashables whose meaning may be scoped to
+made of. Cell handles are plain hashables whose meaning may be scoped to
 a resolution (DGGRID seqnums), so every geometry call carries `res`.
+
+A cell's boundary is always the same kind of object — a list of vertices,
+in order, joined by great-circle edges — and the only knob is the SAMPLING
+DENSITY: how many extra vertices are sampled along each native edge.
+Density 0 is the minimal vertex set. For systems whose native edges are
+not great circles, higher density traces the true edge more closely;
+scripts/convergence.py verifies the metrics are converged in this knob.
 Every systems/ module implements:
 
     resolutions()          -> range of generatable resolutions (0..finest)
     num_cells(res)         -> int, total cells at `res`
-    cells_at(res, points)  -> [zone or None, ...] for [(lat, lng), ...];
+    cells_at(res, points)  -> [cell or None, ...] for [(lat, lng), ...];
                               None = the engine couldn't resolve the point
                               (rare DGGAL deep-level singular points) —
                               samplers skip and draw again
-    cid_strs(zones)        -> [str, ...] text ids stored in the tables;
+    cid_strs(cells)        -> [str, ...] text ids stored in the tables;
                               must sort (as text) in a spatially coherent
                               order — cache.build_table orders rows by
                               them for Parquet page locality (fixed-width)
-    boundaries(res, zones) -> [[(lat, lng), ...] open corner ring, ...]
-                              aligned with `zones`, degrees
-    refined_boundaries(res, zones, refine)
-                           -> boundary rings with ~`refine` extra points
-                              per edge tracing the TRUE cell edge — the
-                              reference geometry validate-corners checks
-                              the corner rings against
-    enumerate_cells(res)   -> iterator of every zone at `res`
+    boundaries(res, cells, samples_per_edge=0)
+                           -> [[(lat, lng), ...] open vertex list, ...]
+                              aligned with `cells`, degrees, with AT LEAST
+                              `samples_per_edge` extra vertices sampled
+                              along each native edge (binding APIs
+                              quantize, so modules may return more)
+    enumerate_cells(res)   -> iterator of every cell at `res`
 
 DGGAL-backed modules additionally expose `adapter()` — the live-engine
-`dggal_engine.Adapter` (neighbors, edge-refined vertices, …) for analyses
-that need more than a bag of cells.
-
-Optional: `stats_rings(res, zones)` -> [ring or None, ...] fed to the
-AR/area solvers INSTEAD of the corner rings where not None — for systems
-whose corners do not always bound the cell (isea3h: odd-level cells kink
-at icosahedron edges). The tables' verts column always stores corners.
+`dggal_engine.Adapter` (neighbors, point->cell, …) for analyses that need
+more than a bag of cells.
 """
 
 import importlib

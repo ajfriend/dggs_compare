@@ -111,18 +111,18 @@ class Adapter:
     # ----- registry-contract batches ------------------------------------
     # The five DGGAL systems/ modules delegate their batch calls here, so
     # the loop bodies — including the (lat, lng) -> (lng, lat) argument
-    # swap — live once.
+    # swap — live once. ("zone" below is DGGAL's own name for a cell; it
+    # stays inside this adapter.)
     def cells_at(self, level, points):
         return [self.zone_at(level, lng, lat) for lat, lng in points]
 
-    def cid_strs(self, zones):
-        return [self.cid_str(z) for z in zones]
+    def cid_strs(self, cells):
+        return [self.cid_str(c) for c in cells]
 
-    def boundaries(self, zones):
-        return [self.cell_boundary(z) for z in zones]
-
-    def refined_boundaries(self, zones, refine):
-        return [self.refined_boundary(z, refine) for z in zones]
+    def boundaries(self, cells, samples_per_edge=0):
+        if samples_per_edge:
+            return [self.refined_boundary(c, samples_per_edge) for c in cells]
+        return [self.cell_boundary(c) for c in cells]
 
     # ----- geometry -----------------------------------------------------
     def cell_boundary(self, zone):

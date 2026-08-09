@@ -47,10 +47,10 @@ calibrate:
 dnc-check:
     uv run scripts/dnc_check.py
 
-# Stats-input-vs-refined-boundary AR validation for EVERY registry system —
-# the check that admits a new grid to the pipeline.
-validate-corners:
-    uv run scripts/validate_corners.py
+# Verify metrics are converged in edge-sampling density for EVERY registry
+# system — the check that admits a new grid to the pipeline.
+convergence:
+    uv run scripts/convergence.py
 
 # Build the web viewer's static data (histograms + ajglobe globe binaries +
 # the full-globe page's complete-coverage binaries + manifest) from the

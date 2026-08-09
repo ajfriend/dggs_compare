@@ -14,12 +14,12 @@ from . import config
 
 def refine_geodesic(ring, k):
     """Insert `k` slerp points along each great-circle edge of an open
-    (lat, lng)-degree ring.
+    (lat, lng)-degree vertex list.
 
-    For systems whose edges ARE geodesics between their boundary vertices
-    (h3, s2), this produces the refined reference ring that validate-
-    corners compares against — the enclosing cone can't change (convexity),
-    so the check confirms the implementation matches the theorem.
+    For systems whose edges ARE geodesics between their vertices (h3, s2),
+    this is what higher sampling density means — the enclosing cone can't
+    change (convexity), so the convergence check confirms the
+    implementation matches the theorem.
     """
     la, lo = np.radians(np.asarray(ring, dtype=float)).T
     v = np.column_stack([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo),

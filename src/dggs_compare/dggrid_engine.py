@@ -152,13 +152,14 @@ class Engine:
                     f'{len(out)} ids out')
             return out
 
-    def boundaries(self, res, seqnums, refine=0):
-        """Open CCW rings aligned with `seqnums` (clipped generation);
-        `refine` densification points per edge."""
+    def boundaries(self, res, seqnums, samples_per_edge=0):
+        """Open CCW vertex lists aligned with `seqnums` (clipped
+        generation); `samples_per_edge` extra vertices per edge (DGGRID's
+        `densification`)."""
         with tempfile.TemporaryDirectory() as d:
             ids = Path(d) / 'ids.txt'
             ids.write_text(''.join(f'{s}\n' for s in seqnums))
-            self._generate(res, d, clip='ids.txt', densification=refine)
+            self._generate(res, d, clip='ids.txt', densification=samples_per_edge)
             rings = dict(_parse_aigen(Path(d) / 'cells.gen'))
         missing = set(seqnums) - rings.keys()
         if missing:
