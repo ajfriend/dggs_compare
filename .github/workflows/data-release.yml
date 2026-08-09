@@ -7,6 +7,9 @@
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
 # measurement-code bump worth reflecting) — decoupled from code releases.
 #
+# Also callable (workflow_call) so pr.yml can run the identical path at a
+# tiny budget with publish off — the per-PR pipeline test (#51).
+#
 # One build job per IMPLEMENTATION — the matrix is the scripts/systems/
 # listing, so it can never go stale — running the two pipeline stages
 # back to back in two SEPARATE envs on the same runner:
@@ -53,9 +56,33 @@ on:
         options:
           - ubuntu-latest
           - ubuntu-24.04-arm
+      publish:
+        description: 'Create the GitHub release (off = run every gate, stop before upload)'
+        required: false
+        default: true
+        type: boolean
+  # The reusable form: same input names, so the `inputs` context reads
+  # the same either way (a new input goes in BOTH blocks). workflow_call
+  # has no `choice`; runner is a plain string. Unpassed inputs resolve to
+  # their type defaults ('' / false), which is what a test run wants —
+  # only runner's default is load-bearing (it feeds runs-on).
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+      n_cells:
+        type: string
+      runner:
+        type: string
+        default: ubuntu-latest
+      publish:
+        type: boolean
 
+# Read everywhere by default: on pr.yml-triggered runs the build jobs
+# execute the PR's code, so only the publish job (the one `gh release`
+# caller) holds a write-capable token.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   systems:
@@ -142,6 +169,8 @@ jobs:
     needs: [build]
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
       # No cache-suffix: the default key is already distinct from the
@@ -158,9 +187,12 @@ jobs:
         run: just dnc-check
       - name: derive the web viewer data
         run: just web-data
-      - name: stage + publish
+      - name: stage the release layout
+        run: just data-pack
+      # The one step a PR test run skips: everything above is identical
+      # between a real release and the per-PR proof.
+      - name: publish
+        if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          just data-pack
-          just data-publish '${{ inputs.tag }}'
+        run: just data-publish '${{ inputs.tag }}'
