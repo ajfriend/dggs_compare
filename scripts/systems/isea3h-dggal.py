@@ -20,9 +20,9 @@ to ~4e-3 for those cells, and the convergence gate carves this grid out
 Run with:  uv run scripts/systems/isea3h-dggal.py
 """
 
-from dggs_compare.dggal_engine import GridImplAdapter
+from dggs_compare.dggal_engine import Adapter
 from dggs_compare import runner, stats
 
 if __name__ == '__main__':
     runner.generate(
-        GridImplAdapter('isea3h', 'ISEA3H', to_sphere=stats.authalic_rings))
+        Adapter('ISEA3H', grid='isea3h', to_sphere=stats.authalic_rings))

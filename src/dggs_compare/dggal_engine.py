@@ -97,31 +97,62 @@ def latlng_ring(points):
 # pentagons per level. Every ring an Adapter hands out is normalized
 # (stats.orient_ccw).
 class Adapter:
-    """Wrap one DGGAL DGGRS. `cls` is the DGGRS class name (e.g. 'ISEA7H')."""
+    """Wrap one DGGAL DGGRS — both the GridImpl the five DGGAL scripts
+    hand to `runner.generate` and the live-engine object the exploration
+    scripts drive.
 
-    def __init__(self, cls):
+    `cls` is the DGGRS class name (e.g. 'ISEA7H'). The registry path also
+    passes `grid` (the artifact key's grid half) and — DGGAL's coordinates
+    being WGS84 geodetic — `to_sphere` (a rings->rings function, e.g.
+    `stats.authalic_rings`), whose presence in the script call is the
+    record of how the system gets to the sphere. Analyses may omit both
+    and get raw geodetic output.
+    """
+
+    impl = 'dggal'
+    packages = ('dggal',)
+
+    def __init__(self, cls, grid=None, to_sphere=None):
         self.name = cls
+        self.grid = grid
+        self._to_sphere = to_sphere
         self.dggrs = globals()[cls]()
         # One reused query point: a GeoPoint constructed per zone_at call
         # is never freed by the binding (~1M leaked instances per sampled
         # resolution).
         self._pt = GeoPoint(0.0, 0.0)
 
-    # ----- registry-contract batches ------------------------------------
-    # The five DGGAL systems/ modules delegate their batch calls here, so
-    # the loop bodies — including the (lat, lng) -> (lng, lat) argument
-    # swap — live once. ("zone" below is DGGAL's own name for a cell; it
-    # stays inside this adapter.)
-    def cells_at(self, level, points):
-        return [self.zone_at(level, lng, lat) for lat, lng in points]
+    # ----- the GridImpl contract ----------------------------------------
+    # ("zone" below is DGGAL's own name for a cell; it stays inside this
+    # adapter. Zones encode their level, so `res` is implied by the cell
+    # arguments where the contract passes both.)
+    def resolutions(self):
+        return range(self.dggrs.getMaxDGGRSZoneLevel() + 1)
+
+    def num_cells(self, res):
+        return int(self.dggrs.countZones(res))
+
+    def cells_at(self, res, points):
+        return [self.zone_at(res, lng, lat) for lat, lng in points]
 
     def cid_strs(self, cells):
         return [self.cid_str(c) for c in cells]
 
-    def boundaries(self, cells, samples_per_edge=0):
+    def boundaries(self, res, cells, samples_per_edge=0):
         if samples_per_edge:
-            return [self.refined_boundary(c, samples_per_edge) for c in cells]
-        return [self.cell_boundary(c) for c in cells]
+            rings = [self.refined_boundary(c, samples_per_edge)
+                     for c in cells]
+        else:
+            rings = [self.cell_boundary(c) for c in cells]
+        return self._to_sphere(rings) if self._to_sphere else rings
+
+    def enumerate_cells(self, res):
+        """Every zone at `res`, whole world."""
+        arr = self.dggrs.listZones(res, wholeWorld)
+        try:
+            yield from arr
+        finally:
+            Instance.delete(arr)   # the binding never frees the zone Array
 
     # ----- geometry -----------------------------------------------------
     def cell_boundary(self, zone):
@@ -153,28 +184,14 @@ class Adapter:
         import csar
         return csar.to_vec3(self.cell_boundary(zone), geo='latlng_deg')
 
-    # ----- ids / counts -------------------------------------------------
+    # ----- ids ----------------------------------------------------------
     def cid_str(self, zone):
         return self.dggrs.getZoneTextID(zone)
-
-    def count(self, level):
-        return int(self.dggrs.countZones(level))
-
-    def max_level(self):
-        return self.dggrs.getMaxDGGRSZoneLevel()
 
     def level(self, zone):
         return self.dggrs.getZoneLevel(zone)
 
-    # ----- cell streams -------------------------------------------------
-    def enumerate(self, level):
-        """Every zone at `level`, whole world."""
-        arr = self.dggrs.listZones(level, wholeWorld)
-        try:
-            yield from arr
-        finally:
-            Instance.delete(arr)   # the binding never frees the zone Array
-
+    # ----- point lookup / sampling --------------------------------------
     def zone_at(self, level, lng, lat):
         """The zone at `level` containing the (lng, lat) point, or None when
         the engine can't resolve it — DGGAL returns its nullZone sentinel for
@@ -210,39 +227,3 @@ class Adapter:
             yield self.cid_str(zone), self.verts(zone)
 
 
-class GridImplAdapter:
-    """The GridImpl-shaped view of an Adapter, for the five DGGAL scripts
-    in scripts/systems/ — the contract methods forward to one Adapter, so
-    a contract change is one edit here instead of five.
-
-    `to_sphere` (a rings->rings function, e.g. `stats.authalic_rings`) is
-    applied to every `boundaries` return: DGGAL's coordinates are WGS84
-    geodetic, and passing the transform here is the script's record of
-    how its system gets to the sphere."""
-
-    impl = 'dggal'
-    packages = ('dggal',)
-
-    def __init__(self, grid, dggal_cls, to_sphere=None):
-        self.grid = grid
-        self._a = Adapter(dggal_cls)
-        self._to_sphere = to_sphere
-
-    def resolutions(self):
-        return range(self._a.max_level() + 1)
-
-    def num_cells(self, res):
-        return self._a.count(res)
-
-    def cells_at(self, res, points):
-        return self._a.cells_at(res, points)
-
-    def cid_strs(self, cells):
-        return self._a.cid_strs(cells)
-
-    def boundaries(self, res, cells, samples_per_edge=0):
-        rings = self._a.boundaries(cells, samples_per_edge)
-        return self._to_sphere(rings) if self._to_sphere else rings
-
-    def enumerate_cells(self, res):
-        yield from self._a.enumerate(res)
