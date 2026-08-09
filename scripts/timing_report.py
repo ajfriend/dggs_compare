@@ -7,6 +7,9 @@ runner's `select/cids/bounds = N us/cell` generation lines and metrics'
 
 Run with:  just timing-report <run-id>      (ids: gh run list)
 Runs predating the instrumented log lines report step-level columns only.
+Tiny-budget runs under-resolve sub-0.1s phases (the log lines print one
+decimal), so e.g. the solve rate reads 0 there; full-budget runs are the
+real subject.
 """
 
 import json
@@ -77,17 +80,21 @@ def parse_job(job):
             t_solve += float(m['slv'])
         elif (m := CONV_PAT.search(line)):
             conv += float(m['s'])
-    row.update(cells=cells, engine=engine, conv=conv,
-               solved=solved, t_solve=t_solve)
+    # None = the instrumented lines were absent (a pre-instrumentation
+    # run), as opposed to a measured 0.0.
+    row.update(cells=cells, engine=engine if cells else None, conv=conv,
+               solved=solved, t_solve=t_solve if solved else None)
     return row
 
 
 def fmt(secs):
-    return f'{secs / 60:.1f}' if secs else '-'
+    """Minutes; '-' for absent or sub-second (a skipped install, an
+    unparsed phase)."""
+    return '-' if secs is None or secs < 1 else f'{secs / 60:.1f}'
 
 
 def rate(secs, n):
-    return f'{1e6 * secs / n:.0f}' if n else '-'
+    return '-' if not n or secs is None else f'{1e6 * secs / n:.0f}'
 
 
 def main():
@@ -102,24 +109,30 @@ def main():
     print('minutes' + ' ' * (len(hdr) - len('minutes') - len('us/cell')) +
           'us/cell')
     print(hdr)
-    tot = {}
-    for key_, r in sorted(builds.items()):
-        parquet = max(0.0, r['gen'] - r['engine'] - r['conv'])
-        print(f'{key_:16} {fmt(r["setup"]):>6} {fmt(r["install"]):>6} '
-              f'{fmt(r["gen"]):>6} {fmt(r["engine"]):>6} {fmt(parquet):>6} '
-              f'{fmt(r["conv"]):>6} {fmt(r["metrics"]):>6} '
-              f'{fmt(r["t_solve"]):>6} {fmt(r["upload"]):>6} '
+    def parquet_of(r):
+        if r['engine'] is None:
+            return None
+        return max(0.0, r['gen'] - r['engine'] - r['conv'])
+
+    def row(label, r):
+        print(f'{label:16} {fmt(r["setup"]):>6} {fmt(r["install"]):>6} '
+              f'{fmt(r["gen"]):>6} {fmt(r["engine"]):>6} '
+              f'{fmt(parquet_of(r)):>6} {fmt(r["conv"]):>6} '
+              f'{fmt(r["metrics"]):>6} {fmt(r["t_solve"]):>6} '
+              f'{fmt(r["upload"]):>6} '
               f'| {rate(r["engine"], r["cells"]):>5} '
               f'{rate(r["t_solve"], r["solved"]):>5}')
+
+    tot = {}
+    for key_, r in sorted(builds.items()):
+        row(key_, r)
         for k, v in r.items():
-            tot[k] = tot.get(k, 0.0) + v
-    parquet = max(0.0, tot['gen'] - tot['engine'] - tot['conv'])
-    print(f'{"TOTAL":16} {fmt(tot["setup"]):>6} {fmt(tot["install"]):>6} '
-          f'{fmt(tot["gen"]):>6} {fmt(tot["engine"]):>6} {fmt(parquet):>6} '
-          f'{fmt(tot["conv"]):>6} {fmt(tot["metrics"]):>6} '
-          f'{fmt(tot["t_solve"]):>6} {fmt(tot["upload"]):>6} '
-          f'| {rate(tot["engine"], tot["cells"]):>5} '
-          f'{rate(tot["t_solve"], tot["solved"]):>5}')
+            tot[k] = tot.get(k, 0.0) + (v or 0.0)
+    if not tot['cells']:
+        tot['engine'] = None
+    if not tot['solved']:
+        tot['t_solve'] = None
+    row('TOTAL', tot)
 
     for j in jobs:
         if j['name'] == 'publish':
