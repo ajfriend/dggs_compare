@@ -105,7 +105,7 @@ One Parquet file per `(grid, implementation, resolution)` at
 | `dggs` | string | system name (constant per file) |
 | `res` | int32 | resolution/level (constant per file) |
 | `cid` | string | cell id text |
-| `verts` | list<[lat, lng] f64> | corner ring, degrees, open |
+| `verts` | list<[lat, lng] f64> | vertex list, degrees, open |
 | `ar` | float64 | enclosing-cone aspect ratio; NaN = did-not-certify |
 | `area` | float64 | spherical area, steradians |
 
@@ -158,5 +158,5 @@ csar_py branch or rev, `uv sync`, set `RESOLVE=True` in
 installed csar against invariants that have caught real solver differences.
 
 Extracted from [skar_py](https://github.com/ajfriend/skar_py) (history through
-its PR #16); restructured for native dggal 0.0.6 (no more Rosetta) with stats
+its PR #16); restructured for dggal 0.0.6 with stats
 bundled into the tables.

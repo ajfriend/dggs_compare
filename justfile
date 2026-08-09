@@ -25,12 +25,17 @@ sync:
 # (e.g. `just gen isea3h-dggal`).
 gen key="all":
     #!/usr/bin/env sh
-    set -e
-    if [ "{{key}}" = "all" ]; then \
-        for f in scripts/systems/*.py; do uv run "$f"; done; \
-    else \
-        uv run "scripts/systems/{{key}}.py"; \
+    if [ "{{key}}" != "all" ]; then
+        exec uv run "scripts/systems/{{key}}.py"
     fi
+    # Run every implementation even if one fails (mirrors CI's
+    # fail-fast: false): one run yields the full failure set AND all the
+    # healthy raw artifacts, which `just metrics` can then use per-key.
+    fail=0
+    for f in scripts/systems/*.py; do
+        uv run "$f" || { echo "FAILED: $f"; fail=1; }
+    done
+    exit $fail
 
 # Stage 2: raw geometry -> the published tables in data/cells/ (per-cell
 # csar AR + sparea area, one solver provenance for every system), applying

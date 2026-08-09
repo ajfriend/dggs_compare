@@ -23,7 +23,6 @@ import re
 from pathlib import Path
 
 import numpy as np
-import pyarrow.parquet as pq
 
 from . import cache, config
 
@@ -36,25 +35,25 @@ NOISE_TOL = 1e-2
 MAX_EXAMPLES = 5      # offending cell ids reported per failing resolution
 
 
+_SCRIPT_PAT = re.compile(rf'^{cache.KEY_RE}\.py$')
+
+
 def implementations():
     """Sorted (grid, impl) pairs from the scripts/systems/ listing — the
-    registry. Scripts are named '{grid}-{impl}.py'."""
-    pat = re.compile(r'^([^-]+)-([^-]+)\.py$')
-    return sorted((m.group(1), m.group(2))
-                  for p in SCRIPTS_DIR.glob('*.py')
-                  if (m := pat.match(p.name)))
-
-
-def _declared_resolutions(grid, impl):
-    """The 'resolutions' metadata from one of the pair's tables (they all
-    carry the same value), or None if no table exists."""
-    res_list = cache.available_tables().get((grid, impl))
-    if not res_list:
-        return None
-    path = cache.DATA_DIR / f'{grid}-{impl}_r{res_list[0]}.parquet'
-    meta = pq.ParquetFile(path).metadata.metadata or {}
-    raw = meta.get(b'resolutions')
-    return None if raw is None else {int(r) for r in raw.decode().split(',')}
+    registry. Scripts are named '{grid}-{impl}.py'; a .py file that
+    doesn't match is a loud error, because a silently skipped script
+    would also vanish from the completeness gate's expectations."""
+    pairs, bad = [], []
+    for p in SCRIPTS_DIR.glob('*.py'):
+        if (m := _SCRIPT_PAT.match(p.name)):
+            pairs.append((m.group(1), m.group(2)))
+        else:
+            bad.append(p.name)
+    if bad:
+        raise RuntimeError(
+            f'scripts/systems/ files not named {{grid}}-{{impl}}.py: '
+            f'{sorted(bad)}')
+    return sorted(pairs)
 
 
 def missing_systems():
@@ -74,21 +73,42 @@ def missing_systems():
     return no_tables, no_config
 
 
-def stale_tables():
-    """Tables on disk OUTSIDE their own declared resolution coverage.
+def coverage_problems():
+    """Disk == declaration, checked in BOTH directions from each table's
+    own metadata.
 
-    Disk == declaration is an invariant every consumer relies on without
-    checking — a stale table (left behind when an implementation's max
-    resolution was lowered, or a partial write from a crashed run) would
-    silently pollute them all, so the gate fails loudly on any. Files not
-    matching the {grid}-{impl} naming scheme are ignored (not part of the
-    artifact)."""
-    out = []
+    Stale: a table whose resolution is outside its own declared coverage
+    (left behind when an implementation's max resolution was lowered).
+    Mixed: tables of one pair carrying different declarations (a partial
+    regeneration across a contract change). Holes: declared resolutions
+    with no table on disk (a partial local run, or a failed CI matrix leg
+    under fail-fast: false) — a releasable artifact has none. Every
+    consumer relies on disk == declaration without checking, so the gate
+    fails loudly on any of these."""
+    problems = []
     for (grid, impl), res_list in sorted(cache.available_tables().items()):
-        declared = _declared_resolutions(grid, impl)
-        out += [f'{grid}-{impl}_r{res}.parquet' for res in res_list
-                if declared is not None and res not in declared]
-    return out
+        key = cache.key(grid, impl)
+        declarations = {}
+        for res in res_list:
+            raw = cache.table_metadata(grid, impl, res).get('resolutions')
+            if raw is None:
+                problems.append(f'{key}_r{res}: no resolutions metadata')
+                continue
+            declared = frozenset(int(r) for r in raw.split(','))
+            declarations.setdefault(declared, []).append(res)
+            if res not in declared:
+                problems.append(f'{key}_r{res}: stale (outside its own '
+                                f'declared coverage)')
+        if len(declarations) > 1:
+            problems.append(f'{key}: tables carry {len(declarations)} '
+                            f'different resolution declarations (mixed '
+                            f'generations)')
+        elif declarations:
+            (declared, _), = declarations.items()
+            holes = sorted(declared - set(res_list))
+            if holes:
+                problems.append(f'{key}: declared but missing r{holes}')
+    return problems
 
 
 def target_res_problems():
@@ -100,24 +120,28 @@ def target_res_problems():
     requires a primary-implementation table at the target: a target finer
     than the finest table would make the DNC invariant pass vacuously."""
     anchor = config.CELLS_PER_RES['h3'](config.TARGET_RES['h3'])
+    tables = cache.available_tables()
     problems = []
     for g, baked in config.TARGET_RES.items():
         if g != 'h3' and baked != (pick := config.count_match_res(g, anchor)):
             problems.append(f'{g}: TARGET_RES r{baked} != count-match r{pick}')
-        if baked not in cache.available_resolutions(g):
+        if baked not in tables.get((g, config.PRIMARY_IMPL[g]), []):
             problems.append(f'{g}: no table at TARGET_RES r{baked}')
     return problems
 
 
-def sweep_system(name, *, resolve=False):
-    """[(res, tested, dnc, [example cids])] over a grid's primary tables."""
+def sweep_system(name, *, impl=None, resolve=False):
+    """[(res, tested, dnc, [example cids])] over one implementation's
+    tables (the grid's primary, unless `impl` says otherwise). The DNC
+    gate runs per (grid, impl): everything published gets swept, not just
+    what the site renders."""
     rows = []
-    for res in cache.available_resolutions(name):
+    for res in cache.available_resolutions(name, impl):
         if resolve:
             import csar
             tested = dnc = 0
             examples = []
-            for cid, latlng in cache.load_cells(name, res):
+            for cid, latlng in cache.load_cells(name, res, impl):
                 tested += 1
                 r = csar.solve(csar.to_vec3(latlng, geo='latlng_deg'),
                                geo='vec3', gap_tol=config.GAP_TOL,
@@ -127,7 +151,7 @@ def sweep_system(name, *, resolve=False):
                     if len(examples) < MAX_EXAMPLES:
                         examples.append(cid)
         else:
-            cols = cache.load_columns(name, res, ['cid', 'ar'])
+            cols = cache.load_columns(name, res, ["cid", "ar"], impl)
             bad = np.isnan(cols['ar'])
             tested = len(cols['ar'])
             dnc = int(bad.sum())

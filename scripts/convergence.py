@@ -13,26 +13,24 @@ No CLI args (project convention).
 
 import json
 
-import pyarrow.parquet as pq
-
 from dggs_compare import cache, config
 
 
 def main():
     for (grid, impl), res_list in sorted(cache.available_tables().items()):
-        path = cache.DATA_DIR / f'{grid}-{impl}_r{res_list[0]}.parquet'
-        meta = pq.ParquetFile(path).metadata.metadata or {}
-        raw = meta.get(b'convergence_max_dar')
+        raw = cache.table_metadata(grid, impl, res_list[0]).get(
+            'convergence_max_dar')
         if raw is None:
-            print(f'{grid}-{impl}: no convergence metadata (pre-#37 table?)')
+            print(f'{cache.key(grid, impl)}: no convergence metadata '
+                  f'(pre-#37 table?)')
             continue
-        residuals = {int(r): v for r, v in json.loads(raw.decode()).items()}
+        residuals = {int(r): v for r, v in json.loads(raw).items()}
         worst = max(residuals.values(), default=0.0)
         ladder = '  '.join(f'r{r}={v:.1e}' for r, v in sorted(residuals.items()))
         note = ''
         if worst >= config.CONV_TOL:
             note = f'  [over tolerance: {config.CONV_EXPECTED_RED.get(grid, "UNEXPECTED")}]'
-        print(f'{grid}-{impl}: {ladder}{note}')
+        print(f'{cache.key(grid, impl)}: {ladder}{note}')
 
 
 if __name__ == '__main__':

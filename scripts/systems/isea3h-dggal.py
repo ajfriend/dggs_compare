@@ -20,36 +20,8 @@ to ~4e-3 for those cells, and the convergence gate carves this grid out
 Run with:  uv run scripts/systems/isea3h-dggal.py
 """
 
-from dggs_compare.dggal_engine import Adapter
+from dggs_compare.dggal_engine import GridImplAdapter
 from dggs_compare import runner
 
-
-class Impl:
-    grid = 'isea3h'
-    impl = 'dggal'
-    packages = ('dggal',)
-
-    def __init__(self):
-        self._a = Adapter('ISEA3H')
-
-    def resolutions(self):
-        return range(self._a.max_level() + 1)
-
-    def num_cells(self, res):
-        return self._a.count(res)
-
-    def cells_at(self, res, points):
-        return self._a.cells_at(res, points)
-
-    def cid_strs(self, cells):
-        return self._a.cid_strs(cells)
-
-    def boundaries(self, res, cells, samples_per_edge=0):
-        return self._a.boundaries(cells, samples_per_edge)
-
-    def enumerate_cells(self, res):
-        yield from self._a.enumerate(res)
-
-
 if __name__ == '__main__':
-    runner.generate(Impl())
+    runner.generate(GridImplAdapter('isea3h', 'ISEA3H'))

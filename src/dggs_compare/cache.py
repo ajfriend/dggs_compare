@@ -89,14 +89,51 @@ def open_ring(ring):
     return ring
 
 
+# ----- artifact naming: THE one home ---------------------------------------
+# An implementation is named by the key '{grid}-{impl}'; its tables are
+# '{key}_r{res}.parquet' and its script is 'scripts/systems/{key}.py'. The
+# key is invertible only because neither half may contain '-': composition
+# asserts it, and every parse in the pipeline routes through KEY_RE.
+
+KEY_RE = r'([^-]+)-([^-]+)'                # the two halves of a key
+_TABLE_PAT = re.compile(rf'^{KEY_RE}_r(\d+)\.parquet$')
+
+
+def key(grid, impl):
+    """The artifact key '{grid}-{impl}'."""
+    assert '-' not in grid and '-' not in impl, (grid, impl)
+    return f'{grid}-{impl}'
+
+
+def parse_key(key_):
+    """(grid, impl) from a key; raises on a malformed one."""
+    grid, impl = key_.split('-')
+    return grid, impl
+
+
+def table_name(key_, res):
+    return f'{key_}_r{res}.parquet'
+
+
+def parse_table_name(name):
+    """(grid, impl, res) from a table filename, or None if it doesn't
+    match the scheme."""
+    m = _TABLE_PAT.match(name)
+    return (m.group(1), m.group(2), int(m.group(3))) if m else None
+
+
+def impl_table_path(grid, impl, res):
+    return DATA_DIR / table_name(key(grid, impl), res)
+
+
 def table_path(dggs, res):
     """Canonical Parquet path for `dggs` (a grid name) at `res`, resolved
     through the grid's primary implementation."""
-    return DATA_DIR / f'{dggs}-{config.PRIMARY_IMPL[dggs]}_r{res}.parquet'
+    return impl_table_path(dggs, config.PRIMARY_IMPL[dggs], res)
 
 
-def _existing_path(dggs, res):
-    path = table_path(dggs, res)
+def _existing_path(dggs, res, impl=None):
+    path = impl_table_path(dggs, impl or config.PRIMARY_IMPL[dggs], res)
     if not path.exists():
         raise FileNotFoundError(
             f'{path} not found — build the tables first (`just gen` then '
@@ -107,17 +144,15 @@ def _existing_path(dggs, res):
 
 # ----- readers -------------------------------------------------------------
 
-_NAME_PAT = re.compile(r'^([^-]+)-([^-]+)_r(\d+)\.parquet$')
-
-
 def available_tables():
     """{(grid, impl): sorted [res, ...]} for every table in data/cells/.
-    Files that don't match the {grid}-{impl}_r{res} scheme are ignored."""
+    Files that don't match the {grid}-{impl}_r{res} scheme are ignored
+    (not part of the artifact)."""
     found = {}
     for p in DATA_DIR.glob('*.parquet'):
-        if (m := _NAME_PAT.match(p.name)):
-            found.setdefault((m.group(1), m.group(2)), []).append(
-                int(m.group(3)))
+        if (parsed := parse_table_name(p.name)):
+            grid, impl, res = parsed
+            found.setdefault((grid, impl), []).append(res)
     return {k: sorted(v) for k, v in found.items()}
 
 
@@ -128,19 +163,26 @@ def available_systems():
                   if config.PRIMARY_IMPL.get(g) == i)
 
 
-def available_resolutions(dggs):
-    """Sorted resolutions with a primary-implementation table on disk."""
+def available_resolutions(dggs, impl=None):
+    """Sorted resolutions of `dggs` with a table on disk (the primary
+    implementation's, unless `impl` says otherwise)."""
     return available_tables().get(
-        (dggs, config.PRIMARY_IMPL[dggs]), [])
+        (dggs, impl or config.PRIMARY_IMPL[dggs]), [])
 
 
-def load_columns(dggs, res, columns):
+def table_metadata(grid, impl, res):
+    """One table's Parquet metadata, decoded to a str dict."""
+    meta = pq.ParquetFile(impl_table_path(grid, impl, res)).metadata.metadata
+    return {k.decode(): v.decode() for k, v in (meta or {}).items()}
+
+
+def load_columns(dggs, res, columns, impl=None):
     """The requested columns of one table as a dict of numpy/python arrays.
 
     Float columns come back as numpy arrays; `cid` as a list of str; `verts`
     as a list of (M, 2) float arrays.
     """
-    table = pq.read_table(_existing_path(dggs, res), columns=list(columns))
+    table = pq.read_table(_existing_path(dggs, res, impl), columns=list(columns))
     out = {}
     for col in columns:
         if col == 'cid':
@@ -153,9 +195,9 @@ def load_columns(dggs, res, columns):
     return out
 
 
-def load_cells(dggs, res):
+def load_cells(dggs, res, impl=None):
     """Yield (cid, (M, 2) lat/lng array) — streaming, memory-flat."""
-    path = _existing_path(dggs, res)
+    path = _existing_path(dggs, res, impl)
     for batch in pq.ParquetFile(path).iter_batches(columns=['cid', 'verts']):
         for row in batch.to_pylist():
             yield row['cid'], np.asarray(row['verts'], dtype=float)

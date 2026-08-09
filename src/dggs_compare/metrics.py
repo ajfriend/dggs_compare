@@ -22,7 +22,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from . import config, runner, stats
+from . import cache, config, runner, stats
 from .cache import BATCH, DATA_DIR, SCHEMA, open_ring, open_writer
 
 
@@ -70,14 +70,14 @@ def build(key, res, extra_meta=None, out_dir=None):
     grid = raw_meta[b'grid'].decode()
     # The filename and the metadata must agree on the identity — a copied
     # or hand-renamed raw file must not publish under the wrong key.
-    assert key == runner.key(grid, raw_meta[b'impl'].decode()), key
+    assert key == cache.key(grid, raw_meta[b'impl'].decode()), key
 
     meta = _forwarded(raw_meta)
     meta.update(_solver_metadata())
     meta.update(extra_meta or {})
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f'{key}_r{res}.parquet'
+    path = out_dir / cache.table_name(key, res)
     writer = open_writer(path, SCHEMA, meta)
     dnc = 0
     n = 0
@@ -110,13 +110,20 @@ def build(key, res, extra_meta=None, out_dir=None):
 
 
 def available_raw():
-    """Sorted (key, [res, ...]) pairs present in data/raw/."""
-    import re
-    pat = re.compile(r'^(.+)_r(\d+)\.parquet$')
+    """Sorted (key, [res, ...]) pairs present in data/raw/. A file that
+    matches neither the table scheme nor '{key}_convergence.parquet' is a
+    loud error — a stray file must not silently join (or be silently
+    excluded from) the published artifact."""
     found = {}
-    for p in runner.RAW_DIR.glob('*_r*.parquet'):
-        if (m := pat.match(p.name)):
-            found.setdefault(m.group(1), []).append(int(m.group(2)))
+    bad = []
+    for p in runner.RAW_DIR.glob('*.parquet'):
+        if (parsed := cache.parse_table_name(p.name)):
+            grid, impl, res = parsed
+            found.setdefault(cache.key(grid, impl), []).append(res)
+        elif not p.name.endswith('_convergence.parquet'):
+            bad.append(p.name)
+    if bad:
+        raise RuntimeError(f'unrecognized files in data/raw/: {sorted(bad)}')
     return sorted((k, sorted(rs)) for k, rs in found.items())
 
 
@@ -127,7 +134,7 @@ def build_all():
     for key, res_list in available_raw():
         residuals = convergence_residuals(key)
         worst = max(residuals.values(), default=0.0)
-        grid = key.split('-')[0]
+        grid, _ = cache.parse_key(key)
         print(f'[{key}] convergence max |dAR| per level: '
               + '  '.join(f'r{r}={v:.1e}'
                           for r, v in sorted(residuals.items())))

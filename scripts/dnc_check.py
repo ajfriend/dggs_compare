@@ -38,10 +38,12 @@ def plot(per_system):
     """DNC % vs resolution, a line per system: flat-zero until the finest
     resolutions then a monotone rise — both invariants at a glance."""
     fig, ax = plt.subplots(figsize=(9, 5))
-    for name, rows in per_system.items():
+    for key, rows in per_system.items():
+        grid, _ = cache.parse_key(key)
         res = [r for r, *_ in rows]
-        pct = [100 * dnc / tested for _, tested, dnc, _ in rows]
-        ax.plot(res, pct, '-o', ms=4, color=config.SYS_COLOR.get(name), label=name)
+        pct = [100 * dnc / tested if tested else 100.0
+               for _, tested, dnc, _ in rows]
+        ax.plot(res, pct, '-o', ms=4, color=config.SYS_COLOR.get(grid), label=key)
     ax.set_xlabel('resolution / level')
     ax.set_ylabel('did-not-converge (%)')
     ax.set_title(f'DGGS DNC fraction vs resolution (gap_tol = {config.GAP_TOL:g})')
@@ -66,10 +68,13 @@ def main():
         print(f'FAIL — missing config.PER_SYSTEM entries: {no_config}')
     if no_tables or no_config:
         sys.exit(1)
-    stale = checks.stale_tables()
-    if stale:
-        print(f'FAIL — tables outside their system\'s declared resolutions: '
-              f'{stale} (stale cap or partial write — delete or rebuild)')
+    coverage = checks.coverage_problems()
+    if coverage:
+        print('FAIL — disk/declaration coverage problems (a releasable '
+              'artifact has none; a partial local build reports its holes '
+              'here):')
+        for p in coverage:
+            print(f'  {p}')
         sys.exit(1)
     bad_targets = checks.target_res_problems()
     if bad_targets:
@@ -77,17 +82,17 @@ def main():
               '(run `just calibrate`)')
         sys.exit(1)
 
-    print(f'{"system":8} {"onset":>6} {"finest %DNC":>12} {"result":>8}')
+    print(f'{"implementation":16} {"onset":>6} {"finest %DNC":>12} {"result":>8}')
     all_failures = []
     per_system = {}
-    have = set(cache.available_systems())
-    for name in [s for s in config.TARGET_RES if s in have]:
+    for grid, impl in checks.implementations():
+        key = cache.key(grid, impl)
         t0 = time.perf_counter()
-        rows = checks.sweep_system(name, resolve=RESOLVE)
-        per_system[name] = rows
-        failures, onset, finest_frac = checks.check_system(name, rows)
-        all_failures += [(name, f) for f in failures]
-        print(f'{name:8} {("r%d" % onset if onset is not None else "none"):>6} '
+        rows = checks.sweep_system(grid, impl=impl, resolve=RESOLVE)
+        per_system[key] = rows
+        failures, onset, finest_frac = checks.check_system(grid, rows)
+        all_failures += [(key, f) for f in failures]
+        print(f'{key:16} {("r%d" % onset if onset is not None else "none"):>6} '
               f'{100*finest_frac:>11.1f}% {"FAIL" if failures else "OK":>8} '
               f'  ({time.perf_counter() - t0:.1f}s)')
 

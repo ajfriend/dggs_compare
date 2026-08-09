@@ -11,9 +11,9 @@ plus one small convergence artifact per implementation: density-0 and
 dense vertex pairs for K sampled cells at the gate levels, so the metrics
 stage can measure the sampling-density residual binding-free.
 
-Selection regimes, seeds, and row order are identical to the classic
-cache.build_table path (same seeds -> same cells), so ports verify by
-column comparison.
+Selection regimes, seeds, and row order are identical to the pre-#37
+pipeline that produced data-v6 (same seeds -> same cells), which is what
+made the ports verifiable by column comparison.
 """
 
 import os
@@ -25,7 +25,7 @@ import numpy as np
 import pyarrow as pa
 
 from . import config, stats
-from .cache import BATCH, VERTS_TYPE, open_writer
+from .cache import BATCH, VERTS_TYPE, key, open_writer, table_name
 
 RAW_DIR = Path(__file__).resolve().parents[2] / 'data' / 'raw'
 RAW_COMPRESSION_LEVEL = 3   # written once, read once — don't pay zstd 19
@@ -44,16 +44,10 @@ META_KEYS = ('grid', 'impl', 'seed', 'per_res_seed', 'n_cells',
 META_VERSION_PREFIX = 'version_'
 
 
-# ----- artifact naming: the one home -------------------------------------
-def key(grid, impl_name):
-    """The artifact key '{grid}-{impl}'. Invertible only if neither half
-    contains '-', so that is enforced here."""
-    assert '-' not in grid and '-' not in impl_name, (grid, impl_name)
-    return f'{grid}-{impl_name}'
-
-
+# Naming (cache.key / cache.table_name are the grammar's home); the raw
+# dir holds the same table names plus one convergence file per key.
 def raw_path(key_, res):
-    return RAW_DIR / f'{key_}_r{res}.parquet'
+    return RAW_DIR / table_name(key_, res)
 
 
 def conv_path(key_):
