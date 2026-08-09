@@ -129,13 +129,23 @@ def _select_cells(impl, res, n_cells, full):
                             batch=100_000, log_skips=True)
 
 
+def _us_per_cell(secs, n):
+    return f'{1e6 * secs / n:.0f} us/cell'
+
+
 def _write_res(impl, res, meta, n_cells, full):
-    """One resolution's raw table. Returns (n, seconds) for the caller's
-    per-cell accounting."""
+    """One resolution's raw table. Returns the seconds spent inside the
+    impl's contract calls — the ENGINE share, the honest per-cell cost
+    (everything else here is pipeline overhead: sort, arrow, zstd, IO).
+    `select` includes the sampler's own rng/dedup — a thin numpy layer
+    over the binding's point lookups."""
     t0 = time.perf_counter()
     cells, mode = _select_cells(impl, res, n_cells, full)
     t_select = time.perf_counter() - t0
-    cells = sorted(zip(impl.cid_strs(cells), cells), key=lambda cc: cc[0])
+    tc = time.perf_counter()
+    cids = impl.cid_strs(cells)
+    t_cids = time.perf_counter() - tc
+    cells = sorted(zip(cids, cells), key=lambda cc: cc[0])
     path = raw_path(key(impl.grid, impl.impl), res)
     writer = open_writer(path, RAW_SCHEMA, meta,
                          compression_level=RAW_COMPRESSION_LEVEL)
@@ -147,23 +157,27 @@ def _write_res(impl, res, meta, n_cells, full):
             tb = time.perf_counter()
             verts = impl.boundaries(res, clist)
             t_bounds += time.perf_counter() - tb
+            # Rebind to the arrow array: the Python list is batch-sized
+            # memory that must not outlive its conversion.
+            verts = pa.array(verts, VERTS_TYPE)
             writer.write_table(pa.table(
-                {'cid': pa.array(cids, pa.string()),
-                 'verts': pa.array(verts, VERTS_TYPE)},
+                {'cid': pa.array(cids, pa.string()), 'verts': verts},
                 schema=RAW_SCHEMA))
     finally:
         writer.close()
     kb = path.stat().st_size / 1024
     t = time.perf_counter() - t0
     n = len(cells)
+    engine = t_select + t_cids + t_bounds
     print(f'[{path.stem} ] {mode:>6} {n:>8} cells ({kb:.0f} KiB) '
-          f'[{t:.1f}s: select {t_select:.1f} bounds {t_bounds:.1f} | '
-          f'{1e6 * t / n:.0f} us/cell]', flush=True)
-    return n, t
+          f'[{t:.1f}s: select {t_select:.1f} cids {t_cids:.1f} '
+          f'bounds {t_bounds:.1f} = {_us_per_cell(engine, n)}]', flush=True)
+    return engine
 
 
 def _write_convergence(impl, meta):
     """Density-0 + dense vertex pairs for the gate levels."""
+    t0 = time.perf_counter()
     rng = np.random.default_rng(config.CONV_SEED)
     path = conv_path(key(impl.grid, impl.impl))
     writer = open_writer(path, CONV_SCHEMA, meta,
@@ -186,7 +200,8 @@ def _write_convergence(impl, meta):
                 schema=CONV_SCHEMA))
     finally:
         writer.close()
-    print(f'[{path.stem}] convergence pairs written', flush=True)
+    print(f'[{path.stem}] convergence pairs written '
+          f'[{time.perf_counter() - t0:.1f}s]', flush=True)
 
 
 def generate(impl):
@@ -214,12 +229,9 @@ def generate(impl):
              else min(impl.num_cells(r), n_cells) for r in res_list}
     total_cells = sum(cells.values())
     done_cells = 0
-    made = 0
-    made_secs = 0.0
+    engine_secs = 0.0
     for i, res in enumerate(res_list):
-        n, secs = _write_res(impl, res, meta, n_cells, full)
-        made += n
-        made_secs += secs
+        engine_secs += _write_res(impl, res, meta, n_cells, full)
         done_cells += cells[res]
         done = time.perf_counter() - t0
         if i + 1 < len(res_list):
@@ -228,7 +240,8 @@ def generate(impl):
                   f'({done_cells:,}/{total_cells:,} cells) in {done:.0f}s '
                   f'(~{eta:.0f}s to go)', flush=True)
     _write_convergence(impl, meta)
-    rate = f' ({1e6 * made_secs / made:.0f} us/cell)' if made else ''
+    rate = (f' (engine {_us_per_cell(engine_secs, done_cells)})'
+            if done_cells else '')
     print(f'[{key(impl.grid, impl.impl)}] {len(res_list)} resolutions, '
-          f'{made:,} cells in {time.perf_counter() - t0:.0f}s{rate}',
+          f'{done_cells:,} cells in {time.perf_counter() - t0:.0f}s{rate}',
           flush=True)
