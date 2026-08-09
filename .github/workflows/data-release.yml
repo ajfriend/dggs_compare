@@ -31,6 +31,15 @@ on:
         description: 'Data release tag (e.g. data-v1)'
         required: true
         type: string
+      # Pipeline-proof knob: overrides the per-resolution cell budget and
+      # skips FULL_RES exhaustive coverage, so a scratch run costs minutes
+      # instead of an hour. NEVER set on a real data-vN release — the
+      # reduced budget is stamped in the tables' metadata either way.
+      n_cells:
+        description: 'Cell budget override (proof runs only; empty = full)'
+        required: false
+        default: ''
+        type: string
       # One runner type for EVERY job in a release, so a data artifact never
       # mixes float provenance across architectures. ubuntu-latest (x86_64)
       # is the verified default; ubuntu-24.04-arm is the experiment — the
@@ -98,6 +107,8 @@ jobs:
       # own env from its PEP 723 header.
       - name: generate raw cell geometry
         run: just gen ${{ matrix.key }}
+        env:
+          DGGS_COMPARE_N_CELLS: ${{ inputs.n_cells }}
       # Stage 2 (see header): the explicit sync makes env resolution its
       # own failure point, distinct from a red solve.
       - name: metrics — solve + convergence admission gate

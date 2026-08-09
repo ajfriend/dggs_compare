@@ -54,14 +54,14 @@ def conv_path(key_):
     return RAW_DIR / f'{key_}_convergence.parquet'
 
 
-def _metadata(impl):
+def _metadata(impl, n_cells):
     """Provenance recorded on every raw file (all-str, parquet-style)."""
     meta = {
         'grid': impl.grid,
         'impl': impl.impl,
         'seed': hex(config.SEED),
         'per_res_seed': str(config.PER_RES_SEED),
-        'n_cells': str(config.N_CELLS),
+        'n_cells': str(n_cells),
         'resolutions': ','.join(str(r) for r in impl.resolutions()),
         'conv_seed': hex(config.CONV_SEED),
         'conv_levels': ','.join(str(r) for r in config.CONV_LEVELS),
@@ -118,21 +118,21 @@ def _sample_distinct(impl, res, n, rng, *, batch, log_skips):
     return cells, 'sample'
 
 
-def _select_cells(impl, res):
-    """The resolution's cell set: exactly N_CELLS cells (or every cell
-    where fewer exist / config.FULL_RES demands complete coverage)."""
-    if res in config.FULL_RES.get(impl.grid, ()):
+def _select_cells(impl, res, n_cells, full):
+    """The resolution's cell set: exactly `n_cells` cells (or every cell
+    where fewer exist / `full` demands complete coverage)."""
+    if res in full:
         return list(impl.enumerate_cells(res)), 'all'
     rng = np.random.default_rng(
         [config.SEED, res] if config.PER_RES_SEED else config.SEED)
-    return _sample_distinct(impl, res, config.N_CELLS, rng,
+    return _sample_distinct(impl, res, n_cells, rng,
                             batch=100_000, log_skips=True)
 
 
-def _write_res(impl, res, meta):
+def _write_res(impl, res, meta, n_cells, full):
     """One resolution's raw table."""
     t0 = time.perf_counter()
-    cells, mode = _select_cells(impl, res)
+    cells, mode = _select_cells(impl, res, n_cells, full)
     cells = sorted(zip(impl.cid_strs(cells), cells), key=lambda cc: cc[0])
     path = raw_path(key(impl.grid, impl.impl), res)
     writer = open_writer(path, RAW_SCHEMA, meta,
@@ -182,23 +182,30 @@ def _write_convergence(impl, meta):
 def generate(impl):
     """Write the raw geometry artifacts for `impl` — all resolutions, or
     the subset named in the DGGS_COMPARE_RES env var (comma-separated; for
-    quick local runs — CI always generates everything)."""
+    quick local runs — CI always generates everything).
+
+    DGGS_COMPARE_N_CELLS overrides the per-resolution cell budget
+    (config.N_CELLS) AND skips config.FULL_RES's exhaustive coverage —
+    the pipeline-proof knob (real releases run the full budget). The
+    effective budget is recorded in the metadata either way."""
     t0 = time.perf_counter()
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    meta = _metadata(impl)
+    override = os.environ.get('DGGS_COMPARE_N_CELLS')
+    n_cells = int(override) if override else config.N_CELLS
+    full = () if override else config.FULL_RES.get(impl.grid, ())
+    meta = _metadata(impl, n_cells)
     res_list = list(impl.resolutions())
     if (only := os.environ.get('DGGS_COMPARE_RES')):
         wanted = {int(r) for r in only.split(',')}
         res_list = [r for r in res_list if r in wanted]
     # Live ETA weighted by CELL counts (coarse resolutions are nearly free;
-    # every deep one is a full N_CELLS build).
-    full = config.FULL_RES.get(impl.grid, ())
+    # every deep one is a full-budget build).
     cells = {r: impl.num_cells(r) if r in full
-             else min(impl.num_cells(r), config.N_CELLS) for r in res_list}
+             else min(impl.num_cells(r), n_cells) for r in res_list}
     total_cells = sum(cells.values())
     done_cells = 0
     for i, res in enumerate(res_list):
-        _write_res(impl, res, meta)
+        _write_res(impl, res, meta, n_cells, full)
         done_cells += cells[res]
         done = time.perf_counter() - t0
         if i + 1 < len(res_list):
