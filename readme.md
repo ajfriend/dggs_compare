@@ -28,20 +28,21 @@ projection, and dggal has no triangle grids.
 ## Layout
 
 ```
-src/dggs_compare/     the internal library (organization only, not for PyPI)
+src/dggs_compare/     the internal library (organization only, not for PyPI;
+                      NO system-specific code — it knows only the contract)
   config.py             pipeline constants — the single source of truth
   interface.py          the implementation contract (GridImpl)
   runner.py             stage 1: GridImpl -> raw geometry (data/raw/)
   metrics.py            stage 2: raw -> published tables, binding-free
-  dggal_engine.py       shared DGGAL glue + the live-engine Adapter
-  dggrid_engine.py      DGGRID batch-subprocess engine (backs isea4t)
   stats.py              solvers (csar AR, sparea area) + sphere helpers
   cache.py              the published tables: IO + readers (data/cells/)
   checks.py             DNC invariants + artifact/config coherence
   webdata.py            web-viewer artifacts from the tables
 scripts/systems/      ONE PEP 723 SCRIPT PER (grid, implementation), named
                       {grid}-{impl}.py; the folder is the registry and the
-                      CI matrix (see "Adding a grid")
+                      CI matrix (see "Adding a grid"). Shared engine glue
+                      lives here too, underscore-prefixed (_dggal_engine.py,
+                      _dggrid_engine.py) — scripts import it directly
 scripts/              thin callers: metrics, survey, calibrate, dnc_check,
                       convergence, web_*, explorations/
 web/                  the static comparison site (survey plots + ajglobe

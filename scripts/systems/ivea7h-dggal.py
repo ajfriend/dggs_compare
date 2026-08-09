@@ -15,7 +15,7 @@ of concentrated in seams.
 Run with:  uv run scripts/systems/ivea7h-dggal.py
 """
 
-from dggs_compare.dggal_engine import Adapter
+from _dggal_engine import Adapter
 from dggs_compare import runner, stats
 
 if __name__ == '__main__':

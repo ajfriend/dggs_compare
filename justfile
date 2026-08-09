@@ -21,9 +21,10 @@ sync:
 
 # The registry, read as a key list ({grid}-{impl} per line): the CI build
 # matrix and `gen all` both consume this — the one shell reading of the
-# scripts/systems/ listing.
+# scripts/systems/ listing. Underscore-prefixed files are shared engine
+# modules, not registry entries.
 systems:
-    @basename -a -s .py scripts/systems/*.py
+    @basename -a -s .py scripts/systems/[!_]*.py
 
 # Stage 1: raw cell geometry -> data/raw/ (gitignored). One PEP 723 script
 # per (grid, implementation) in scripts/systems/, each in its own env; the

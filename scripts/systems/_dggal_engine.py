@@ -1,6 +1,12 @@
-"""Shared DGGAL binding glue — the common code behind the DGGAL-backed
-systems/ modules (isea7h, ivea7h, isea3h, ivea3h, rhealpix) and the
-live-engine analyses.
+"""Shared DGGAL binding glue — the common code behind the five
+DGGAL-backed scripts here (isea7h, ivea7h, isea3h, ivea3h, rhealpix) and
+the live-engine explorations.
+
+System-specific code lives OUT of the library, next to the scripts that
+use it: `uv run scripts/systems/<key>.py` puts this directory on
+sys.path, so the scripts import this module directly. The underscore
+prefix keeps it out of the registry (the {grid}-{impl}.py listing) and
+cannot collide with the `dggal` package itself.
 
 DGGAL (Ecere's Discrete Global Grid Abstraction Library, `pip install dggal`,
 BSD-3-Clause) exposes many DGGRSs through a single `DGGRS` API. This module
@@ -22,7 +28,7 @@ import glob
 import importlib.util
 import os
 
-from .stats import orient_ccw
+from dggs_compare.stats import orient_ccw
 
 
 def _preload_native():

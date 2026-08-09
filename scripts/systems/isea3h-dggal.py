@@ -20,7 +20,7 @@ to ~4e-3 for those cells, and the convergence gate carves this grid out
 Run with:  uv run scripts/systems/isea3h-dggal.py
 """
 
-from dggs_compare.dggal_engine import Adapter
+from _dggal_engine import Adapter
 from dggs_compare import runner, stats
 
 if __name__ == '__main__':

@@ -10,14 +10,14 @@ Modules:
     interface     the implementation contract (GridImpl)
     runner        stage 1: GridImpl -> raw geometry parquet (data/raw/)
     metrics       stage 2: raw -> published tables (binding-free)
-    dggal_engine  shared DGGAL glue + the live-engine Adapter
-    dggrid_engine DGGRID batch-subprocess engine
     stats         solvers (csar AR, sparea area) + sphere helpers
     cache         the published tables: IO + readers (data/cells/)
     checks        DNC invariants + artifact/config coherence
     webdata       web-viewer artifacts derived from the tables
 
-The implementation registry is the scripts/systems/ file listing; each
+No system-specific code: the library knows only the GridImpl contract.
+Implementations — and any glue they share (scripts/systems/_*.py) — live
+with the scripts. The registry is the scripts/systems/ file listing; each
 script resolves its own env. `import dggs_compare` stays light — the
 library core never loads a DGGS binding or a solver.
 """

@@ -1,5 +1,7 @@
 """Shared DGGRID glue — the batch-subprocess engine behind the
-DGGRID-backed systems/ modules (isea4t).
+DGGRID-backed scripts here (isea4t). Underscore-prefixed: shared script
+code, not a registry entry, not part of the library (see _dggal_engine's
+docstring for the pattern).
 
 DGGRID (Kevin Sahr's reference DGGS implementation, C++) has no supported
 in-process API: the canonical interface is a metafile-driven CLI with
@@ -28,7 +30,7 @@ import tempfile
 from functools import cache
 from pathlib import Path
 
-from .stats import is_ccw
+from dggs_compare.stats import is_ccw
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 

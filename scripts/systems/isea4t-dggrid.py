@@ -26,7 +26,7 @@ edges ON cell edges at every level, so there are no distortion vertices.
 Run with:  uv run scripts/systems/isea4t-dggrid.py
 """
 
-from dggs_compare.dggrid_engine import Engine
+from _dggrid_engine import Engine
 from dggs_compare import runner
 
 MAX_RES = 28
