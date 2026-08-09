@@ -142,6 +142,11 @@ The optional `-f runner=ubuntu-24.04-arm` input switches every job in the
 release to arm64 runners (faster single-core; one runner type per release so
 a data artifact never mixes float provenance across architectures).
 
+Every PR runs this exact workflow as its test (`pr.yml` calls it with a
+1000-cell budget and publish off): all ten per-script envs, both engine
+paths, gen→metrics handoff, every gate, and release staging — stopping
+just short of the upload.
+
 Each release carries provenance notes (the same facts ride in every table's
 Parquet metadata). Release assets support HTTP Range but send **no CORS
 headers**, so browsers can't fetch them cross-origin — CLI/API consumers

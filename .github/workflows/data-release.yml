@@ -7,6 +7,9 @@
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
 # measurement-code bump worth reflecting) — decoupled from code releases.
 #
+# Also callable (workflow_call) so pr.yml can run the identical path at a
+# tiny budget with publish off — the per-PR pipeline test (#51).
+#
 # One build job per IMPLEMENTATION — the matrix is the scripts/systems/
 # listing, so it can never go stale — running the two pipeline stages
 # back to back in two SEPARATE envs on the same runner:
@@ -53,6 +56,32 @@ on:
         options:
           - ubuntu-latest
           - ubuntu-24.04-arm
+      publish:
+        description: 'Create the GitHub release (off = run every gate, stop before upload)'
+        required: false
+        default: true
+        type: boolean
+  # The reusable form: same input names, so the `inputs` context reads the
+  # same either way. workflow_call has no `choice`; runner is a plain
+  # string here.
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        default: ''
+        type: string
+      n_cells:
+        required: false
+        default: ''
+        type: string
+      runner:
+        required: false
+        default: ubuntu-latest
+        type: string
+      publish:
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -158,9 +187,12 @@ jobs:
         run: just dnc-check
       - name: derive the web viewer data
         run: just web-data
-      - name: stage + publish
+      - name: stage the release layout
+        run: just data-pack
+      # The one step a PR test run skips: everything above is identical
+      # between a real release and the per-PR proof.
+      - name: publish
+        if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          just data-pack
-          just data-publish '${{ inputs.tag }}'
+        run: just data-publish '${{ inputs.tag }}'

@@ -1,0 +1,31 @@
+# Per-PR pipeline test (#51): the data-release workflow — same scripts,
+# same envs, same gates — at a tiny cell budget, stopping before the
+# persistent publish. A real release is the identical call at full budget
+# with publish on. Replaces the manual scratch-tag proof runs.
+#
+# Budget caveat: the gate statistics are calibrated for the 1M budget; at
+# n=1000 the monotonicity check carries ~1% binomial noise against
+# NOISE_TOL. If false reds appear, raise n_cells to '10000' here — the one
+# knob.
+name: pr
+
+on:
+  pull_request:
+
+# A new push to the PR obsoletes the running test.
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# A called workflow can't hold more permission than its caller grants;
+# data-release.yml declares contents:write for its publish step, which
+# this run skips (publish: false), so the grant is inert here.
+permissions:
+  contents: write
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/data-release.yml
+    with:
+      n_cells: '1000'
+      publish: false
