@@ -7,12 +7,13 @@
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
 # solver bump worth reflecting) — decoupled from code releases.
 #
-# Fan-out/fan-in: one runner per DGGS builds that system's tables — the
-# matrix is derived from src/dggs_compare/systems/ at run time, so it can
-# never go stale — and the publish job merges the artifacts, gates on the
-# DNC invariants (including registry-completeness), derives the viewer data
-# (including the full-globe page's complete-coverage binaries — those
-# resolutions live exhaustively in the ivea7h tables), and uploads.
+# Two stages (issue #37): one runner per IMPLEMENTATION generates that
+# system's raw geometry in the script's own PEP 723 env — the matrix is the
+# scripts/systems/ listing, so it can never go stale — then ONE metrics
+# runner solves everything (a single csar/sparea build => one solver
+# provenance for every published number), applies the convergence admission
+# gate and the DNC/coverage release gates, derives the viewer data, and
+# uploads.
 name: data-release
 
 on:
@@ -25,8 +26,8 @@ on:
       # One runner type for EVERY job in a release, so a data artifact never
       # mixes float provenance across architectures. ubuntu-latest (x86_64)
       # is the verified default; ubuntu-24.04-arm is the experiment — the
-      # aarch64 dggal/a5_fast wheels exist but are unverified (the dnc-check
-      # gate + a table spot-diff against an x86 release is the validation).
+      # aarch64 wheels exist but are unverified (the dnc-check gate + a
+      # table spot-diff against an x86 release is the validation).
       runner:
         description: 'Runner type for all jobs'
         required: false
@@ -41,7 +42,8 @@ permissions:
 
 jobs:
   systems:
-    # The gen matrix IS the registry: one line of shell over systems/*.py.
+    # The gen matrix IS the registry: one line of shell over the
+    # scripts/systems/ listing ({grid}-{impl}.py per implementation).
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 5
     outputs:
@@ -50,67 +52,67 @@ jobs:
       - uses: actions/checkout@v6
       - id: ls
         run: |
-          echo "list=$(basename -a -s .py src/dggs_compare/systems/*.py | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
+          echo "list=$(basename -a -s .py scripts/systems/*.py | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
 
   gen:
     needs: [systems]
     strategy:
-      # One broken system must not cancel the other nine: with fail-fast
-      # off, healthy jobs finish and `gh run rerun --failed` reuses their
-      # artifacts, so a fix only reruns the one red job.
+      # One broken implementation must not cancel the other nine: with
+      # fail-fast off, healthy jobs finish and `gh run rerun --failed`
+      # reuses their artifacts, so a fix only reruns the one red job.
       fail-fast: false
       matrix:
-        system: ${{ fromJSON(needs.systems.outputs.list) }}
+        key: ${{ fromJSON(needs.systems.outputs.list) }}
     runs-on: ${{ inputs.runner }}
-    # The aperture-3 grids build 34 resolutions each (vs isea7h's 20), and
-    # isea3h's odd levels solve 126-point refined rings — the longest jobs.
+    # Geometry only (no solving): the aperture-3 grids are the longest at
+    # ~34 resolutions of point-sampling each.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      # Caching is safe now: every dependency ships linux wheels (csar
+      # from PyPI since 0.1.1 — nothing builds from source in CI).
+      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: extractions/setup-just@v4
+      # DGGRID-backed implementations (detected from the script source, so
+      # no hand-maintained list) need the dggrid binary built into .tools/.
+      - name: install dggrid if this implementation needs it
+        run: |
+          if grep -q dggrid_engine "scripts/systems/${{ matrix.key }}.py"; then
+            just install-dggrid
+          fi
+      # The script resolves its own env from its PEP 723 header (no
+      # project sync); `just gen` is the same entry point used locally.
+      - run: just gen ${{ matrix.key }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: raw-${{ matrix.key }}
+          path: data/raw/
+          if-no-files-found: error
+
+  metrics:
+    needs: [gen]
+    runs-on: ${{ inputs.runner }}
+    # Solving all ~250 resolutions serially in one env — the price of one
+    # solver provenance; ~3h.
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v6
+      # raw (~16GB) + finals (~13GB) coexist on this runner; the stock
+      # image doesn't leave that much free, so drop the preinstalled
+      # toolchains we never touch (~25GB back).
+      - name: free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: astral-sh/setup-uv@v8.1.0
-        with:
-          # No cross-run cache: csar builds from source with zig ReleaseFast
-          # tuned to the build machine CPU, and hosted runners are a
-          # heterogeneous fleet — a wheel cached on one microarch can SIGILL
-          # on the next (exit 132; see skar_py issue on baseline targeting).
-          enable-cache: false
-      - uses: extractions/setup-just@v4
-      - run: just sync
-      # DGGRID-backed systems (detected from the module source, so no
-      # hand-maintained list) need the dggrid binary built into .tools/.
-      - name: install dggrid if this system needs it
-        run: |
-          if grep -q dggrid_engine "src/dggs_compare/systems/${{ matrix.system }}.py"; then
-            just install-dggrid
-          fi
-      - run: just gen ${{ matrix.system }}
-      - uses: actions/upload-artifact@v6
-        with:
-          name: tables-${{ matrix.system }}
-          path: data/cells/
-          if-no-files-found: error
-
-  publish:
-    needs: [gen]
-    runs-on: ${{ inputs.runner }}
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.1.0
-        with:
-          # No cross-run cache: csar builds from source with zig ReleaseFast
-          # tuned to the build machine CPU, and hosted runners are a
-          # heterogeneous fleet — a wheel cached on one microarch can SIGILL
-          # on the next (exit 132; see skar_py issue on baseline targeting).
-          enable-cache: false
       - uses: extractions/setup-just@v4
       - run: just sync
       - uses: actions/download-artifact@v6
         with:
-          pattern: tables-*
-          path: data/cells/
+          pattern: raw-*
+          path: data/raw/
           merge-multiple: true
-      - name: gate — DNC invariants must hold before anything ships
+      - name: metrics — solve + convergence admission gate
+        run: just metrics
+      - name: gate — coverage + DNC invariants must hold before anything ships
         run: just dnc-check
       - name: derive the web viewer data
         run: just web-data
