@@ -40,11 +40,12 @@ _SCRIPT_PAT = re.compile(rf'^{cache.KEY_RE}\.py$')
 
 def implementations():
     """Sorted (grid, impl) pairs from the scripts/systems/ listing — the
-    registry. Scripts are named '{grid}-{impl}.py'; a .py file that
-    doesn't match is a loud error, because a silently skipped script
+    registry. Scripts are named '{grid}-{impl}.py'; underscore-prefixed
+    files are shared engine modules, not registry entries. Any other .py
+    that doesn't match is a loud error, because a silently skipped script
     would also vanish from the completeness gate's expectations."""
     pairs, bad = [], []
-    for p in SCRIPTS_DIR.glob('*.py'):
+    for p in SCRIPTS_DIR.glob('[!_]*.py'):
         if (m := _SCRIPT_PAT.match(p.name)):
             pairs.append((m.group(1), m.group(2)))
         else:

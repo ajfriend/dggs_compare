@@ -9,7 +9,7 @@
 # ///
 """ISEA4T — Snyder equal-area icosahedral aperture-4 triangle (via DGGRID).
 
-Batch subprocess calls instead of per-cell FFI (see dggrid_engine; the
+Batch subprocess calls instead of per-cell FFI (see _dggrid_engine; the
 dggrid binary comes from `just install-dggrid` or DGGS_COMPARE_DGGRID —
 it is not a python package, so `packages` is empty). Cells are plain
 SEQNUM ints; they are only unique within a resolution, which is why the
@@ -26,7 +26,7 @@ edges ON cell edges at every level, so there are no distortion vertices.
 Run with:  uv run scripts/systems/isea4t-dggrid.py
 """
 
-from dggs_compare.dggrid_engine import Engine
+from _dggrid_engine import Engine
 from dggs_compare import runner
 
 MAX_RES = 28

@@ -15,7 +15,7 @@ of concentrated in seams (the same ISEA/IVEA relationship as the 7H pair).
 Run with:  uv run scripts/systems/ivea3h-dggal.py
 """
 
-from dggs_compare.dggal_engine import Adapter
+from _dggal_engine import Adapter
 from dggs_compare import runner, stats
 
 if __name__ == '__main__':

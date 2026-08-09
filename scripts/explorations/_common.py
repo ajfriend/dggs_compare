@@ -5,8 +5,9 @@ Gives the csar/numpy primitives below directly, plus two lazy accessors
 
     cells — the table reader (dggs_compare.cache); pair with
             dggs_compare.config for TARGET_RES etc.
-    dc    — the live DGGAL engine (dggs_compare.dggal_engine): Adapter,
-            GeoExtent, and the rest of the dggal namespace.
+    dc    — the live DGGAL engine (scripts/systems/_dggal_engine.py):
+            Adapter, GeoExtent, and the rest of the dggal namespace.
+            Needs an env with the dggal binding.
 """
 
 import numpy as np
@@ -21,7 +22,10 @@ def __getattr__(name):
     if name == 'cells':
         from dggs_compare import cache as mod
     elif name == 'dc':
-        from dggs_compare import dggal_engine as mod
+        import sys
+        from dggs_compare.checks import SCRIPTS_DIR
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        import _dggal_engine as mod
     else:
         raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
     globals()[name] = mod
