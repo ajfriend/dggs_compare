@@ -21,7 +21,8 @@ Run with:  uv run scripts/systems/isea3h-dggal.py
 """
 
 from dggs_compare.dggal_engine import GridImplAdapter
-from dggs_compare import runner
+from dggs_compare import runner, stats
 
 if __name__ == '__main__':
-    runner.generate(GridImplAdapter('isea3h', 'ISEA3H'))
+    runner.generate(
+        GridImplAdapter('isea3h', 'ISEA3H', to_sphere=stats.authalic_rings))

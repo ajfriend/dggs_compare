@@ -213,14 +213,20 @@ class Adapter:
 class GridImplAdapter:
     """The GridImpl-shaped view of an Adapter, for the five DGGAL scripts
     in scripts/systems/ — the contract methods forward to one Adapter, so
-    a contract change is one edit here instead of five."""
+    a contract change is one edit here instead of five.
+
+    `to_sphere` (a rings->rings function, e.g. `stats.authalic_rings`) is
+    applied to every `boundaries` return: DGGAL's coordinates are WGS84
+    geodetic, and passing the transform here is the script's record of
+    how its system gets to the sphere."""
 
     impl = 'dggal'
     packages = ('dggal',)
 
-    def __init__(self, grid, dggal_cls):
+    def __init__(self, grid, dggal_cls, to_sphere=None):
         self.grid = grid
         self._a = Adapter(dggal_cls)
+        self._to_sphere = to_sphere
 
     def resolutions(self):
         return range(self._a.max_level() + 1)
@@ -235,7 +241,8 @@ class GridImplAdapter:
         return self._a.cid_strs(cells)
 
     def boundaries(self, res, cells, samples_per_edge=0):
-        return self._a.boundaries(cells, samples_per_edge)
+        rings = self._a.boundaries(cells, samples_per_edge)
+        return self._to_sphere(rings) if self._to_sphere else rings
 
     def enumerate_cells(self, res):
         yield from self._a.enumerate(res)

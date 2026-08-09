@@ -35,7 +35,7 @@ Run with:  uv run scripts/systems/hex9-hex9.py
 import hex9
 import numpy as np
 
-from dggs_compare import runner
+from dggs_compare import runner, stats
 
 MAX_RES = 19
 
@@ -81,8 +81,11 @@ class Hex9:
         d = 0
         while 3 ** d - 1 < samples_per_edge:
             d += 1
-        return [hex9.cell(self._u(c), c[0], d)[-2::-1, ::-1].tolist()
-                for c in cells]
+        # hex9 addresses WGS84 geodetic coordinates; the authalic map is
+        # how this system gets to the sphere.
+        return stats.authalic_rings(
+            [hex9.cell(self._u(c), c[0], d)[-2::-1, ::-1].tolist()
+             for c in cells])
 
     def enumerate_cells(self, res):
         # The 12 layer-0 base cells, then each one's canonical 9^res-cell

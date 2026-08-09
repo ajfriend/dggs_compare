@@ -16,7 +16,8 @@ Run with:  uv run scripts/systems/ivea7h-dggal.py
 """
 
 from dggs_compare.dggal_engine import GridImplAdapter
-from dggs_compare import runner
+from dggs_compare import runner, stats
 
 if __name__ == '__main__':
-    runner.generate(GridImplAdapter('ivea7h', 'IVEA7H'))
+    runner.generate(
+        GridImplAdapter('ivea7h', 'IVEA7H', to_sphere=stats.authalic_rings))
