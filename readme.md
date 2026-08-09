@@ -30,61 +30,75 @@ projection, and dggal has no triangle grids.
 ```
 src/dggs_compare/     the internal library (organization only, not for PyPI)
   config.py             pipeline constants — the single source of truth
-  systems/              ONE FILE PER DGGS, nothing else; the folder is the
-                        registry (see "Adding a grid")
-  registry.py           folder discovery + lazy imports
+  interface.py          the implementation contract (GridImpl)
+  runner.py             stage 1: GridImpl -> raw geometry (data/raw/)
+  metrics.py            stage 2: raw -> published tables, binding-free
   dggal_engine.py       shared DGGAL glue + the live-engine Adapter
   dggrid_engine.py      DGGRID batch-subprocess engine (backs isea4t)
-  stats.py              per-cell AR (csar) + area (sparea)
-  cache.py              the Parquet tables: build + read (data/cells/)
-  checks.py             DNC invariants (cached-ar or re-solve modes)
+  stats.py              solvers (csar AR, sparea area) + sphere helpers
+  cache.py              the published tables: IO + readers (data/cells/)
+  checks.py             DNC invariants + artifact/config coherence
   webdata.py            web-viewer artifacts from the tables
-scripts/              thin callers: gen, survey, calibrate, dnc_check,
+scripts/systems/      ONE PEP 723 SCRIPT PER (grid, implementation), named
+                      {grid}-{impl}.py; the folder is the registry and the
+                      CI matrix (see "Adding a grid")
+scripts/              thin callers: metrics, survey, calibrate, dnc_check,
                       convergence, web_*, explorations/
 web/                  the static comparison site (survey plots + ajglobe
                       globes colored by AR); data from web/out/
-data/cells/           the tables (gitignored; published as data releases)
+data/raw/             stage-1 geometry (gitignored, intermediate)
+data/cells/           the published tables (gitignored; data releases)
 notebooks/            interactive companions
 ```
 
-Everything runs in **one env** (`just sync`) — no per-script envs, no re-exec
-tricks; the registry imports a system's module on first use, so table-reading
-consumers never load a DGGS binding. One platform wrinkle: dggal 0.0.6's
-macOS arm64 wheel still bundles x86_64 dylibs, so on Apple Silicon the env
-runs x86_64 under Rosetta (one justfile line); Linux is native (CI generates
-the canonical data there). The one system outside the env: isea4t shells out
-to a DGGRID binary (no wheels exist anywhere) — `just install-dggrid` builds
-it into `.tools/` in ~2 min; CI installs it only on the runner that needs it.
+Each implementation script resolves its **own env** from its PEP 723
+header — its binding plus the library, never co-resolved with any other
+system, so implementations can differ in dependencies, python version,
+even OS/arch without conflicting. The project env (`just sync`) holds the
+library plus the analysis tools and never depends on a DGGS binding.
+Platform wrinkle: dggal 0.0.6's macOS arm64 wheel bundles x86_64 dylibs,
+so on Apple Silicon everything runs x86_64 under Rosetta (one justfile
+line); Linux is native (CI generates the canonical data there). isea4t
+shells out to a DGGRID binary (no wheels exist anywhere) —
+`just install-dggrid` builds it into `.tools/` in ~2 min.
 
 ## Use
 
 ```sh
-just gen               # build all tables: geometry + stats, one pass (~min)
+just gen               # stage 1: raw geometry, one env per system -> data/raw/
+just gen hex9-hex9     # ... just one implementation
+just metrics           # stage 2: solve + gate -> the tables in data/cells/
 just survey            # AR comparison plots -> out/
 just calibrate         # area-match resolutions across systems (closed-form)
 just dnc-check         # assert the DNC invariants (pass/fail)
+just convergence       # report the stamped convergence residuals
 just site              # build the static site into web/out/ (survey plots + globes)
 just web               # build the site, then serve it at :8000
-just convergence       # metrics converged in edge-sampling density, every system
 ```
 
 ## Adding a grid
 
-The `systems/` folder is the registry — the data-release gen matrix is
-derived from it at run time. A new DGGS touches:
+The `scripts/systems/` listing is the registry — the data-release gen
+matrix is derived from it. A new implementation touches:
 
-1. `src/dggs_compare/systems/<name>.py` — the module (the batch-first
-   contract is `registry.py`'s docstring; mirror any existing system).
+1. `scripts/systems/{grid}-{impl}.py` — a PEP 723 script declaring its own
+   dependencies, defining a `GridImpl` class (the contract is
+   `interface.py`'s docstring; mirror any existing script), and handing it
+   to `runner.generate`. Bringing cells to the sphere is the
+   implementation's job; the script is the record of how.
 2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
    (`just calibrate` picks it from the closed-form counts — no tables
-   needed), `SYS_COLOR`.
+   needed), `SYS_COLOR`, `PRIMARY_IMPL`.
 
-Then run `just convergence` (the admission gate) and cut a data release — `just dnc-check` fails its publish gate
-unless every registry system has tables and `PER_SYSTEM` config.
+`just metrics` then applies the convergence admission gate (density-0
+vertex lists must be faithful solver inputs), and `just dnc-check` fails
+its publish gate unless every registry implementation has tables and every
+grid has `PER_SYSTEM` config.
 
 ## Table schema
 
-One Parquet file per `(system, resolution)` at `data/cells/{sys}_r{res}.parquet`:
+One Parquet file per `(grid, implementation, resolution)` at
+`data/cells/{grid}-{impl}_r{res}.parquet`:
 
 | column | type | |
 |---|---|---|

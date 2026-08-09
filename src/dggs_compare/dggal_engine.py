@@ -23,7 +23,6 @@ import importlib.util
 import os
 
 import numpy as np
-import csar
 
 from .stats import orient_ccw
 
@@ -151,6 +150,7 @@ class Adapter:
 
     def verts(self, zone):
         """Corner vertices as an (M, 3) unit-vec3 array (corners only)."""
+        import csar   # deferred: only the live-engine analyses need it
         return csar.to_vec3(self.cell_boundary(zone), geo='latlng_deg')
 
     # ----- ids / counts -------------------------------------------------

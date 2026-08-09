@@ -7,17 +7,19 @@ tables) and the web pages built from them.
 
 Modules:
     config        pipeline constants — the single source of truth
-    registry      system discovery (the systems/ folder IS the registry)
-    systems/      one module per DGGS, nothing else
+    interface     the implementation contract (GridImpl)
+    runner        stage 1: GridImpl -> raw geometry parquet (data/raw/)
+    metrics       stage 2: raw -> published tables (binding-free)
     dggal_engine  shared DGGAL glue + the live-engine Adapter
-    stats         per-cell aspect ratio (csar) + area (sparea)
-    cache         the Parquet tables: build (geometry + stats) and read
-    checks        DNC invariants + corners-only validation
+    dggrid_engine DGGRID batch-subprocess engine
+    stats         solvers (csar AR, sparea area) + sphere helpers
+    cache         the published tables: IO + readers (data/cells/)
+    checks        DNC invariants + artifact/config coherence
     webdata       web-viewer artifacts derived from the tables
 
-The registry imports a system's module on first use (the only laziness in
-the pipeline), so `import dggs_compare` and the table-reading consumers stay
-light — they never load a DGGS binding.
+The implementation registry is the scripts/systems/ file listing; each
+script resolves its own env. `import dggs_compare` stays light — the
+library core never loads a DGGS binding or a solver.
 """
 
-from . import config, registry  # noqa: F401  (light, dependency-free)
+from . import config  # noqa: F401  (light, dependency-free)

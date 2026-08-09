@@ -1,21 +1,33 @@
-"""Data-quality checks: the DNC invariants and the corners-only validation.
+"""Data-quality checks: the DNC invariants and artifact/config coherence.
 
-Both are library functions returning structured results; the thin
-scripts/dnc_check.py and scripts/convergence.py print/plot and set exit
-codes.
+All checks are pure table/metadata/filename reads — no DGGS binding is
+ever imported. The implementation registry is the scripts/systems/ file
+listing (one script per (grid, impl), named '{grid}-{impl}.py'); each
+table's declared resolution coverage comes from the 'resolutions' key the
+runner stamps into its metadata.
+
+Library functions returning structured results; the thin
+scripts/dnc_check.py prints/plots and sets exit codes.
 
 DNC sweep modes (`resolve=`):
   False (default) — read the cached `ar` column; DNC = NaN. Fast: checks the
       published artifact itself.
   True — re-solve every cell's `verts` with the *installed* csar at the
       config solver settings, ignoring the cached stats. This is the csar
-      pre-release regression gate: point the pyproject csar pin at a release
-      candidate, `uv sync`, and run the gate — no table rebuild needed.
+      pre-release regression gate: point a [tool.uv.sources] entry at a
+      csar_py branch/rev, `uv sync`, and run the gate — no table rebuild
+      needed.
 """
 
-import numpy as np
+import re
+from pathlib import Path
 
-from . import cache, config, registry
+import numpy as np
+import pyarrow.parquet as pq
+
+from . import cache, config
+
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / 'scripts' / 'systems'
 
 # DNC-fraction noise floor — sampled resolutions are N_CELLS cells
 # (sampling noise), so a stray cell or two at the f64 floor isn’t a
@@ -24,64 +36,81 @@ NOISE_TOL = 1e-2
 MAX_EXAMPLES = 5      # offending cell ids reported per failing resolution
 
 
-def missing_systems():
-    """Registry systems absent from the data or the per-system config.
+def implementations():
+    """Sorted (grid, impl) pairs from the scripts/systems/ listing — the
+    registry. Scripts are named '{grid}-{impl}.py'."""
+    pat = re.compile(r'^([^-]+)-([^-]+)\.py$')
+    return sorted((m.group(1), m.group(2))
+                  for p in SCRIPTS_DIR.glob('*.py')
+                  if (m := pat.match(p.name)))
 
-    Returns (no_tables, no_config): names with no tables in data/cells/,
-    and 'name (DICT)' entries for each config.PER_SYSTEM dict a name is
-    missing from. Both empty = the artifact covers the whole registry —
-    the release-gate completeness check.
+
+def _declared_resolutions(grid, impl):
+    """The 'resolutions' metadata from one of the pair's tables (they all
+    carry the same value), or None if no table exists."""
+    res_list = cache.available_tables().get((grid, impl))
+    if not res_list:
+        return None
+    path = cache.DATA_DIR / f'{grid}-{impl}_r{res_list[0]}.parquet'
+    meta = pq.ParquetFile(path).metadata.metadata or {}
+    raw = meta.get(b'resolutions')
+    return None if raw is None else {int(r) for r in raw.decode().split(',')}
+
+
+def missing_systems():
+    """Registry implementations absent from the data or the per-grid config.
+
+    Returns (no_tables, no_config): (grid, impl) pairs with no tables in
+    data/cells/, and 'grid (DICT)' entries for each config.PER_SYSTEM dict
+    a grid is missing from. Both empty = the artifact covers the whole
+    registry — the release-gate completeness check.
     """
-    names = registry.names()
-    have = set(cache.available_systems())
-    no_tables = [s for s in names if s not in have]
-    no_config = [f'{s} ({k})' for s in names
-                 for k, d in config.PER_SYSTEM.items() if s not in d]
+    have = cache.available_tables()
+    impls = implementations()
+    no_tables = [gi for gi in impls if gi not in have]
+    grids = sorted({g for g, _ in impls})
+    no_config = [f'{g} ({k})' for g in grids
+                 for k, d in config.PER_SYSTEM.items() if g not in d]
     return no_tables, no_config
 
 
 def stale_tables():
-    """Tables on disk OUTSIDE their system's declared resolutions().
+    """Tables on disk OUTSIDE their own declared resolution coverage.
 
-    Disk == contract is an invariant every table consumer (survey,
-    calibrate, webdata, the sweeps below) relies on without checking — a
-    stale table (e.g. left behind when a system's MAX_RES was lowered, or
-    a partial write from a crashed run) silently pollutes all of them, so
-    the gate fails loudly on any rather than one consumer filtering.
-    Costs a lazy module import per system, so gate-only.
-    """
-    return [f'{name}_r{res}.parquet'
-            for name in cache.available_systems()
-            for declared in [set(registry.get(name).resolutions())]
-            for res in cache.available_resolutions(name)
-            if res not in declared]
+    Disk == declaration is an invariant every consumer relies on without
+    checking — a stale table (left behind when an implementation's max
+    resolution was lowered, or a partial write from a crashed run) would
+    silently pollute them all, so the gate fails loudly on any. Files not
+    matching the {grid}-{impl} naming scheme are ignored (not part of the
+    artifact)."""
+    out = []
+    for (grid, impl), res_list in sorted(cache.available_tables().items()):
+        declared = _declared_resolutions(grid, impl)
+        out += [f'{grid}-{impl}_r{res}.parquet' for res in res_list
+                if declared is not None and res not in declared]
+    return out
 
 
 def target_res_problems():
-    """TARGET_RES entries that are drifted, out of contract, or untabled.
+    """TARGET_RES entries that are drifted or untabled.
 
-    TARGET_RES has a defined correct answer (the count match, issue #32) and
-    three consumers that trust it blindly (check_system's clean-where-used
-    bound, the site manifest, survey) — so the gate asserts it rather than
-    relying on someone reading calibrate's output. Also requires the entry
-    to be a declared, on-disk resolution: a target finer than the finest
-    table would make the DNC invariant pass vacuously.
-    """
+    TARGET_RES has a defined correct answer (the count match, issue #32)
+    and consumers that trust it blindly (check_system's clean-where-used
+    bound, the site manifest, survey) — so the gate asserts it. Also
+    requires a primary-implementation table at the target: a target finer
+    than the finest table would make the DNC invariant pass vacuously."""
     anchor = config.CELLS_PER_RES['h3'](config.TARGET_RES['h3'])
     problems = []
-    for s, baked in config.TARGET_RES.items():
-        if s != 'h3' and baked != (pick := config.count_match_res(s, anchor)):
-            problems.append(f'{s}: TARGET_RES r{baked} != count-match r{pick}')
-        if baked not in registry.get(s).resolutions():
-            problems.append(f'{s}: TARGET_RES r{baked} outside declared '
-                            f'resolutions')
-        elif baked not in cache.available_resolutions(s):
-            problems.append(f'{s}: no table at TARGET_RES r{baked}')
+    for g, baked in config.TARGET_RES.items():
+        if g != 'h3' and baked != (pick := config.count_match_res(g, anchor)):
+            problems.append(f'{g}: TARGET_RES r{baked} != count-match r{pick}')
+        if baked not in cache.available_resolutions(g):
+            problems.append(f'{g}: no table at TARGET_RES r{baked}')
     return problems
 
 
 def sweep_system(name, *, resolve=False):
-    """[(res, tested, dnc, [example cids])] over the system's tables."""
+    """[(res, tested, dnc, [example cids])] over a grid's primary tables."""
     rows = []
     for res in cache.available_resolutions(name):
         if resolve:
@@ -108,7 +137,7 @@ def sweep_system(name, *, resolve=False):
 
 
 def check_system(name, rows):
-    """Return (failures, onset_res, finest_frac) for one system's sweep rows.
+    """Return (failures, onset_res, finest_frac) for one grid's sweep rows.
 
     Invariants:
       1. clean where it's used — 0 DNC at the working (target) resolution and

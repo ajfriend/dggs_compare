@@ -16,6 +16,7 @@ cache.build_table path (same seeds -> same cells), so ports verify by
 column comparison.
 """
 
+import os
 import time
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
@@ -24,10 +25,11 @@ import numpy as np
 import pyarrow as pa
 
 from . import config, stats
-from .cache import (BATCH, MAX_DRAW_FACTOR, VERTS_TYPE, open_writer)
+from .cache import BATCH, VERTS_TYPE, open_writer
 
 RAW_DIR = Path(__file__).resolve().parents[2] / 'data' / 'raw'
 RAW_COMPRESSION_LEVEL = 3   # written once, read once — don't pay zstd 19
+MAX_DRAW_FACTOR = 60        # safety cap on point draws in the sample regime
 
 RAW_SCHEMA = pa.schema([('cid', pa.string()), ('verts', VERTS_TYPE)])
 CONV_SCHEMA = pa.schema([('res', pa.int32()), ('cid', pa.string()),
@@ -184,11 +186,16 @@ def _write_convergence(impl, meta):
 
 
 def generate(impl):
-    """Write the raw geometry artifacts for `impl` (all resolutions)."""
+    """Write the raw geometry artifacts for `impl` — all resolutions, or
+    the subset named in the DGGS_COMPARE_RES env var (comma-separated; for
+    quick local runs — CI always generates everything)."""
     t0 = time.perf_counter()
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     meta = _metadata(impl)
     res_list = list(impl.resolutions())
+    if (only := os.environ.get('DGGS_COMPARE_RES')):
+        wanted = {int(r) for r in only.split(',')}
+        res_list = [r for r in res_list if r in wanted]
     # Live ETA weighted by CELL counts (coarse resolutions are nearly free;
     # every deep one is a full N_CELLS build).
     full = config.FULL_RES.get(impl.grid, ())

@@ -39,15 +39,21 @@ SUBSAMPLE_MAX_RATIO = 4
 # binaries for exactly these entries, straight from the tables.
 FULL_RES = {'ivea7h': (1, 2, 3, 5, 6)}
 
-# ----- per-system registry metadata ---------------------------------------
-# Working ("target") resolution per system: the finest in actual use, count-
+# ----- per-grid registry metadata ------------------------------------------
+# Working ("target") resolution per grid: the finest in actual use, count-
 # matched to an H3 r9 cell by scripts/calibrate.py (closed-form, no tables;
-# it flags any entry here that disagrees with its pick). Systems appear here
-# iff they have a module in systems/ (the folder is the registry; this is
-# its metadata).
+# it flags any entry here that disagrees with its pick). Grids appear here
+# iff they have an implementation script in scripts/systems/ (the listing
+# is the registry; this is its per-grid metadata).
 TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
               'rhealpix': 9, 'isea3h': 18, 'ivea3h': 18, 'isea4t': 14,
               'hex9': 9}
+# Which implementation's tables the site and analyses read, per grid. A
+# grid may have several implementations ({grid}-{impl} artifact keys);
+# consumers key by grid and resolve through this dict.
+PRIMARY_IMPL = {'h3': 'h3', 's2': 's2', 'a5': 'a5', 'isea7h': 'dggal',
+                'ivea7h': 'dggal', 'rhealpix': 'dggal', 'isea3h': 'dggal',
+                'ivea3h': 'dggal', 'isea4t': 'dggrid', 'hex9': 'hex9'}
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
              'ivea7h': 'C4', 'rhealpix': 'C5', 'isea3h': 'C6',
@@ -89,7 +95,7 @@ def count_match_res(sys, anchor_n, resolutions=range(40)):
 # a dict here extends the gate for free (FULL_RES stays optional;
 # RES_PREFIX is derived).
 PER_SYSTEM = {'TARGET_RES': TARGET_RES, 'SYS_COLOR': SYS_COLOR,
-              'CELLS_PER_RES': CELLS_PER_RES}
+              'CELLS_PER_RES': CELLS_PER_RES, 'PRIMARY_IMPL': PRIMARY_IMPL}
 # The globe view draws one globe per system, all at a common cell size: this H3
 # resolution sets it (r3 ~ 41,162 cells ~ 12,600 km^2/cell), and every other
 # system uses the resolution whose cell count is closest to H3's here. Raise for
