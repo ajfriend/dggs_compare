@@ -70,8 +70,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       # Caching is safe now: every dependency ships linux wheels (csar
-      # from PyPI since 0.1.1 — nothing builds from source in CI).
+      # from PyPI since 0.1.1 — nothing builds from source in CI). One
+      # cache per implementation — the matrix jobs otherwise share a key
+      # and race to save it (nine "Failed to save" warnings per run), and
+      # a shared cache would hold only the winner's binding wheels anyway.
       - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          cache-suffix: ${{ matrix.key }}
       - uses: extractions/setup-just@v4
       # DGGRID-backed implementations (detected from the script source, so
       # no hand-maintained list) need the dggrid binary built into .tools/.
@@ -103,6 +108,10 @@ jobs:
       - name: free disk space
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          # Distinct from the gen caches: this env is the project (solvers),
+          # not a binding.
+          cache-suffix: metrics
       - uses: extractions/setup-just@v4
       - run: just sync
       - uses: actions/download-artifact@v6
