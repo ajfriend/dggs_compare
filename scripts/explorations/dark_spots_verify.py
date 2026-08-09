@@ -15,14 +15,14 @@ Run under the x86_64 (Rosetta) env — see ../README.md:
 import numpy as np
 
 from _common import (SPIKE_LATLON, aspect_ratio, dc, gnomonic_xy, mvee_ratio,
-                     tangent_basis_vec)
+                     tangent_basis_vec, verts)
 
 RES = 10
-ad = dc.Adapter('ISEA7H')
+ad = dc.Adapter('ISEA7H', grid='isea7h')
 
 
 def tangent_xy(z):
-    v = ad.verts(z)
+    v = verts(ad, z)
     c, e1, e2 = tangent_basis_vec(v.mean(0))    # gnomonic about cell centroid
     return gnomonic_xy(v, c, e1, e2)
 
@@ -31,7 +31,7 @@ la, lo = SPIKE_LATLON
 print(f'{"offset":>7} {"csar":>9} {"MVEE":>9}')
 for d in (0.0, 0.05):
     z = ad.zone_at(RES, lo, la + d)
-    print(f'{d:7.2f} {aspect_ratio(ad.verts(z)):9.5f} {mvee_ratio(tangent_xy(z)):9.5f}')
+    print(f'{d:7.2f} {aspect_ratio(verts(ad, z)):9.5f} {mvee_ratio(tangent_xy(z)):9.5f}')
 
 z = ad.zone_at(RES, lo, la)
 xy = tangent_xy(z)

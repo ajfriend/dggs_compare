@@ -4,10 +4,10 @@ live-engine analyses.
 
 DGGAL (Ecere's Discrete Global Grid Abstraction Library, `pip install dggal`,
 BSD-3-Clause) exposes many DGGRSs through a single `DGGRS` API. This module
-initializes the DGGAL `Application` once at import and wraps a DGGRS instance
-in an `Adapter` (count / enumerate / point→cell / boundary / cid / edge
-refinement / neighbors). Import it lazily (the systems/ modules do) so
-`import dggs_compare` doesn't load the engine.
+initializes the DGGAL `Application` once at import and wraps a DGGRS
+instance in an `Adapter` speaking the GridImpl contract (interface.py).
+Import it lazily (the scripts do) so `import dggs_compare` doesn't load
+the engine.
 
 Platform note: dggal 0.0.6's macOS arm64 wheel is still half-broken — the
 Python extensions are arm64 but the bundled libecrt/libdggal dylibs are
@@ -21,8 +21,6 @@ import ctypes
 import glob
 import importlib.util
 import os
-
-import numpy as np
 
 from .stats import orient_ccw
 
@@ -52,15 +50,7 @@ from dggal import *  # noqa: E402,F401,F403  upstream-documented setup pattern
 _app = Application(appGlobals=globals())
 pydggal_setup(_app)
 
-CHUNK = 50_000              # sampling batch size (keeps memory flat)
 NULL_ZONE = 0xFFFFFFFFFFFFFFFF   # DGGAL's nullZone sentinel (failed lookup)
-
-
-def sample_uniform_lnglat(n, rng):
-    """Uniform-on-sphere samples as (lng_deg, lat_deg), shape (n, 2)."""
-    lng = 360.0 * rng.random(n) - 180.0
-    lat = np.degrees(np.arcsin(2.0 * rng.random(n) - 1.0))  # equal-area in lat
-    return np.column_stack([lng, lat])
 
 
 def _drain(points):
@@ -101,18 +91,18 @@ class Adapter:
     hand to `runner.generate` and the live-engine object the exploration
     scripts drive.
 
-    `cls` is the DGGRS class name (e.g. 'ISEA7H'). The registry path also
-    passes `grid` (the artifact key's grid half) and — DGGAL's coordinates
-    being WGS84 geodetic — `to_sphere` (a rings->rings function, e.g.
-    `stats.authalic_rings`), whose presence in the script call is the
-    record of how the system gets to the sphere. Analyses may omit both
-    and get raw geodetic output.
+    `cls` is the DGGRS class name (e.g. 'ISEA7H'); `grid` is the artifact
+    key's grid half. DGGAL's coordinates are WGS84 geodetic, so the
+    registry scripts pass `to_sphere` (a rings->rings function, e.g.
+    `stats.authalic_rings`) — its presence in the script call is the
+    record of how the system gets to the sphere. Explorations that want
+    raw geodetic output omit it.
     """
 
     impl = 'dggal'
     packages = ('dggal',)
 
-    def __init__(self, cls, grid=None, to_sphere=None):
+    def __init__(self, cls, grid, to_sphere=None):
         self.name = cls
         self.grid = grid
         self._to_sphere = to_sphere
@@ -179,19 +169,10 @@ class Adapter:
         return orient_ccw(
             latlng_ring(self.dggrs.getZoneRefinedWGS84Vertices(zone, refine)))
 
-    def verts(self, zone):
-        """Corner vertices as an (M, 3) unit-vec3 array (corners only)."""
-        import csar
-        return csar.to_vec3(self.cell_boundary(zone), geo='latlng_deg')
-
-    # ----- ids ----------------------------------------------------------
+    # ----- ids / point lookup -------------------------------------------
     def cid_str(self, zone):
         return self.dggrs.getZoneTextID(zone)
 
-    def level(self, zone):
-        return self.dggrs.getZoneLevel(zone)
-
-    # ----- point lookup / sampling --------------------------------------
     def zone_at(self, level, lng, lat):
         """The zone at `level` containing the (lng, lat) point, or None when
         the engine can't resolve it — DGGAL returns its nullZone sentinel for
@@ -202,28 +183,5 @@ class Adapter:
         p.lat, p.lon = float(lat), float(lng)
         zone = self.dggrs.getZoneFromWGS84Centroid(level, p)
         return None if zone == NULL_ZONE else zone
-
-    def sample(self, level, n, rng):
-        """`n` zones from uniform-on-sphere points (with repeats; failed
-        lookups skipped)."""
-        done = 0
-        while done < n:
-            k = min(CHUNK, n - done)
-            for lng, lat in sample_uniform_lnglat(k, rng):
-                zone = self.zone_at(level, lng, lat)
-                if zone is not None:
-                    yield zone
-            done += k
-
-    def iter_sample(self, level, n, seed):
-        """Yield `(cid_str, verts)` for the distinct cells among `n` samples."""
-        rng = np.random.default_rng(seed)
-        seen = set()
-        for lng, lat in sample_uniform_lnglat(n, rng):
-            zone = self.zone_at(level, lng, lat)
-            if zone is None or zone in seen:
-                continue
-            seen.add(zone)
-            yield self.cid_str(zone), self.verts(zone)
 
 

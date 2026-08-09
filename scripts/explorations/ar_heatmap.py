@@ -24,7 +24,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-from _common import aspect_ratio, dc, tangent_basis
+from _common import aspect_ratio, dc, tangent_basis, verts
 
 RES = 10
 GRIDS = [('ISEA7H', (-58.3971, -168.80)), ('IVEA7H', (58.3971, 11.20))]
@@ -35,7 +35,7 @@ FACE_HALF = 0.7                    # tan(half-angle) ~ 35 deg
 
 
 def ar_at(ad, lng, lat):
-    return aspect_ratio(ad.verts(ad.zone_at(RES, float(lng), float(lat))))
+    return aspect_ratio(verts(ad, ad.zone_at(RES, float(lng), float(lat))))
 
 
 def global_field(ad):
@@ -67,7 +67,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 gfields = {}
 for cls, _ in GRIDS:
     print(f'global {cls} ...', flush=True)
-    gfields[cls] = global_field(dc.Adapter(cls))
+    gfields[cls] = global_field(dc.Adapter(cls, grid=cls.lower()))
 vmax = max(np.nanmax(f) for f in gfields.values())
 fig, axes = plt.subplots(len(GRIDS), 1, figsize=(11, 9))
 for ax, (cls, _) in zip(axes, GRIDS):
@@ -86,7 +86,7 @@ print('wrote', OUT / 'ar_heatmap_global.png')
 ffields = {}
 for cls, (lat0, lng0) in GRIDS:
     print(f'face {cls} ...', flush=True)
-    ffields[cls] = face_field(dc.Adapter(cls), lat0, lng0)
+    ffields[cls] = face_field(dc.Adapter(cls, grid=cls.lower()), lat0, lng0)
 fig, axes = plt.subplots(1, len(GRIDS), figsize=(12, 5.5))
 for ax, (cls, _) in zip(axes, GRIDS):
     f = ffields[cls]

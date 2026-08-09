@@ -34,6 +34,13 @@ def aspect_ratio(verts):
     return r.aspect_ratio if isinstance(r, csar.Converged) else np.nan
 
 
+def verts(ad, zone):
+    """A zone's corner vertices as an (M, 3) unit-vec3 array, straight
+    from a live Adapter (exploration convenience — the pipeline never
+    needs vec3 boundaries)."""
+    return csar.to_vec3(ad.cell_boundary(zone), geo='latlng_deg')
+
+
 def unit(lat_deg, lng_deg):
     """(lat, lng) degrees -> unit vec3."""
     la, lo = np.radians(lat_deg), np.radians(lng_deg)
