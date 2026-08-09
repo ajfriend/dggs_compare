@@ -86,7 +86,10 @@ matrix is derived from it. A new implementation touches:
    dependencies, defining a `GridImpl` class (the contract is
    `interface.py`'s docstring; mirror any existing script), and handing it
    to `runner.generate`. Bringing cells to the sphere is the
-   implementation's job; the script is the record of how.
+   implementation's job; the script is the record of how. Glue shared
+   between scripts lives beside them as underscore-prefixed modules
+   (never in the library) — a bare `from _dggal_engine import Adapter`
+   works because running a script puts its own directory on `sys.path`.
 2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
    (`just calibrate` picks it from the closed-form counts — no tables
    needed), `SYS_COLOR`, `PRIMARY_IMPL`.

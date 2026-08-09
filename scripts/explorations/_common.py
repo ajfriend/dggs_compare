@@ -10,9 +10,6 @@ Gives the csar/numpy primitives below directly, plus two lazy accessors
             Needs an env with the dggal binding.
 """
 
-import sys
-from pathlib import Path
-
 import numpy as np
 
 import csar
@@ -25,7 +22,9 @@ def __getattr__(name):
     if name == 'cells':
         from dggs_compare import cache as mod
     elif name == 'dc':
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'systems'))
+        import sys
+        from dggs_compare.checks import SCRIPTS_DIR
+        sys.path.insert(0, str(SCRIPTS_DIR))
         import _dggal_engine as mod
     else:
         raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

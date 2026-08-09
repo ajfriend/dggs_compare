@@ -96,13 +96,15 @@ jobs:
         with:
           cache-suffix: ${{ matrix.key }}
       - uses: extractions/setup-just@v4
-      # DGGRID-backed implementations (detected from the script source, so
-      # no hand-maintained list) need the dggrid binary built into .tools/.
+      # DGGRID-backed implementations need the dggrid binary built into
+      # .tools/. Keyed on the impl half of the registry name — that an
+      # implementation is DGGRID-backed is exactly what '{grid}-dggrid'
+      # declares.
       - name: install dggrid if this implementation needs it
         run: |
-          if grep -q dggrid_engine "scripts/systems/${{ matrix.key }}.py"; then
-            just install-dggrid
-          fi
+          case "${{ matrix.key }}" in
+            *-dggrid) just install-dggrid ;;
+          esac
       # Stage 1 (see header): no `just sync` — the script resolves its
       # own env from its PEP 723 header.
       - name: generate raw cell geometry

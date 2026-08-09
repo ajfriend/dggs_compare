@@ -9,7 +9,7 @@
 # ///
 """ISEA4T — Snyder equal-area icosahedral aperture-4 triangle (via DGGRID).
 
-Batch subprocess calls instead of per-cell FFI (see dggrid_engine; the
+Batch subprocess calls instead of per-cell FFI (see _dggrid_engine; the
 dggrid binary comes from `just install-dggrid` or DGGS_COMPARE_DGGRID —
 it is not a python package, so `packages` is empty). Cells are plain
 SEQNUM ints; they are only unique within a resolution, which is why the
