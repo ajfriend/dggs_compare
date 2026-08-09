@@ -7,12 +7,21 @@
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
 # solver bump worth reflecting) — decoupled from code releases.
 #
-# Fan-out/fan-in: one runner per DGGS builds that system's tables — the
-# matrix is derived from src/dggs_compare/systems/ at run time, so it can
-# never go stale — and the publish job merges the artifacts, gates on the
-# DNC invariants (including registry-completeness), derives the viewer data
-# (including the full-globe page's complete-coverage binaries — those
-# resolutions live exhaustively in the ivea7h tables), and uploads.
+# One build job per IMPLEMENTATION — the matrix is the scripts/systems/
+# listing, so it can never go stale — running the two pipeline stages
+# back to back in two SEPARATE envs on the same runner:
+#
+#   stage 1  `just gen <key>`: raw cell geometry, in the script's own
+#            PEP 723 env (binding + library, nothing else)
+#   stage 2  `just metrics`: solve + convergence admission gate, in the
+#            project env (solvers, no bindings) — reads only the raw
+#            parquet stage 1 wrote
+#
+# Same-runner keeps the fan-out fully parallel (no barrier, no 16GB raw
+# round-trip) without weakening provenance: csar/sparea install as fixed
+# PyPI wheels, so every runner executes identical solver binaries. The
+# publish job merges the finals, applies the release gates, derives the
+# viewer data, and uploads.
 name: data-release
 
 on:
@@ -22,11 +31,20 @@ on:
         description: 'Data release tag (e.g. data-v1)'
         required: true
         type: string
+      # Pipeline-proof knob: overrides the per-resolution cell budget and
+      # skips FULL_RES exhaustive coverage, so a scratch run costs minutes
+      # instead of an hour. NEVER set on a real data-vN release — the
+      # reduced budget is stamped in the tables' metadata either way.
+      n_cells:
+        description: 'Cell budget override (proof runs only; empty = full)'
+        required: false
+        default: ''
+        type: string
       # One runner type for EVERY job in a release, so a data artifact never
       # mixes float provenance across architectures. ubuntu-latest (x86_64)
       # is the verified default; ubuntu-24.04-arm is the experiment — the
-      # aarch64 dggal/a5_fast wheels exist but are unverified (the dnc-check
-      # gate + a table spot-diff against an x86 release is the validation).
+      # aarch64 wheels exist but are unverified (the dnc-check gate + a
+      # table spot-diff against an x86 release is the validation).
       runner:
         description: 'Runner type for all jobs'
         required: false
@@ -41,68 +59,92 @@ permissions:
 
 jobs:
   systems:
-    # The gen matrix IS the registry: one line of shell over systems/*.py.
+    # The build matrix IS the registry: `just systems` is the one shell
+    # reading of the scripts/systems/ listing ({grid}-{impl}.py per
+    # implementation).
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 5
     outputs:
       list: ${{ steps.ls.outputs.list }}
     steps:
       - uses: actions/checkout@v6
+      - uses: extractions/setup-just@v4
       - id: ls
         run: |
-          echo "list=$(basename -a -s .py src/dggs_compare/systems/*.py | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
+          echo "list=$(just systems | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
 
-  gen:
+  build:
     needs: [systems]
     strategy:
-      # One broken system must not cancel the other nine: with fail-fast
-      # off, healthy jobs finish and `gh run rerun --failed` reuses their
-      # artifacts, so a fix only reruns the one red job.
+      # One broken implementation must not cancel the other nine: with
+      # fail-fast off, healthy jobs finish and `gh run rerun --failed`
+      # reuses their artifacts, so a fix only reruns the one red job.
       fail-fast: false
       matrix:
-        system: ${{ fromJSON(needs.systems.outputs.list) }}
+        key: ${{ fromJSON(needs.systems.outputs.list) }}
     runs-on: ${{ inputs.runner }}
-    # The aperture-3 grids build 34 resolutions each (vs isea7h's 20), and
-    # isea3h's odd levels solve 126-point refined rings — the longest jobs.
-    timeout-minutes: 300
+    # The aperture-3 grids are the longest chains (~34 resolutions
+    # generated, then solved), ~40 min each verified.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
+      # Caching is safe (every dependency ships linux wheels — nothing
+      # builds from source in CI) and keyed per implementation: matrix
+      # jobs sharing one key would race to save it, and the winner's
+      # cache would hold only its own binding wheels.
       - uses: astral-sh/setup-uv@v8.1.0
         with:
-          # No cross-run cache: csar builds from source with zig ReleaseFast
-          # tuned to the build machine CPU, and hosted runners are a
-          # heterogeneous fleet — a wheel cached on one microarch can SIGILL
-          # on the next (exit 132; see skar_py issue on baseline targeting).
-          enable-cache: false
+          cache-suffix: ${{ matrix.key }}
       - uses: extractions/setup-just@v4
-      - run: just sync
-      # DGGRID-backed systems (detected from the module source, so no
-      # hand-maintained list) need the dggrid binary built into .tools/.
-      - name: install dggrid if this system needs it
+      # DGGRID-backed implementations (detected from the script source, so
+      # no hand-maintained list) need the dggrid binary built into .tools/.
+      - name: install dggrid if this implementation needs it
         run: |
-          if grep -q dggrid_engine "src/dggs_compare/systems/${{ matrix.system }}.py"; then
+          if grep -q dggrid_engine "scripts/systems/${{ matrix.key }}.py"; then
             just install-dggrid
           fi
-      - run: just gen ${{ matrix.system }}
+      # Stage 1 (see header): no `just sync` — the script resolves its
+      # own env from its PEP 723 header.
+      - name: generate raw cell geometry
+        run: just gen ${{ matrix.key }}
+        env:
+          DGGS_COMPARE_N_CELLS: ${{ inputs.n_cells }}
+      # Stage 2 (see header): the explicit sync makes env resolution its
+      # own failure point, distinct from a red solve.
+      - name: metrics — solve + convergence admission gate
+        run: |
+          just sync
+          just metrics
+      # zstd parquet doesn't re-compress, and the finals are duplicated
+      # into the release minutes later — short retention, no zip effort.
       - uses: actions/upload-artifact@v6
         with:
-          name: tables-${{ matrix.system }}
+          name: tables-${{ matrix.key }}
           path: data/cells/
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      # The raw geometry is reproducible from the pinned envs, so the
+      # happy path uploads nothing; a red job preserves it for debugging
+      # without regenerating.
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: raw-${{ matrix.key }}
+          path: data/raw/
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 3
 
   publish:
-    needs: [gen]
+    needs: [build]
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+      # No cache-suffix: the default key is already distinct from the
+      # suffixed build caches.
       - uses: astral-sh/setup-uv@v8.1.0
-        with:
-          # No cross-run cache: csar builds from source with zig ReleaseFast
-          # tuned to the build machine CPU, and hosted runners are a
-          # heterogeneous fleet — a wheel cached on one microarch can SIGILL
-          # on the next (exit 132; see skar_py issue on baseline targeting).
-          enable-cache: false
       - uses: extractions/setup-just@v4
       - run: just sync
       - uses: actions/download-artifact@v6
@@ -110,7 +152,7 @@ jobs:
           pattern: tables-*
           path: data/cells/
           merge-multiple: true
-      - name: gate — DNC invariants must hold before anything ships
+      - name: gate — coverage + DNC invariants must hold before anything ships
         run: just dnc-check
       - name: derive the web viewer data
         run: just web-data

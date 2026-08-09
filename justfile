@@ -19,6 +19,12 @@ export UV_PYTHON := python
 sync:
     uv sync --python {{python}}
 
+# The registry, read as a key list ({grid}-{impl} per line): the CI build
+# matrix and `gen all` both consume this — the one shell reading of the
+# scripts/systems/ listing.
+systems:
+    @basename -a -s .py scripts/systems/*.py
+
 # Stage 1: raw cell geometry -> data/raw/ (gitignored). One PEP 723 script
 # per (grid, implementation) in scripts/systems/, each in its own env; the
 # folder listing is the registry and the CI matrix. Pass a key to run one
@@ -32,8 +38,8 @@ gen key="all":
     # fail-fast: false): one run yields the full failure set AND all the
     # healthy raw artifacts, which `just metrics` can then use per-key.
     fail=0
-    for f in scripts/systems/*.py; do
-        uv run "$f" || { echo "FAILED: $f"; fail=1; }
+    for k in $(just systems); do
+        uv run "scripts/systems/$k.py" || { echo "FAILED: $k"; fail=1; }
     done
     exit $fail
 
