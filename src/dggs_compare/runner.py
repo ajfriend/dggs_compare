@@ -130,26 +130,36 @@ def _select_cells(impl, res, n_cells, full):
 
 
 def _write_res(impl, res, meta, n_cells, full):
-    """One resolution's raw table."""
+    """One resolution's raw table. Returns (n, seconds) for the caller's
+    per-cell accounting."""
     t0 = time.perf_counter()
     cells, mode = _select_cells(impl, res, n_cells, full)
+    t_select = time.perf_counter() - t0
     cells = sorted(zip(impl.cid_strs(cells), cells), key=lambda cc: cc[0])
     path = raw_path(key(impl.grid, impl.impl), res)
     writer = open_writer(path, RAW_SCHEMA, meta,
                          compression_level=RAW_COMPRESSION_LEVEL)
+    t_bounds = 0.0
     try:
         for lo in range(0, len(cells), BATCH):
             chunk = cells[lo:lo + BATCH]
             cids, clist = zip(*chunk)
+            tb = time.perf_counter()
+            verts = impl.boundaries(res, clist)
+            t_bounds += time.perf_counter() - tb
             writer.write_table(pa.table(
                 {'cid': pa.array(cids, pa.string()),
-                 'verts': pa.array(impl.boundaries(res, clist), VERTS_TYPE)},
+                 'verts': pa.array(verts, VERTS_TYPE)},
                 schema=RAW_SCHEMA))
     finally:
         writer.close()
     kb = path.stat().st_size / 1024
-    print(f'[{path.stem} ] {mode:>6} {len(cells):>8} cells '
-          f'({kb:.0f} KiB) [{time.perf_counter() - t0:.0f}s]', flush=True)
+    t = time.perf_counter() - t0
+    n = len(cells)
+    print(f'[{path.stem} ] {mode:>6} {n:>8} cells ({kb:.0f} KiB) '
+          f'[{t:.1f}s: select {t_select:.1f} bounds {t_bounds:.1f} | '
+          f'{1e6 * t / n:.0f} us/cell]', flush=True)
+    return n, t
 
 
 def _write_convergence(impl, meta):
@@ -204,8 +214,12 @@ def generate(impl):
              else min(impl.num_cells(r), n_cells) for r in res_list}
     total_cells = sum(cells.values())
     done_cells = 0
+    made = 0
+    made_secs = 0.0
     for i, res in enumerate(res_list):
-        _write_res(impl, res, meta, n_cells, full)
+        n, secs = _write_res(impl, res, meta, n_cells, full)
+        made += n
+        made_secs += secs
         done_cells += cells[res]
         done = time.perf_counter() - t0
         if i + 1 < len(res_list):
@@ -214,5 +228,7 @@ def generate(impl):
                   f'({done_cells:,}/{total_cells:,} cells) in {done:.0f}s '
                   f'(~{eta:.0f}s to go)', flush=True)
     _write_convergence(impl, meta)
-    print(f'[{key(impl.grid, impl.impl)}] {len(res_list)} resolutions in '
-          f'{time.perf_counter() - t0:.0f}s', flush=True)
+    rate = f' ({1e6 * made_secs / made:.0f} us/cell)' if made else ''
+    print(f'[{key(impl.grid, impl.impl)}] {len(res_list)} resolutions, '
+          f'{made:,} cells in {time.perf_counter() - t0:.0f}s{rate}',
+          flush=True)
