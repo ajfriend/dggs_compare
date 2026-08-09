@@ -81,13 +81,16 @@ def build(key, res, extra_meta=None, out_dir=None):
     writer = open_writer(path, SCHEMA, meta)
     dnc = 0
     n = 0
+    t_solve = 0.0
     try:
         for batch in raw.iter_batches(batch_size=BATCH):
+            ts = time.perf_counter()
             ars, areas = [], []
             for vlist in batch['verts'].to_pylist():
                 ar, area = stats.cell_stats(open_ring(vlist))
                 ars.append(ar)
                 areas.append(area)
+            t_solve += time.perf_counter() - ts
             dnc += int(np.isnan(ars).sum())
             rows = len(batch)
             n += rows
@@ -105,8 +108,12 @@ def build(key, res, extra_meta=None, out_dir=None):
     finally:
         writer.close()
     kb = path.stat().st_size / 1024
+    t = time.perf_counter() - t0
+    # solve = the per-cell csar/sparea loop (incl. the arrow->python vlist
+    # decode); the residual is raw read + arrow build + zstd-19 write.
     print(f'[{key} r{res:<2}] {n:>8} cells (DNC {dnc}) -> {path.name} '
-          f'({kb:.0f} KiB) [{time.perf_counter() - t0:.0f}s]', flush=True)
+          f'({kb:.0f} KiB) [{t:.1f}s: solve {t_solve:.1f} = '
+          f'{runner._us_per_cell(t_solve, n)}]', flush=True)
 
 
 def available_raw():

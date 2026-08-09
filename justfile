@@ -71,6 +71,12 @@ dnc-check:
 convergence:
     uv run scripts/convergence.py
 
+# Consolidated timing report for one data-release Actions run (ids from
+# `gh run list`): GH step durations + the in-process phase lines parsed
+# from the job logs.
+timing-report run_id:
+    DGGS_COMPARE_RUN={{run_id}} uv run scripts/timing_report.py
+
 # Build the web viewer's static data (histograms + ajglobe globe binaries +
 # the full-globe page's complete-coverage binaries + manifest) from the
 # tables -> web/out/ (gitignored). A column reshape — nothing is solved.
