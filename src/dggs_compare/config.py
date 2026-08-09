@@ -100,6 +100,17 @@ GLOBE_H3_RES = 3
 GAP_TOL = 1e-6            # csar duality-gap certification threshold
 CSAR_METHOD = 'auto'      # solver path ('auto' = csar's recommended method)
 
+# ----- convergence check (pins the convergence artifact's content) ---------
+# Density-0 vs dense sampling residuals, measured on K cells per gate level.
+CONV_SEED = 0xC0FFEE
+CONV_LEVELS = (0, 1, 2, 3, 5, 8, 11)   # incl coarsest + the pentagons
+CONV_K = 300
+CONV_SAMPLES = 40         # dense-reference sampling density (per edge)
+CONV_TOL = 1e-3           # max |dAR| beyond this fails the admission gate
+# Grids allowed to exceed CONV_TOL, with the documented reason (the gate
+# prints it): isea3h's odd-level density-0 approximation, issue #25.
+CONV_EXPECTED_RED = {'isea3h': 'density-0 approximation, issue #25'}
+
 # ----- units ---------------------------------------------------------------
 R_KM = 6371.0088          # mean Earth radius; steradian -> km^2 is R^2
 SR2KM2 = R_KM * R_KM

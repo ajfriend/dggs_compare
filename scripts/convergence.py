@@ -26,12 +26,13 @@ import csar
 from dggs_compare import registry, stats
 from dggs_compare.cache import open_ring
 
-# ----- knobs -------------------------------------------------------------
-SEED = 0xC0FFEE
-REF_SAMPLES = 40            # reference sampling density (vertices per edge);
-                            # must stay denser than anything the tables use
-LEVELS = [0, 1, 2, 3, 5, 8, 11]   # incl coarsest + the pentagons (level 0)
-K = 300                     # cells tested per level (enumerate if fewer exist)
+# ----- knobs (shared with the two-stage pipeline's runner) ---------------
+from dggs_compare import config  # noqa: E402
+
+SEED = config.CONV_SEED
+REF_SAMPLES = config.CONV_SAMPLES   # must stay denser than the tables use
+LEVELS = config.CONV_LEVELS         # incl coarsest + the pentagons
+K = config.CONV_K
 # -------------------------------------------------------------------------
 
 
