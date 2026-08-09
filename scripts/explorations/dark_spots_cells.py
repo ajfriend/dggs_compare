@@ -25,7 +25,7 @@ from matplotlib.patches import Polygon as MPoly
 import csar
 
 from _common import (SPIKE_LATLON, aspect_ratio, dc, ellipse_pts, mvee,
-                     tangent_basis)
+                     tangent_basis, verts)
 
 RES = 10
 HALF = 0.007                      # bbox half-size (deg) around the spike
@@ -59,7 +59,7 @@ if not any(ad.cid_str(z) == spike_cid for z in zones):
 
 polys, ars, ells, spk = [], [], [], []
 for z in zones:
-    corners = ad.verts(z)                        # fetch once: AR + MVEE
+    corners = verts(ad, z)                        # fetch once: AR + MVEE
     polys.append(refined_xy(z, e1, e2))
     ars.append(aspect_ratio(corners))
     cen, A = mvee(ortho(corners, e1, e2))

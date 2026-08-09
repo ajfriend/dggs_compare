@@ -10,8 +10,9 @@ in order, joined by great-circle edges — and the only knob is the SAMPLING
 DENSITY: how many extra vertices are sampled along each native edge.
 Density 0 is the minimal vertex set. Bringing cells to the sphere is the
 implementation's job, done however it thinks best (the closed-form
-authalic latitude is available as `stats.authalic_lat` for implementations
-that address WGS84 geodetic coordinates); the script is the record of how
+authalic map is available for implementations that address WGS84 geodetic
+coordinates: `stats.authalic_rings` for a `boundaries()` return value,
+`stats.authalic_lat` for bare latitudes); the script is the record of how
 its system got to the sphere.
 
 Cell handles are plain hashables whose meaning may be scoped to a

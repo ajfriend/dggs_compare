@@ -47,18 +47,16 @@ h1 {
 }
 .lede b { color: var(--ink); font-weight: 600; }
 
-.admonition {
+.note {
   margin: 20px 0 0;
   max-width: 760px;
   padding: 12px 16px;
-  background: #f2cc5f;
-  border: 1px solid #8a6d1f;
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: #1c1c1c;
   font-size: 15px;
 }
-.admonition b { color: #000; }
-.admonition a { color: #1d4ed8; font-weight: 600; text-decoration: underline; }
+.note a { font-weight: 600; text-decoration: underline; }
 
 section {
   margin: 48px 0;

@@ -66,12 +66,14 @@ class A5:
 
     def boundaries(self, res, cells, samples_per_edge=0):
         if samples_per_edge:
-            return [stats.refine_geodesic(
-                        [(lat, lng)
-                         for lng, lat in a5.cell_to_boundary(c)[:-1]],
-                        samples_per_edge)
-                    for c in cells]
-        return [self._boundary(c) for c in cells]
+            rings = [stats.refine_geodesic(
+                         [(lat, lng)
+                          for lng, lat in a5.cell_to_boundary(c)[:-1]],
+                         samples_per_edge)
+                     for c in cells]
+        else:
+            rings = [self._boundary(c) for c in cells]
+        return stats.authalic_rings(rings)
 
     def enumerate_cells(self, res):
         for c0 in a5.get_res0_cells():

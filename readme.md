@@ -105,9 +105,17 @@ One Parquet file per `(grid, implementation, resolution)` at
 | `dggs` | string | system name (constant per file) |
 | `res` | int32 | resolution/level (constant per file) |
 | `cid` | string | cell id text |
-| `verts` | list<[lat, lng] f64> | vertex list, degrees, open |
+| `verts` | list<[lat, lng] f64> | vertex list, degrees, open; on the unit sphere (see below) |
 | `ar` | float64 | enclosing-cone aspect ratio; NaN = did-not-certify |
 | `area` | float64 | spherical area, steradians |
+
+Every cell is a **spherical polygon**: `verts` are sphere coordinates and
+edges are great circles, and all metrics are measured on that object.
+Bringing cells to the sphere is each implementation script's job —
+systems declared on an ellipsoid map their vertices through the
+area-preserving authalic latitude (`stats.authalic_rings`), so a system
+that is exactly equal-area on its declared surface measures exactly
+equal-area here (the methodology issue: #42).
 
 Provenance (seed policy, budgets, solver settings, library versions) rides in
 each file's Parquet metadata. Coarse resolutions are enumerated in full;

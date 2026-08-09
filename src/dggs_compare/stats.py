@@ -1,8 +1,10 @@
-"""Per-cell statistics: aspect ratio (csar) + spherical area (sparea).
+"""Per-cell statistics (csar AR, sparea area) + shared sphere helpers.
 
-Computed by the metrics stage and stored as columns in the tables —
-downstream consumers read them; they never re-solve. Solver settings come
-from `config` and are recorded in each table's metadata.
+The statistics are computed by the metrics stage and stored as columns in
+the tables — downstream consumers read them; they never re-solve. Solver
+settings come from `config` and are recorded in each table's metadata.
+The helpers (winding, edge refinement, uniform sampling, the authalic
+map) serve the generation scripts.
 """
 
 import numpy as np
@@ -10,6 +12,53 @@ import csar
 import sparea
 
 from . import config
+
+
+# WGS84 shape constants (authalic_lat only — no datum concept anywhere
+# else in the library; whether and how to use the transform is each
+# implementation script's decision and record).
+_F = 1 / 298.257223563
+_E2 = _F * (2 - _F)
+_E = np.sqrt(_E2)
+
+
+def _q(sinlat):
+    return (1 - _E2) * (sinlat / (1 - _E2 * sinlat * sinlat)
+                        - np.log((1 - _E * sinlat) / (1 + _E * sinlat))
+                        / (2 * _E))
+
+
+_Q_POLE = _q(1.0)
+
+
+def authalic_lat(lat_deg):
+    """Authalic latitude (degrees) for WGS84 geodetic latitude (degrees);
+    scalar or array. Longitude is unchanged by the transform.
+
+    The exact closed form (Snyder 1987, eq. 3-11/3-12), not a series: the
+    latitude on the equal-AREA sphere, so a system that is exactly
+    equal-area on the WGS84 ellipsoid is exactly equal-area on the sphere
+    after mapping each vertex through this. Max |shift| is ~0.13 deg at
+    mid-latitudes. Evaluated on |lat| and mirrored (the function is odd),
+    which keeps both poles exact."""
+    lat = np.asarray(lat_deg, dtype=float)
+    s = np.sin(np.radians(np.abs(lat)))
+    xi = np.degrees(np.arcsin(np.clip(_q(s) / _Q_POLE, -1.0, 1.0)))
+    return np.copysign(xi, lat)
+
+
+def authalic_rings(rings):
+    """[[(lat, lng), ...], ...] with every vertex latitude mapped through
+    `authalic_lat` — the one-call form for a `boundaries()` return value.
+    An implementation whose native coordinates are WGS84 geodetic applies
+    this as the last step of `boundaries`; doing so IS the script's record
+    of how its system got to the sphere."""
+    out = []
+    for ring in rings:
+        r = np.asarray(ring, dtype=float)
+        out.append(list(zip(authalic_lat(r[:, 0]).tolist(),
+                            r[:, 1].tolist())))
+    return out
 
 
 def refine_geodesic(ring, k):

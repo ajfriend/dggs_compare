@@ -17,7 +17,7 @@ import numpy as np
 
 import csar
 
-from _common import dc
+from _common import dc, verts
 
 RES = 10
 ad = dc.Adapter('ISEA7H')
@@ -25,7 +25,7 @@ ad = dc.Adapter('ISEA7H')
 
 def ar_at(lng, lat):
     z = ad.zone_at(RES, float(lng), float(lat))
-    r = csar.solve(ad.verts(z), geo='vec3')
+    r = csar.solve(verts(ad, z), geo='vec3')
     ok = isinstance(r, csar.Converged)
     return (r.aspect_ratio if ok else np.nan), ok, (None if ok else r.status)
 
