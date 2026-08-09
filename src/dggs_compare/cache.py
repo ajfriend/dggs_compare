@@ -91,6 +91,35 @@ def _existing_path(dggs, res):
 BATCH = 50_000        # cells per streamed row group (bounds build memory)
 MAX_DRAW_FACTOR = 60  # safety cap on point draws in the sample regime
 
+# Per-column encodings, applied to whichever of these columns a schema has.
+# BYTE_STREAM_SPLIT packs the float64s ~28% smaller, losslessly (shared
+# sign/exponent bytes compress; random mantissa bytes stay out of the way).
+# DELTA_BYTE_ARRAY prefix-compresses the cid-sorted ids.
+_ENCODINGS = {'cid': 'DELTA_BYTE_ARRAY',
+              VERTS_LEAF: 'BYTE_STREAM_SPLIT',
+              'ar': 'BYTE_STREAM_SPLIT',
+              'area': 'BYTE_STREAM_SPLIT'}
+
+
+def open_writer(path, schema, metadata):
+    """A ParquetWriter with the house encodings for `schema`.
+
+    zstd level 19 is ~free to read (decode speed is level-independent;
+    measured 0.04s vs 0.05s on the 1.18M-row table) and pays only at write
+    time (0.4s -> 9s there). It matters most on full-enumeration tables,
+    where cid-sorted neighbors have near-identical vertex bytes that
+    long-range matching exploits: -23% there, ~-5% on sampled tables.
+    """
+    names = set(schema.names)
+    return pq.ParquetWriter(
+        path, schema.with_metadata(metadata),
+        compression='zstd',
+        compression_level=19,
+        use_dictionary=[c for c in ('dggs', 'res') if c in names],
+        column_encoding={k: v for k, v in _ENCODINGS.items()
+                         if k.split('.')[0] in names},
+    )
+
 
 def _select_cells(sysmod, dggs, res):
     """The resolution's cell set: exactly N_CELLS cells (or every cell where
@@ -151,25 +180,7 @@ def build_table(dggs, res):
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = table_path(dggs, res)
-    # BYTE_STREAM_SPLIT packs the float64s ~28% smaller, losslessly (shared
-    # sign/exponent bytes compress; random mantissa bytes stay out of the way).
-    # DELTA_BYTE_ARRAY prefix-compresses the sorted cids.
-    writer = pq.ParquetWriter(
-        path, SCHEMA.with_metadata(_provenance()),
-        compression='zstd',
-        # Level 19 is ~free to read (zstd decode speed is level-independent;
-        # measured 0.04s vs 0.05s on the 1.18M-row table) and pays only at
-        # write time (0.4s -> 9s there). It matters most on the
-        # full-enumeration tables, where cid-sorted neighbors have
-        # near-identical vertex bytes that long-range matching exploits:
-        # -23% there, ~-5% on sampled tables.
-        compression_level=19,
-        use_dictionary=['dggs', 'res'],
-        column_encoding={'cid': 'DELTA_BYTE_ARRAY',
-                         VERTS_LEAF: 'BYTE_STREAM_SPLIT',
-                         'ar': 'BYTE_STREAM_SPLIT',
-                         'area': 'BYTE_STREAM_SPLIT'},
-    )
+    writer = open_writer(path, SCHEMA, _provenance())
     dnc = 0
     try:
         for lo in range(0, len(cells), BATCH):
