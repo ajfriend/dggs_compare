@@ -55,6 +55,10 @@ jobs:
   gen:
     needs: [systems]
     strategy:
+      # One broken system must not cancel the other nine: with fail-fast
+      # off, healthy jobs finish and `gh run rerun --failed` reuses their
+      # artifacts, so a fix only reruns the one red job.
+      fail-fast: false
       matrix:
         system: ${{ fromJSON(needs.systems.outputs.list) }}
     runs-on: ${{ inputs.runner }}

@@ -137,9 +137,9 @@ data release must be a full one, to seed the cache.
 
 ## Relationship to csar_py
 
-csar comes from the released tag pinned in `pyproject.toml`
-(`[tool.uv.sources]`). This repo is also **csar's pre-release regression
-gate**: point the pin at a candidate, `uv sync`, set `RESOLVE=True` in
+csar comes from PyPI (`csar>=0.1.1`). This repo is also **csar's
+pre-release regression gate**: point a `[tool.uv.sources]` entry at a
+csar_py branch or rev, `uv sync`, set `RESOLVE=True` in
 `scripts/dnc_check.py`, and run it — that re-solves ~5.7M real cells with the
 installed csar against invariants that have caught real solver differences.
 
