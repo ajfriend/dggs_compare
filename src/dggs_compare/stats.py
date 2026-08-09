@@ -62,6 +62,16 @@ def orient_ccw(ring):
     return ring if is_ccw(ring) else ring[::-1]
 
 
+def ar(latlng):
+    """Enclosing-cone aspect ratio of one open (lat, lng)-degree vertex
+    list at the CONFIG solver settings, or None if the solve did not
+    certify. The one AR entry point, so every published number (tables,
+    convergence residuals) shares the same solver provenance."""
+    r = csar.solve(csar.to_vec3(latlng, geo='latlng_deg'), geo='vec3',
+                   gap_tol=config.GAP_TOL, method=config.CSAR_METHOD)
+    return r.aspect_ratio if isinstance(r, csar.Converged) else None
+
+
 def cell_stats(latlng):
     """(ar, area_sr) for one open (lat, lng)-degree ring.
 

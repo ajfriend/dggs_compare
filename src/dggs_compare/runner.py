@@ -7,17 +7,13 @@ writes, per resolution:
     data/raw/{grid}-{impl}_r{res}.parquet     cid + verts (density 0),
                                               cid-sorted
 
-plus one small convergence artifact per implementation:
-
-    data/raw/{grid}-{impl}_convergence.parquet
-        (res, cid, verts, verts_dense) for K sampled cells at the gate
-        levels — density 0 next to density CONV_SAMPLES, so the metrics
-        stage can measure the sampling-density residual binding-free.
+plus one small convergence artifact per implementation: density-0 and
+dense vertex pairs for K sampled cells at the gate levels, so the metrics
+stage can measure the sampling-density residual binding-free.
 
 Selection regimes, seeds, and row order are identical to the classic
 cache.build_table path (same seeds -> same cells), so ports verify by
-column comparison. Every file's metadata records grid, impl, package
-versions, the seed policy, and the resolutions covered.
+column comparison.
 """
 
 import time
@@ -28,20 +24,38 @@ import numpy as np
 import pyarrow as pa
 
 from . import config, stats
-from .cache import BATCH, MAX_DRAW_FACTOR, VERTS_TYPE, open_writer
+from .cache import (BATCH, MAX_DRAW_FACTOR, VERTS_TYPE, open_writer)
 
 RAW_DIR = Path(__file__).resolve().parents[2] / 'data' / 'raw'
+RAW_COMPRESSION_LEVEL = 3   # written once, read once — don't pay zstd 19
 
 RAW_SCHEMA = pa.schema([('cid', pa.string()), ('verts', VERTS_TYPE)])
 CONV_SCHEMA = pa.schema([('res', pa.int32()), ('cid', pa.string()),
                          ('verts', VERTS_TYPE), ('verts_dense', VERTS_TYPE)])
 
-# Convergence sampling (mirrors the classic scripts/convergence.py knobs):
-# K cells per gate level, density 0 vs CONV_SAMPLES.
-CONV_SEED = 0xC0FFEE
-CONV_LEVELS = [0, 1, 2, 3, 5, 8, 11]
-CONV_K = 300
-CONV_SAMPLES = 40
+# The raw-metadata vocabulary: exactly these keys (plus version_*) are
+# written by _metadata and forwarded into the published tables by the
+# metrics stage. Anything else in a raw file's metadata stays behind.
+META_KEYS = ('grid', 'impl', 'seed', 'per_res_seed', 'n_cells',
+             'resolutions', 'conv_seed', 'conv_levels', 'conv_k',
+             'conv_samples')
+META_VERSION_PREFIX = 'version_'
+
+
+# ----- artifact naming: the one home -------------------------------------
+def key(grid, impl_name):
+    """The artifact key '{grid}-{impl}'. Invertible only if neither half
+    contains '-', so that is enforced here."""
+    assert '-' not in grid and '-' not in impl_name, (grid, impl_name)
+    return f'{grid}-{impl_name}'
+
+
+def raw_path(key_, res):
+    return RAW_DIR / f'{key_}_r{res}.parquet'
+
+
+def conv_path(key_):
+    return RAW_DIR / f'{key_}_convergence.parquet'
 
 
 def _metadata(impl):
@@ -53,25 +67,25 @@ def _metadata(impl):
         'per_res_seed': str(config.PER_RES_SEED),
         'n_cells': str(config.N_CELLS),
         'resolutions': ','.join(str(r) for r in impl.resolutions()),
+        'conv_seed': hex(config.CONV_SEED),
+        'conv_levels': ','.join(str(r) for r in config.CONV_LEVELS),
+        'conv_k': str(config.CONV_K),
+        'conv_samples': str(config.CONV_SAMPLES),
     }
-    for pkg in ('dggs_compare', *getattr(impl, 'packages', ())):
+    for pkg in ('dggs_compare', *impl.packages):
         try:
-            meta[f'version_{pkg}'] = _pkg_version(pkg)
+            meta[f'{META_VERSION_PREFIX}{pkg}'] = _pkg_version(pkg)
         except Exception:
             pass
     return {k.encode(): v.encode() for k, v in meta.items()}
 
 
-def _select_cells(impl, res):
-    """The resolution's cell set: exactly N_CELLS cells (or every cell where
-    fewer exist / config.FULL_RES demands complete coverage). Three regimes —
-    see the config.N_CELLS comment. Returns (cells, mode)."""
-    n = config.N_CELLS
+def _sample_distinct(impl, res, n, rng, *, batch, log_skips):
+    """`n` distinct cells via the three selection regimes (see the
+    config.N_CELLS comment): enumerate-all, enumerate+subsample, or
+    draw-until-n in `batch`-point draws. Returns (cells, mode)."""
     total = impl.num_cells(res)
-    rng = np.random.default_rng(
-        [config.SEED, res] if config.PER_RES_SEED else config.SEED)
-
-    if total <= n or res in config.FULL_RES.get(impl.grid, ()):
+    if total <= n:
         return list(impl.enumerate_cells(res)), 'all'
 
     if total <= config.SUBSAMPLE_MAX_RATIO * n:
@@ -86,15 +100,18 @@ def _select_cells(impl, res):
             raise RuntimeError(
                 f'{impl.grid}-{impl.impl} r{res}: {drawn:,} draws yielded '
                 f'only {len(cells):,}/{n:,} distinct cells')
-        k = min(100_000, MAX_DRAW_FACTOR * n - drawn)
+        k = min(batch, MAX_DRAW_FACTOR * n - drawn)
         pts = stats.sample_uniform_latlng(k, rng).tolist()
         hits = impl.cells_at(res, pts)
         for (lat, lng), c in zip(pts, hits):
             if c is None:
                 # The engine couldn't resolve the point (rare deep-level
-                # singular points) — draw again, and log the specimen.
-                print(f'    unresolved point skip: ({lat:.6f}, {lng:.6f}) '
-                      f'[{impl.grid}-{impl.impl} r{res}]', flush=True)
+                # singular points) — draw again; each logged specimen is a
+                # concrete example for an upstream report.
+                if log_skips:
+                    print(f'    unresolved point skip: ({lat:.6f}, '
+                          f'{lng:.6f}) [{impl.grid}-{impl.impl} r{res}]',
+                          flush=True)
                 continue
             if c not in seen:
                 seen.add(c)
@@ -105,94 +122,73 @@ def _select_cells(impl, res):
     return cells, 'sample'
 
 
-def _verts_arrays(vlists):
-    return [[[float(la), float(ln)] for la, ln in v] for v in vlists]
+def _select_cells(impl, res):
+    """The resolution's cell set: exactly N_CELLS cells (or every cell
+    where fewer exist / config.FULL_RES demands complete coverage)."""
+    if res in config.FULL_RES.get(impl.grid, ()):
+        return list(impl.enumerate_cells(res)), 'all'
+    rng = np.random.default_rng(
+        [config.SEED, res] if config.PER_RES_SEED else config.SEED)
+    return _sample_distinct(impl, res, config.N_CELLS, rng,
+                            batch=100_000, log_skips=True)
 
 
 def _write_res(impl, res, meta):
-    """One resolution's raw table. Returns the cell count."""
+    """One resolution's raw table."""
     t0 = time.perf_counter()
     cells, mode = _select_cells(impl, res)
     cells = sorted(zip(impl.cid_strs(cells), cells), key=lambda cc: cc[0])
-    key = f'{impl.grid}-{impl.impl}'
-    path = RAW_DIR / f'{key}_r{res}.parquet'
-    writer = open_writer(path, RAW_SCHEMA, meta)
+    path = raw_path(key(impl.grid, impl.impl), res)
+    writer = open_writer(path, RAW_SCHEMA, meta,
+                         compression_level=RAW_COMPRESSION_LEVEL)
     try:
         for lo in range(0, len(cells), BATCH):
             chunk = cells[lo:lo + BATCH]
             cids, clist = zip(*chunk)
-            verts = _verts_arrays(impl.boundaries(res, clist))
             writer.write_table(pa.table(
                 {'cid': pa.array(cids, pa.string()),
-                 'verts': pa.array(verts, VERTS_TYPE)}, schema=RAW_SCHEMA))
+                 'verts': pa.array(impl.boundaries(res, clist), VERTS_TYPE)},
+                schema=RAW_SCHEMA))
     finally:
         writer.close()
     kb = path.stat().st_size / 1024
-    print(f'[{key} r{res:<2}] {mode:>6} {len(cells):>8} cells '
-          f'-> {path.name} ({kb:.0f} KiB) '
-          f'[{time.perf_counter() - t0:.0f}s]', flush=True)
-    return len(cells)
+    print(f'[{path.stem} ] {mode:>6} {len(cells):>8} cells '
+          f'({kb:.0f} KiB) [{time.perf_counter() - t0:.0f}s]', flush=True)
 
 
 def _write_convergence(impl, meta):
-    """Density-0 + dense vertex pairs for the gate levels, so the metrics
-    stage can measure the sampling-density residual without the binding."""
-    rng = np.random.default_rng(CONV_SEED)
-    key = f'{impl.grid}-{impl.impl}'
-    path = RAW_DIR / f'{key}_convergence.parquet'
-    writer = open_writer(path, CONV_SCHEMA, meta)
+    """Density-0 + dense vertex pairs for the gate levels."""
+    rng = np.random.default_rng(config.CONV_SEED)
+    path = conv_path(key(impl.grid, impl.impl))
+    writer = open_writer(path, CONV_SCHEMA, meta,
+                         compression_level=RAW_COMPRESSION_LEVEL)
     try:
-        for level in CONV_LEVELS:
+        for level in config.CONV_LEVELS:
             if level not in impl.resolutions():
                 continue
-            cells = _conv_cells(impl, level, rng)
-            cids = impl.cid_strs(cells)
-            base = _verts_arrays(impl.boundaries(level, cells))
-            dense = _verts_arrays(
-                impl.boundaries(level, cells, CONV_SAMPLES))
+            cells, _ = _sample_distinct(impl, level, config.CONV_K, rng,
+                                        batch=config.CONV_K * 4,
+                                        log_skips=False)
             writer.write_table(pa.table(
                 {'res': pa.array([level] * len(cells), pa.int32()),
-                 'cid': pa.array(cids, pa.string()),
-                 'verts': pa.array(base, VERTS_TYPE),
-                 'verts_dense': pa.array(dense, VERTS_TYPE)},
+                 'cid': pa.array(impl.cid_strs(cells), pa.string()),
+                 'verts': pa.array(impl.boundaries(level, cells),
+                                   VERTS_TYPE),
+                 'verts_dense': pa.array(
+                     impl.boundaries(level, cells, config.CONV_SAMPLES),
+                     VERTS_TYPE)},
                 schema=CONV_SCHEMA))
     finally:
         writer.close()
-    print(f'[{key}] convergence pairs -> {path.name}', flush=True)
+    print(f'[{path.stem}] convergence pairs written', flush=True)
 
 
-def _conv_cells(impl, level, rng):
-    total = impl.num_cells(level)
-    if total <= CONV_K:
-        return list(impl.enumerate_cells(level))
-    if total <= 4 * CONV_K:
-        cells = list(impl.enumerate_cells(level))
-        idx = rng.choice(len(cells), CONV_K, replace=False)
-        return [cells[i] for i in idx]
-    seen, out = set(), []
-    drawn = 0
-    while len(out) < CONV_K:
-        if drawn >= 60 * CONV_K:
-            raise RuntimeError(
-                f'{drawn:,} draws yielded only {len(out)}/{CONV_K} cells')
-        pts = stats.sample_uniform_latlng(CONV_K * 4, rng).tolist()
-        drawn += len(pts)
-        for c in impl.cells_at(level, pts):
-            if c is not None and c not in seen:
-                seen.add(c)
-                out.append(c)
-                if len(out) >= CONV_K:
-                    break
-    return out
-
-
-def generate(impl, only=None):
-    """Write the raw geometry artifacts for `impl` (all resolutions, or
-    the subset in `only`)."""
+def generate(impl):
+    """Write the raw geometry artifacts for `impl` (all resolutions)."""
     t0 = time.perf_counter()
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     meta = _metadata(impl)
-    res_list = [r for r in impl.resolutions() if only is None or r in only]
+    res_list = list(impl.resolutions())
     # Live ETA weighted by CELL counts (coarse resolutions are nearly free;
     # every deep one is a full N_CELLS build).
     full = config.FULL_RES.get(impl.grid, ())
@@ -210,5 +206,5 @@ def generate(impl, only=None):
                   f'({done_cells:,}/{total_cells:,} cells) in {done:.0f}s '
                   f'(~{eta:.0f}s to go)', flush=True)
     _write_convergence(impl, meta)
-    print(f'[{impl.grid}-{impl.impl}] {len(res_list)} resolutions in '
+    print(f'[{key(impl.grid, impl.impl)}] {len(res_list)} resolutions in '
           f'{time.perf_counter() - t0:.0f}s', flush=True)

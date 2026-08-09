@@ -18,7 +18,7 @@ Cell handles are plain hashables whose meaning may be scoped to a
 resolution (DGGRID seqnums), so every geometry call carries `res`.
 """
 
-from typing import Iterable, Iterator, Optional, Protocol, Sequence
+from typing import Iterator, Protocol, Sequence
 
 
 class GridImpl(Protocol):

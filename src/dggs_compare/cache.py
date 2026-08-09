@@ -101,20 +101,22 @@ _ENCODINGS = {'cid': 'DELTA_BYTE_ARRAY',
               'area': 'BYTE_STREAM_SPLIT'}
 
 
-def open_writer(path, schema, metadata):
+def open_writer(path, schema, metadata, compression_level=19):
     """A ParquetWriter with the house encodings for `schema`.
 
-    zstd level 19 is ~free to read (decode speed is level-independent;
-    measured 0.04s vs 0.05s on the 1.18M-row table) and pays only at write
-    time (0.4s -> 9s there). It matters most on full-enumeration tables,
-    where cid-sorted neighbors have near-identical vertex bytes that
-    long-range matching exploits: -23% there, ~-5% on sampled tables.
+    zstd level 19 (the default, for PUBLISHED tables) is ~free to read
+    (decode speed is level-independent; measured 0.04s vs 0.05s on the
+    1.18M-row table) and pays only at write time (0.4s -> 9s there). It
+    matters most on full-enumeration tables, where cid-sorted neighbors
+    have near-identical vertex bytes that long-range matching exploits:
+    -23% there, ~-5% on sampled tables. Intermediates that are written
+    once and read once (data/raw/) should pass a low level instead.
     """
     names = set(schema.names)
     return pq.ParquetWriter(
         path, schema.with_metadata(metadata),
         compression='zstd',
-        compression_level=19,
+        compression_level=compression_level,
         use_dictionary=[c for c in ('dggs', 'res') if c in names],
         column_encoding={k: v for k, v in _ENCODINGS.items()
                          if k.split('.')[0] in names},

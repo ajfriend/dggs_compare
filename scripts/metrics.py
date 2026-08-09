@@ -1,8 +1,5 @@
-"""Build the published tables from the raw geometry in data/raw/.
-
-The binding-free half of the pipeline: reads what the implementation
-scripts wrote, computes ar/area with the shared solvers, stamps each
-implementation's convergence residuals into the metadata.
+"""Build the published tables from the raw geometry in data/raw/ —
+see dggs_compare.metrics.
 
 Run with:  uv run scripts/metrics.py
 No CLI args (project convention).
