@@ -7,13 +7,21 @@
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
 # solver bump worth reflecting) — decoupled from code releases.
 #
-# Two stages (issue #37): one runner per IMPLEMENTATION generates that
-# system's raw geometry in the script's own PEP 723 env — the matrix is the
-# scripts/systems/ listing, so it can never go stale — then ONE metrics
-# runner solves everything (a single csar/sparea build => one solver
-# provenance for every published number), applies the convergence admission
-# gate and the DNC/coverage release gates, derives the viewer data, and
-# uploads.
+# One build job per IMPLEMENTATION — the matrix is the scripts/systems/
+# listing, so it can never go stale — running the two pipeline stages
+# back to back in two SEPARATE envs on the same runner:
+#
+#   stage 1  `just gen <key>`: raw cell geometry, in the script's own
+#            PEP 723 env (binding + library, nothing else)
+#   stage 2  `just metrics`: solve + convergence admission gate, in the
+#            project env (solvers, no bindings) — reads only the raw
+#            parquet stage 1 wrote
+#
+# Same-runner keeps the fan-out fully parallel (no barrier, no 16GB raw
+# round-trip) without weakening provenance: csar/sparea install as fixed
+# PyPI wheels, so every runner executes identical solver binaries. The
+# publish job merges the finals, applies the release gates, derives the
+# viewer data, and uploads.
 name: data-release
 
 on:
@@ -42,7 +50,7 @@ permissions:
 
 jobs:
   systems:
-    # The gen matrix IS the registry: one line of shell over the
+    # The build matrix IS the registry: one line of shell over the
     # scripts/systems/ listing ({grid}-{impl}.py per implementation).
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 5
@@ -54,7 +62,7 @@ jobs:
         run: |
           echo "list=$(basename -a -s .py scripts/systems/*.py | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
 
-  gen:
+  build:
     needs: [systems]
     strategy:
       # One broken implementation must not cancel the other nine: with
@@ -64,16 +72,15 @@ jobs:
       matrix:
         key: ${{ fromJSON(needs.systems.outputs.list) }}
     runs-on: ${{ inputs.runner }}
-    # Geometry only (no solving): the aperture-3 grids are the longest at
-    # ~34 resolutions of point-sampling each.
+    # The aperture-3 grids are the longest chains (~34 resolutions
+    # generated, then solved), ~1h each.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v6
-      # Caching is safe now: every dependency ships linux wheels (csar
-      # from PyPI since 0.1.1 — nothing builds from source in CI). One
-      # cache per implementation — the matrix jobs otherwise share a key
-      # and race to save it (nine "Failed to save" warnings per run), and
-      # a shared cache would hold only the winner's binding wheels anyway.
+      # Caching is safe (every dependency ships linux wheels — nothing
+      # builds from source in CI) and keyed per implementation: matrix
+      # jobs sharing one key would race to save it, and the winner's
+      # cache would hold only its own binding wheels.
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           cache-suffix: ${{ matrix.key }}
@@ -85,42 +92,48 @@ jobs:
           if grep -q dggrid_engine "scripts/systems/${{ matrix.key }}.py"; then
             just install-dggrid
           fi
-      # The script resolves its own env from its PEP 723 header (no
-      # project sync); `just gen` is the same entry point used locally.
-      - run: just gen ${{ matrix.key }}
+      # Stage 1: the script resolves its own env from its PEP 723 header
+      # (no project sync).
+      - name: generate raw cell geometry
+        run: just gen ${{ matrix.key }}
+      # The stage boundary, kept for the record (and for debugging a red
+      # metrics stage without regenerating).
       - uses: actions/upload-artifact@v6
         with:
           name: raw-${{ matrix.key }}
           path: data/raw/
           if-no-files-found: error
+      # Stage 2: the project env (solvers, no bindings) reads the raw
+      # parquet and writes the final tables, applying the convergence
+      # admission gate.
+      - name: metrics — solve + convergence admission gate
+        run: |
+          just sync
+          just metrics
+      - uses: actions/upload-artifact@v6
+        with:
+          name: tables-${{ matrix.key }}
+          path: data/cells/
+          if-no-files-found: error
 
-  metrics:
-    needs: [gen]
+  publish:
+    needs: [build]
     runs-on: ${{ inputs.runner }}
-    # Solving all ~250 resolutions serially in one env — the price of one
-    # solver provenance; ~3h.
-    timeout-minutes: 300
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
-      # raw (~16GB) + finals (~13GB) coexist on this runner; the stock
-      # image doesn't leave that much free, so drop the preinstalled
-      # toolchains we never touch (~25GB back).
-      - name: free disk space
-        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: astral-sh/setup-uv@v8.1.0
         with:
-          # Distinct from the gen caches: this env is the project (solvers),
-          # not a binding.
-          cache-suffix: metrics
+          # Distinct from the per-implementation build caches: this env
+          # is the project only.
+          cache-suffix: publish
       - uses: extractions/setup-just@v4
       - run: just sync
       - uses: actions/download-artifact@v6
         with:
-          pattern: raw-*
-          path: data/raw/
+          pattern: tables-*
+          path: data/cells/
           merge-multiple: true
-      - name: metrics — solve + convergence admission gate
-        run: just metrics
       - name: gate — coverage + DNC invariants must hold before anything ships
         run: just dnc-check
       - name: derive the web viewer data
