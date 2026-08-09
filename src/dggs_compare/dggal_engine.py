@@ -23,7 +23,6 @@ import importlib.util
 import os
 
 import numpy as np
-import csar
 
 from .stats import orient_ccw
 
@@ -151,6 +150,7 @@ class Adapter:
 
     def verts(self, zone):
         """Corner vertices as an (M, 3) unit-vec3 array (corners only)."""
+        import csar
         return csar.to_vec3(self.cell_boundary(zone), geo='latlng_deg')
 
     # ----- ids / counts -------------------------------------------------
@@ -208,3 +208,34 @@ class Adapter:
                 continue
             seen.add(zone)
             yield self.cid_str(zone), self.verts(zone)
+
+
+class GridImplAdapter:
+    """The GridImpl-shaped view of an Adapter, for the five DGGAL scripts
+    in scripts/systems/ — the contract methods forward to one Adapter, so
+    a contract change is one edit here instead of five."""
+
+    impl = 'dggal'
+    packages = ('dggal',)
+
+    def __init__(self, grid, dggal_cls):
+        self.grid = grid
+        self._a = Adapter(dggal_cls)
+
+    def resolutions(self):
+        return range(self._a.max_level() + 1)
+
+    def num_cells(self, res):
+        return self._a.count(res)
+
+    def cells_at(self, res, points):
+        return self._a.cells_at(res, points)
+
+    def cid_strs(self, cells):
+        return self._a.cid_strs(cells)
+
+    def boundaries(self, res, cells, samples_per_edge=0):
+        return self._a.boundaries(cells, samples_per_edge)
+
+    def enumerate_cells(self, res):
+        yield from self._a.enumerate(res)

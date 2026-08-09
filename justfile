@@ -1,35 +1,47 @@
 _:
     just --list
 
-# ONE env for everything — no per-script envs, no re-exec tricks. One
-# wrinkle: dggal 0.0.6's macOS arm64 wheel is still half-broken (the
-# Python extension is arm64 but the bundled libecrt/libdggal dylibs are
-# x86_64), so on Apple Silicon the whole env runs x86_64 under Rosetta;
-# Linux wheels are correct — CI generates the canonical data natively on
-# ubuntu. Everything is 3.13 again: hex9 2.3.1's wheels are genuinely
-# abi3 (the cpython-312-only extension that forced linux down to 3.12
-# is fixed, and pyproject now floors hex9 there), and a5_fast's mac
-# wheels are cp313.
+# The project env holds the library, solvers, and plotting; each implementation
+# script in scripts/systems/ resolves its OWN env from its PEP 723 header
+# (binding + library, never co-resolved with anything else). Platform
+# wrinkle: dggal 0.0.6's macOS arm64 wheel bundles x86_64 dylibs, so on
+# Apple Silicon everything runs x86_64 under Rosetta; Linux is native (CI
+# generates the canonical data there).
 python := if os() == "macos" { "cpython-3.13-macos-x86_64-none" } else { "3.13" }
 
-# Exported so EVERY `uv run` in these recipes uses the platform pin: a bare
-# `uv run` otherwise consults .python-version, which knows the version but
-# not the macOS ARCH — on Apple Silicon it would silently RECREATE the venv
-# on native arm64 (dggal's broken dylibs). The same slip on linux is how
-# the first data-v6 runs reinstalled a broken hex9 wheel after `just sync`
-# had built a good env. Env var beats the file.
+# Exported so EVERY `uv run` in these recipes (including the per-script
+# envs) uses the platform pin: a bare `uv run` otherwise consults
+# .python-version, which knows the version but not the macOS ARCH — on
+# Apple Silicon it would silently pick native arm64 (dggal's broken
+# dylibs). Env var beats the file.
 export UV_PYTHON := python
 
 sync:
     uv sync --python {{python}}
 
-# Build the (system, resolution) Parquet tables: geometry + per-cell stats
-# (csar AR, sparea area) in one pass. Systems come from the library registry
-# (src/dggs_compare/systems/ — one file per DGGS). Output -> data/cells/
-# (gitignored; published as GitHub data releases). Pass a system name to
-# build just that one (how CI parallelizes: one runner per system).
-gen system="all":
-    DGGS_COMPARE_GEN={{system}} uv run scripts/gen.py
+# Stage 1: raw cell geometry -> data/raw/ (gitignored). One PEP 723 script
+# per (grid, implementation) in scripts/systems/, each in its own env; the
+# folder listing is the registry and the CI matrix. Pass a key to run one
+# (e.g. `just gen isea3h-dggal`).
+gen key="all":
+    #!/usr/bin/env sh
+    if [ "{{key}}" != "all" ]; then
+        exec uv run "scripts/systems/{{key}}.py"
+    fi
+    # Run every implementation even if one fails (mirrors CI's
+    # fail-fast: false): one run yields the full failure set AND all the
+    # healthy raw artifacts, which `just metrics` can then use per-key.
+    fail=0
+    for f in scripts/systems/*.py; do
+        uv run "$f" || { echo "FAILED: $f"; fail=1; }
+    done
+    exit $fail
+
+# Stage 2: raw geometry -> the published tables in data/cells/ (per-cell
+# csar AR + sparea area, one solver provenance for every system), applying
+# the convergence admission gate.
+metrics:
+    uv run scripts/metrics.py
 
 # Aspect-ratio survey: reads the ar column (no solving) -> out/histograms.png,
 # extremes.png, by_res_<system>.png.
@@ -47,8 +59,8 @@ calibrate:
 dnc-check:
     uv run scripts/dnc_check.py
 
-# Verify metrics are converged in edge-sampling density for EVERY registry
-# system — the check that admits a new grid to the pipeline.
+# Report the convergence residuals stamped into the published tables (the
+# gate itself runs in `just metrics`). A pure metadata read.
 convergence:
     uv run scripts/convergence.py
 
@@ -108,7 +120,7 @@ data-publish tag:
 
 # Download a data release's tables into data/cells/ — the instant alternative
 # to `just gen`. (10s of GB at the 1M-cell budget; grab single tables with
-# `gh release download <tag> -p '<sys>_r<res>.parquet'` instead if that's
+# `gh release download <tag> -p '<grid>-<impl>_r<res>.parquet'` instead if that's
 # all you need.)
 fetch-data tag:
     mkdir -p data/cells

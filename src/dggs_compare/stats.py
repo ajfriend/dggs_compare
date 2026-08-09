@@ -1,8 +1,8 @@
 """Per-cell statistics: aspect ratio (csar) + spherical area (sparea).
 
-Computed once, at generation time, and stored as columns in the tables —
+Computed by the metrics stage and stored as columns in the tables —
 downstream consumers read them; they never re-solve. Solver settings come
-from `config` and are recorded in each table's metadata (see `cache.py`).
+from `config` and are recorded in each table's metadata.
 """
 
 import numpy as np

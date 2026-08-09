@@ -5,32 +5,23 @@ build-backend = "hatchling.build"
 [project]
 name = "dggs_compare"
 version = "0.1.0"
-description = "Comparing DGGS grids (H3, S2, A5, ISEA7H, IVEA7H, rHEALPix) by per-cell shape and area stats, via csar + sparea."
+description = "Comparing DGGS grids by per-cell shape and area stats, via csar + sparea."
 readme = "readme.md"
 # a5_fast has no cp314 wheels yet (Rust sdist otherwise), so dev/CI pin 3.13.
 requires-python = ">=3.11,<3.14"
-# The internal library + everything the pipeline touches, ONE env. dggal
-# 0.0.6's macOS arm64 wheel still bundles x86_64 dylibs, so on Apple Silicon
-# that env runs x86_64 under Rosetta (`just sync`); Linux is native. The
-# registry imports system modules on first use, so `import dggs_compare` and
-# the table-reading consumers never load a DGGS binding.
+# The library + the solvers and plotting the pipeline scripts use. No DGGS
+# bindings here: those live in each implementation script's PEP 723 header
+# (scripts/systems/), resolved into per-script envs that never co-resolve
+# with each other. csar from PyPI since 0.1.1 (no macOS x86_64 wheels, so
+# the Rosetta env builds the sdist — zig/meson arrive via build isolation);
+# for the csar pre-release regression gate, point a [tool.uv.sources] entry
+# at a csar_py branch/rev.
 dependencies = [
     "numpy>=1.24",
     "pyarrow>=15",
     "matplotlib>=3",
-    # From PyPI since 0.1.1 (no macOS x86_64 wheels, so the Rosetta env
-    # builds the sdist — zig/meson arrive via build isolation). For the
-    # pre-release regression gate, point a [tool.uv.sources] entry at a
-    # csar_py branch/rev.
     "csar>=0.1.1",
     "sparea>=0.4",
-    "h3>=4",
-    "s2sphere",
-    "a5_fast",
-    "dggal>=0.0.6",
-    # 2.3.1+ only: earlier releases tagged their wheels abi3 while shipping a
-    # cpython-312-only extension, which 3.13 cannot import (failed data-v6).
-    "hex9>=2.3.1",
 ]
 
 [dependency-groups]
