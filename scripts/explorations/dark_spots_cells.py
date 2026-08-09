@@ -31,7 +31,7 @@ RES = 10
 HALF = 0.007                      # bbox half-size (deg) around the spike
 R_KM = 6371.0088
 OUT = Path(__file__).resolve().parent / 'out' / 'dark_spots_cells.png'
-ad = dc.Adapter('ISEA7H', grid='isea7h')
+ad = dc.Adapter('ISEA7H')
 
 
 def ortho(vecs, e1, e2):

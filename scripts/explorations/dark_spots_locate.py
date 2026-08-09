@@ -20,7 +20,7 @@ import csar
 from _common import dc, verts
 
 RES = 10
-ad = dc.Adapter('ISEA7H', grid='isea7h')
+ad = dc.Adapter('ISEA7H')
 
 
 def ar_at(lng, lat):

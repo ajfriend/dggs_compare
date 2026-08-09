@@ -1,8 +1,10 @@
-"""Per-cell statistics: aspect ratio (csar) + spherical area (sparea).
+"""Per-cell statistics (csar AR, sparea area) + shared sphere helpers.
 
-Computed by the metrics stage and stored as columns in the tables —
-downstream consumers read them; they never re-solve. Solver settings come
-from `config` and are recorded in each table's metadata.
+The statistics are computed by the metrics stage and stored as columns in
+the tables — downstream consumers read them; they never re-solve. Solver
+settings come from `config` and are recorded in each table's metadata.
+The helpers (winding, edge refinement, uniform sampling, the authalic
+map) serve the generation scripts.
 """
 
 import numpy as np
@@ -26,6 +28,9 @@ def _q(sinlat):
                         / (2 * _E))
 
 
+_Q_POLE = _q(1.0)
+
+
 def authalic_lat(lat_deg):
     """Authalic latitude (degrees) for WGS84 geodetic latitude (degrees);
     scalar or array. Longitude is unchanged by the transform.
@@ -38,7 +43,7 @@ def authalic_lat(lat_deg):
     which keeps both poles exact."""
     lat = np.asarray(lat_deg, dtype=float)
     s = np.sin(np.radians(np.abs(lat)))
-    xi = np.degrees(np.arcsin(np.clip(_q(s) / _q(1.0), -1.0, 1.0)))
+    xi = np.degrees(np.arcsin(np.clip(_q(s) / _Q_POLE, -1.0, 1.0)))
     return np.copysign(xi, lat)
 
 

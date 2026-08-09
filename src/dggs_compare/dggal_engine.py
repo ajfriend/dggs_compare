@@ -91,20 +91,22 @@ class Adapter:
     hand to `runner.generate` and the live-engine object the exploration
     scripts drive.
 
-    `cls` is the DGGRS class name (e.g. 'ISEA7H'); `grid` is the artifact
-    key's grid half. DGGAL's coordinates are WGS84 geodetic, so the
-    registry scripts pass `to_sphere` (a rings->rings function, e.g.
+    `cls` is the DGGRS class name (e.g. 'ISEA7H'); the artifact key's
+    grid half is its lowercase (override with `grid` if they ever
+    diverge). DGGAL's coordinates are WGS84 geodetic, so the registry
+    scripts pass `to_sphere` (a rings->rings function, e.g.
     `stats.authalic_rings`) — its presence in the script call is the
-    record of how the system gets to the sphere. Explorations that want
-    raw geodetic output omit it.
+    record of how the system gets to the sphere. The contract methods
+    below return that frame; the per-cell singles after them return the
+    binding's raw geodetic frame (the exploration surface).
     """
 
     impl = 'dggal'
     packages = ('dggal',)
 
-    def __init__(self, cls, grid, to_sphere=None):
+    def __init__(self, cls, to_sphere=None, grid=None):
         self.name = cls
-        self.grid = grid
+        self.grid = cls.lower() if grid is None else grid
         self._to_sphere = to_sphere
         self.dggrs = globals()[cls]()
         # One reused query point: a GeoPoint constructed per zone_at call
@@ -183,5 +185,3 @@ class Adapter:
         p.lat, p.lon = float(lat), float(lng)
         zone = self.dggrs.getZoneFromWGS84Centroid(level, p)
         return None if zone == NULL_ZONE else zone
-
-

@@ -11,8 +11,13 @@
 """hex9 — octahedral aperture-9 equal-area hexagonal DGGS (via the hex9
 wheel).
 
-hex9 addresses the WGS84 authalic sphere (geodetic->authalic conversion
-and an equal-area warp are built into the binding; both are always on).
+hex9 computes internally on its own authalic sphere, but the `cell()`
+I/O skin used here speaks WGS84 geodetic degrees — confirmed by the
+~0.4% area-CV datum fingerprint those coordinates show when read as
+spherical. This script maps that skin to the sphere with
+`stats.authalic_rings` (the binding also offers sphere-frame output via
+`sphere=True`; we transform the geodetic skin ourselves so the map into
+the measured frame is this repo's own, auditable one).
 Cells are hexagons at every layer — the 12 topological pentagons (two per
 octahedral vertex) are represented as 6-vertex lists with a reflected
 half-hex across the seam, so no pentagon special-casing is needed here.
@@ -77,15 +82,12 @@ class Hex9:
         # lists clockwise seen from outside; sparea needs CCW (a CW list
         # reads as the 4pi-complement polygon): the row slice drops the
         # closing vertex and reverses, the column flip swaps (lng, lat) ->
-        # (lat, lng), all before the one C-speed tolist().
+        # (lat, lng); authalic_rings consumes the ndarrays directly.
         d = 0
         while 3 ** d - 1 < samples_per_edge:
             d += 1
-        # hex9 addresses WGS84 geodetic coordinates; the authalic map is
-        # how this system gets to the sphere.
         return stats.authalic_rings(
-            [hex9.cell(self._u(c), c[0], d)[-2::-1, ::-1].tolist()
-             for c in cells])
+            [hex9.cell(self._u(c), c[0], d)[-2::-1, ::-1] for c in cells])
 
     def enumerate_cells(self, res):
         # The 12 layer-0 base cells, then each one's canonical 9^res-cell

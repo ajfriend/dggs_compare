@@ -24,5 +24,4 @@ from dggs_compare.dggal_engine import Adapter
 from dggs_compare import runner, stats
 
 if __name__ == '__main__':
-    runner.generate(
-        Adapter('ISEA3H', grid='isea3h', to_sphere=stats.authalic_rings))
+    runner.generate(Adapter('ISEA3H', to_sphere=stats.authalic_rings))

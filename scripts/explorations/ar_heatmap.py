@@ -67,7 +67,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 gfields = {}
 for cls, _ in GRIDS:
     print(f'global {cls} ...', flush=True)
-    gfields[cls] = global_field(dc.Adapter(cls, grid=cls.lower()))
+    gfields[cls] = global_field(dc.Adapter(cls))
 vmax = max(np.nanmax(f) for f in gfields.values())
 fig, axes = plt.subplots(len(GRIDS), 1, figsize=(11, 9))
 for ax, (cls, _) in zip(axes, GRIDS):
@@ -86,7 +86,7 @@ print('wrote', OUT / 'ar_heatmap_global.png')
 ffields = {}
 for cls, (lat0, lng0) in GRIDS:
     print(f'face {cls} ...', flush=True)
-    ffields[cls] = face_field(dc.Adapter(cls, grid=cls.lower()), lat0, lng0)
+    ffields[cls] = face_field(dc.Adapter(cls), lat0, lng0)
 fig, axes = plt.subplots(1, len(GRIDS), figsize=(12, 5.5))
 for ax, (cls, _) in zip(axes, GRIDS):
     f = ffields[cls]

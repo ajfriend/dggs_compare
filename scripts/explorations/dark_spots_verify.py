@@ -18,7 +18,7 @@ from _common import (SPIKE_LATLON, aspect_ratio, dc, gnomonic_xy, mvee_ratio,
                      tangent_basis_vec, verts)
 
 RES = 10
-ad = dc.Adapter('ISEA7H', grid='isea7h')
+ad = dc.Adapter('ISEA7H')
 
 
 def tangent_xy(z):

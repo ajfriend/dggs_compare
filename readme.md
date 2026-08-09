@@ -113,7 +113,7 @@ Every cell is a **spherical polygon**: `verts` are sphere coordinates and
 edges are great circles, and all metrics are measured on that object.
 Bringing cells to the sphere is each implementation script's job —
 systems declared on an ellipsoid map their vertices through the
-area-preserving authalic latitude (`stats.authalic_lat`), so a system
+area-preserving authalic latitude (`stats.authalic_rings`), so a system
 that is exactly equal-area on its declared surface measures exactly
 equal-area here (the methodology issue: #42).
 
