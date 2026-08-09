@@ -3,7 +3,7 @@
 Combines GitHub's per-step durations (env setup, dggrid install, artifact
 upload) with the in-process phase lines the pipeline prints — the
 runner's `select/cids/bounds = N us/cell` generation lines and metrics'
-`measure = N us/cell` lines — into one per-system table plus fleet totals.
+`measure = N us/cell` lines (both the 'solve' and 'measure' spellings of past runs parse) — into one per-system table plus fleet totals.
 
 Run with:  just timing-report <run-id>      (ids: gh run list)
 Runs predating the instrumented log lines report step-level columns only.
@@ -29,7 +29,7 @@ GEN_PAT = re.compile(
 CONV_PAT = re.compile(r'convergence pairs written \[(?P<s>[\d.]+)s\]')
 MET_PAT = re.compile(
     r'\[\S+ r\d+\s*\]\s+(?P<n>\d+) cells \(DNC \d+\) -> \S+ '
-    r'\(\d+ KiB\) \[(?P<wall>[\d.]+)s: measure (?P<slv>[\d.]+) =')
+    r'\(\d+ KiB\) \[(?P<wall>[\d.]+)s: (?:solve|measure) (?P<slv>[\d.]+) =')
 
 # Workflow step name -> report column (anything else lands in "other").
 STEP_COL = {'generate raw cell geometry': 'gen',

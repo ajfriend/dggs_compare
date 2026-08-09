@@ -102,7 +102,7 @@ PER_SYSTEM = {'TARGET_RES': TARGET_RES, 'SYS_COLOR': SYS_COLOR,
 # finer/heavier globes, lower for coarser/lighter ones.
 GLOBE_H3_RES = 3
 
-# ----- measurement settings (recorded in the tables' metadata) ------------
+# ----- csar settings (recorded in the tables' metadata) -------------------
 GAP_TOL = 1e-6            # csar duality-gap certification threshold
 CSAR_METHOD = 'auto'      # solver path ('auto' = csar's recommended method)
 

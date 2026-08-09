@@ -95,9 +95,9 @@ matrix is derived from it. A new implementation touches:
    needed), `SYS_COLOR`, `PRIMARY_IMPL`.
 
 `just metrics` then applies the convergence admission gate (density-0
-vertex lists must be a faithful representation of the cells), and `just dnc-check` fails
-its publish gate unless every registry implementation has tables and every
-grid has `PER_SYSTEM` config.
+vertex lists must be faithful inputs to the AR measurement), and
+`just dnc-check` fails its publish gate unless every registry
+implementation has tables and every grid has `PER_SYSTEM` config.
 
 ## Table schema
 
@@ -121,7 +121,7 @@ area-preserving authalic latitude (`stats.authalic_rings`), so a system
 that is exactly equal-area on its declared surface measures exactly
 equal-area here (the methodology issue: #42).
 
-Provenance (seed policy, budgets, measurement settings, library versions) rides in
+Provenance (seed policy, budgets, csar settings, library versions) rides in
 each file's Parquet metadata. Coarse resolutions are enumerated in full;
 finer ones hold exactly 1,000,000 sampled cells (enumerate-and-subsample
 near the cap, draw-until-n beyond it — see `config.N_CELLS`).

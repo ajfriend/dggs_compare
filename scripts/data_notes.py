@@ -23,7 +23,7 @@ the web viewer's derived files (flat-named: `globe--*`, `full--*`,
 - sampling: seed {config.SEED:#x}, per-res-seed {config.PER_RES_SEED}, \
 budget {config.N_CELLS:,}
 - csar: gap_tol {config.GAP_TOL:g}, method {config.CSAR_METHOD}
-- measurement code: {versions} (binding versions ride in each table's
+- measurement-code versions: {versions} (binding versions ride in each table's
   Parquet metadata)
 
 Fetch the tables: `just fetch-data <tag>` (or read any asset directly with

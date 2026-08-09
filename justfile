@@ -50,8 +50,9 @@ gen key="all":
 metrics:
     uv run scripts/metrics.py
 
-# Aspect-ratio survey: reads the ar column (no measurement) -> out/histograms.png,
-# extremes.png, by_res_<system>.png.
+# Aspect-ratio survey: reads the ar column -> out/histograms.png,
+# extremes.png, by_res_<system>.png. The only csar calls re-solve each
+# system's two extreme cells to draw their certified ellipses.
 survey:
     uv run scripts/survey.py
 
@@ -88,8 +89,8 @@ web-data:
 # AND the ajglobe globe binaries + manifest. This is the single command the
 # published site runs (pages.yml) after fetching a data release, so every plot
 # on the site is generated from that release's tables — not from anything on
-# disk. Reads the `ar` column; nothing is re-measured but the two extreme cells the
-# survey re-draws per system.
+# disk. Reads the `ar` column; nothing is re-measured except the two
+# extreme cells the survey re-solves (csar) to draw their ellipses.
 site: survey web-data
     cp out/histograms.png out/extremes.png out/by_res_*.png web/out/
 
