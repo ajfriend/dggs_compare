@@ -1,8 +1,9 @@
 """Per-cell statistics (csar AR, sparea area) + shared sphere helpers.
 
-The statistics are computed by the metrics stage and stored as columns in
-the tables — downstream consumers read them; they never re-solve. Solver
-settings come from `config` and are recorded in each table's metadata.
+The statistics are measured by the metrics stage and stored as columns in
+the tables — downstream consumers read them; they never re-measure.
+csar's solver settings come from `config` and are recorded in each
+table's metadata.
 The helpers (winding, edge refinement, uniform sampling, the authalic
 map) serve the generation scripts.
 """

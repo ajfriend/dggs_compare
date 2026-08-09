@@ -5,7 +5,7 @@ level) are measured by the metrics stage at build time and stamped into
 each final table's metadata; the gate itself (config.CONV_TOL, with the
 config.CONV_EXPECTED_RED carve-outs) is enforced there. This script just
 reads the stamped values back out of the published tables — a pure
-metadata read, no bindings, no solving.
+metadata read, no bindings, no measurement.
 
 Run with:  just convergence
 No CLI args (project convention).

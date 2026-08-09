@@ -1,7 +1,7 @@
 _:
     just --list
 
-# The project env holds the library, solvers, and plotting; each implementation
+# The project env holds the library, the measurement code, and plotting; each implementation
 # script in scripts/systems/ resolves its OWN env from its PEP 723 header
 # (binding + library, never co-resolved with anything else). Platform
 # wrinkle: dggal 0.0.6's macOS arm64 wheel bundles x86_64 dylibs, so on
@@ -45,12 +45,12 @@ gen key="all":
     exit $fail
 
 # Stage 2: raw geometry -> the published tables in data/cells/ (per-cell
-# csar AR + sparea area, one solver provenance for every system), applying
+# csar AR + sparea area, one measurement provenance for every system), applying
 # the convergence admission gate.
 metrics:
     uv run scripts/metrics.py
 
-# Aspect-ratio survey: reads the ar column (no solving) -> out/histograms.png,
+# Aspect-ratio survey: reads the ar column (no measurement) -> out/histograms.png,
 # extremes.png, by_res_<system>.png.
 survey:
     uv run scripts/survey.py
@@ -79,7 +79,7 @@ timing-report run_id:
 
 # Build the web viewer's static data (histograms + ajglobe globe binaries +
 # the full-globe page's complete-coverage binaries + manifest) from the
-# tables -> web/out/ (gitignored). A column reshape — nothing is solved.
+# tables -> web/out/ (gitignored). A column reshape — nothing is measured.
 web-data:
     uv run scripts/web_data.py
 
@@ -88,7 +88,7 @@ web-data:
 # AND the ajglobe globe binaries + manifest. This is the single command the
 # published site runs (pages.yml) after fetching a data release, so every plot
 # on the site is generated from that release's tables — not from anything on
-# disk. Reads the `ar` column; nothing is solved but the two extreme cells the
+# disk. Reads the `ar` column; nothing is re-measured but the two extreme cells the
 # survey re-draws per system.
 site: survey web-data
     cp out/histograms.png out/extremes.png out/by_res_*.png web/out/
@@ -105,7 +105,7 @@ web-vendor:
 # ----- data releases ------------------------------------------------------
 # The tables + web data are published as decoupled GitHub releases (data-v1,
 # data-v2, ...), cut when the INPUTS change (seed/budgets, the grid set,
-# calibration, or a solver bump worth reflecting) — not per code release.
+# calibration, or a measurement-code bump worth reflecting) — not per code release.
 # Normally cut from CI: gh workflow run data-release.yml -f tag=data-vN
 
 # Stage the flat-named globe binaries + manifest for the release's flat asset

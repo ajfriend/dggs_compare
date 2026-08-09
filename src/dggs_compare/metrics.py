@@ -1,17 +1,19 @@
 """Metrics stage: raw geometry parquet -> the published tables.
 
 Binding-free by construction: this module reads what the runner wrote
-(data/raw/) and never imports a DGGS binding. It computes the per-cell
-metrics with the shared solvers (csar AR, sparea area), so every published
-number carries ONE solver provenance regardless of which env generated the
-geometry.
+(data/raw/) and never imports a DGGS binding. It MEASURES each cell with
+the shared measurement code (csar AR, sparea area), so every published
+number carries ONE measurement provenance regardless of which env
+generated the geometry. That one metric happens to run a solver is an
+implementation detail of that metric.
 
 Also the admission gate: each implementation's convergence residuals
 (max |dAR|, density 0 vs dense, from the runner's vertex pairs) are
-measured here at the published solver settings, stamped into every final
+measured here at the published settings, stamped into every final
 table's metadata, and checked against config.CONV_TOL — a grid whose
-density-0 vertex lists are not faithful solver inputs fails loudly unless
-it is in config.CONV_EXPECTED_RED with a documented reason.
+density-0 vertex lists are not a faithful representation of its cells
+fails loudly unless it is in config.CONV_EXPECTED_RED with a documented
+reason.
 """
 
 import json
@@ -26,7 +28,7 @@ from . import cache, config, runner, stats
 from .cache import BATCH, DATA_DIR, SCHEMA, open_ring, open_writer
 
 
-def _solver_metadata():
+def _measurement_metadata():
     meta = {'gap_tol': repr(config.GAP_TOL),
             'csar_method': config.CSAR_METHOD}
     for pkg in ('csar', 'sparea'):
@@ -48,7 +50,7 @@ def _forwarded(raw_meta):
 
 def convergence_residuals(key):
     """{res: max |dAR|} from `key`'s density-0/dense pairs, at the
-    published solver settings (stats.ar)."""
+    published csar settings (stats.ar)."""
     table = pq.read_table(runner.conv_path(key))
     out = {}
     for res, v0, vd in zip(table['res'].to_pylist(),
@@ -73,7 +75,7 @@ def build(key, res, extra_meta=None, out_dir=None):
     assert key == cache.key(grid, raw_meta[b'impl'].decode()), key
 
     meta = _forwarded(raw_meta)
-    meta.update(_solver_metadata())
+    meta.update(_measurement_metadata())
     meta.update(extra_meta or {})
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -81,7 +83,7 @@ def build(key, res, extra_meta=None, out_dir=None):
     writer = open_writer(path, SCHEMA, meta)
     dnc = 0
     n = 0
-    t_solve = 0.0
+    t_measure = 0.0
     try:
         for batch in raw.iter_batches(batch_size=BATCH):
             ts = time.perf_counter()
@@ -90,12 +92,12 @@ def build(key, res, extra_meta=None, out_dir=None):
                 ar, area = stats.cell_stats(open_ring(vlist))
                 ars.append(ar)
                 areas.append(area)
-            t_solve += time.perf_counter() - ts
+            t_measure += time.perf_counter() - ts
             dnc += int(np.isnan(ars).sum())
             rows = len(batch)
             n += rows
             # cid/verts pass through untouched (the contract guarantees
-            # open vertex lists, so the solver input above IS the stored
+            # open vertex lists, so what was measured above IS the stored
             # geometry); only the metric columns are new.
             writer.write_table(pa.table({
                 'dggs': pa.array([grid] * rows, pa.string()),
@@ -109,11 +111,12 @@ def build(key, res, extra_meta=None, out_dir=None):
         writer.close()
     kb = path.stat().st_size / 1024
     t = time.perf_counter() - t0
-    # solve = the per-cell csar/sparea loop (incl. the arrow->python vlist
-    # decode); the residual is raw read + arrow build + zstd-19 write.
+    # measure = the per-cell csar/sparea loop (incl. the arrow->python
+    # vlist decode); the residual is raw read + arrow build + zstd-19
+    # write.
     print(f'[{key} r{res:<2}] {n:>8} cells (DNC {dnc}) -> {path.name} '
-          f'({kb:.0f} KiB) [{t:.1f}s: solve {t_solve:.1f} = '
-          f'{runner._us_per_cell(t_solve, n)}]', flush=True)
+          f'({kb:.0f} KiB) [{t:.1f}s: measure {t_measure:.1f} = '
+          f'{runner._us_per_cell(t_measure, n)}]', flush=True)
 
 
 def available_raw():
@@ -151,7 +154,7 @@ def build_all():
                 raise RuntimeError(
                     f'{key}: convergence residual {worst:.1e} >= '
                     f'{config.CONV_TOL:g} — density-0 vertex lists are not '
-                    f'faithful solver inputs for this grid')
+                    f'a faithful representation of this grid\'s cells')
             print(f'[{key}] over tolerance, expected: {reason}')
         extra = {b'convergence_max_dar': json.dumps(residuals).encode()}
         for res in res_list:

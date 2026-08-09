@@ -5,7 +5,7 @@
 #   gh workflow run data-release.yml -f tag=data-vN
 #
 # Cut a new tag when the INPUTS change (seed/budgets, grid set, calibration,
-# solver bump worth reflecting) — decoupled from code releases.
+# measurement-code bump worth reflecting) — decoupled from code releases.
 #
 # One build job per IMPLEMENTATION — the matrix is the scripts/systems/
 # listing, so it can never go stale — running the two pipeline stages
@@ -13,13 +13,13 @@
 #
 #   stage 1  `just gen <key>`: raw cell geometry, in the script's own
 #            PEP 723 env (binding + library, nothing else)
-#   stage 2  `just metrics`: solve + convergence admission gate, in the
-#            project env (solvers, no bindings) — reads only the raw
+#   stage 2  `just metrics`: measure + convergence admission gate, in the
+#            project env (measurement code, no bindings) — reads only the raw
 #            parquet stage 1 wrote
 #
 # Same-runner keeps the fan-out fully parallel (no barrier, no 16GB raw
 # round-trip) without weakening provenance: csar/sparea install as fixed
-# PyPI wheels, so every runner executes identical solver binaries. The
+# PyPI wheels, so every runner executes identical csar/sparea binaries. The
 # publish job merges the finals, applies the release gates, derives the
 # viewer data, and uploads.
 name: data-release
@@ -84,7 +84,7 @@ jobs:
         key: ${{ fromJSON(needs.systems.outputs.list) }}
     runs-on: ${{ inputs.runner }}
     # The aperture-3 grids are the longest chains (~34 resolutions
-    # generated, then solved), ~40 min each verified.
+    # generated, then measured), ~40 min each verified.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
@@ -112,8 +112,8 @@ jobs:
         env:
           DGGS_COMPARE_N_CELLS: ${{ inputs.n_cells }}
       # Stage 2 (see header): the explicit sync makes env resolution its
-      # own failure point, distinct from a red solve.
-      - name: metrics — solve + convergence admission gate
+      # own failure point, distinct from a red measurement.
+      - name: metrics — measure + convergence admission gate
         run: |
           just sync
           just metrics

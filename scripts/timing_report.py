@@ -3,12 +3,12 @@
 Combines GitHub's per-step durations (env setup, dggrid install, artifact
 upload) with the in-process phase lines the pipeline prints — the
 runner's `select/cids/bounds = N us/cell` generation lines and metrics'
-`solve = N us/cell` lines — into one per-system table plus fleet totals.
+`measure = N us/cell` lines — into one per-system table plus fleet totals.
 
 Run with:  just timing-report <run-id>      (ids: gh run list)
 Runs predating the instrumented log lines report step-level columns only.
 Tiny-budget runs under-resolve sub-0.1s phases (the log lines print one
-decimal), so e.g. the solve rate reads 0 there; full-budget runs are the
+decimal), so e.g. the measure rate reads 0 there; full-budget runs are the
 real subject.
 """
 
@@ -29,7 +29,7 @@ GEN_PAT = re.compile(
 CONV_PAT = re.compile(r'convergence pairs written \[(?P<s>[\d.]+)s\]')
 MET_PAT = re.compile(
     r'\[\S+ r\d+\s*\]\s+(?P<n>\d+) cells \(DNC \d+\) -> \S+ '
-    r'\(\d+ KiB\) \[(?P<wall>[\d.]+)s: solve (?P<slv>[\d.]+) =')
+    r'\(\d+ KiB\) \[(?P<wall>[\d.]+)s: measure (?P<slv>[\d.]+) =')
 
 # Workflow step name -> report column (anything else lands in "other").
 STEP_COL = {'generate raw cell geometry': 'gen',
@@ -70,20 +70,20 @@ def parse_job(job):
     for step in job['steps']:
         row[col_of(step['name'])] += step_secs(step)
     log = sh('gh', 'run', 'view', '--job', str(job['databaseId']), '--log')
-    cells = engine = solved = t_solve = conv = 0.0
+    cells = engine = measured = t_measure = conv = 0.0
     for line in log.splitlines():
         if (m := GEN_PAT.search(line)):
             cells += int(m['n'])
             engine += (float(m['sel']) + float(m['cid']) + float(m['bnd']))
         elif (m := MET_PAT.search(line)):
-            solved += int(m['n'])
-            t_solve += float(m['slv'])
+            measured += int(m['n'])
+            t_measure += float(m['slv'])
         elif (m := CONV_PAT.search(line)):
             conv += float(m['s'])
     # None = the instrumented lines were absent (a pre-instrumentation
     # run), as opposed to a measured 0.0.
     row.update(cells=cells, engine=engine if cells else None, conv=conv,
-               solved=solved, t_solve=t_solve if solved else None)
+               measured=measured, t_measure=t_measure if measured else None)
     return row
 
 
@@ -104,8 +104,8 @@ def main():
               for j in jobs if j['name'].startswith('build (')}
 
     hdr = (f'{"system":16} {"setup":>6} {"instl":>6} {"gen":>6} {"engin":>6} '
-           f'{"parqt":>6} {"conv":>6} {"metrc":>6} {"solve":>6} {"upld":>6} '
-           f'| {"gen":>5} {"solve":>5}')
+           f'{"parqt":>6} {"conv":>6} {"metrc":>6} {"measr":>6} {"upld":>6} '
+           f'| {"gen":>5} {"meas":>5}')
     print('minutes' + ' ' * (len(hdr) - len('minutes') - len('us/cell')) +
           'us/cell')
     print(hdr)
@@ -118,10 +118,10 @@ def main():
         print(f'{label:16} {fmt(r["setup"]):>6} {fmt(r["install"]):>6} '
               f'{fmt(r["gen"]):>6} {fmt(r["engine"]):>6} '
               f'{fmt(parquet_of(r)):>6} {fmt(r["conv"]):>6} '
-              f'{fmt(r["metrics"]):>6} {fmt(r["t_solve"]):>6} '
+              f'{fmt(r["metrics"]):>6} {fmt(r["t_measure"]):>6} '
               f'{fmt(r["upload"]):>6} '
               f'| {rate(r["engine"], r["cells"]):>5} '
-              f'{rate(r["t_solve"], r["solved"]):>5}')
+              f'{rate(r["t_measure"], r["measured"]):>5}')
 
     tot = {}
     for key_, r in sorted(builds.items()):
@@ -130,8 +130,8 @@ def main():
             tot[k] = tot.get(k, 0.0) + (v or 0.0)
     if not tot['cells']:
         tot['engine'] = None
-    if not tot['solved']:
-        tot['t_solve'] = None
+    if not tot['measured']:
+        tot['t_measure'] = None
     row('TOTAL', tot)
 
     for j in jobs:

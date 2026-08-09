@@ -1,5 +1,5 @@
 """DGGS aspect-ratio survey — reads the `ar` column of the tables (no
-solving) and writes the comparison plots to out/:
+measurement) and writes the comparison plots to out/:
 
   histograms.png     cross-system AR distributions at the working resolutions
   extremes.png       best/worst cell per system, drawn with its ellipse
