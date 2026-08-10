@@ -78,6 +78,12 @@ convergence:
 timing-report run_id:
     DGGS_COMPARE_RUN={{run_id}} uv run scripts/timing_report.py
 
+# Cross-implementation agreement report for one grid (issue #57): vertex,
+# AR, and area agreement + the fitted rotation between constructions,
+# over the full-enumeration resolutions present in data/raw/.
+cross-impl grid:
+    DGGS_COMPARE_GRID={{grid}} uv run scripts/cross_impl.py
+
 # Build the web viewer's static data (histograms + ajglobe globe binaries +
 # the full-globe page's complete-coverage binaries + manifest) from the
 # tables -> web/out/ (gitignored). A column reshape — nothing is measured.
