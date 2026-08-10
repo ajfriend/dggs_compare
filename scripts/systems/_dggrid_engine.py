@@ -55,6 +55,19 @@ def _find_bin():
 # through the text round-trip.
 PRECISION = 12
 
+# dggal's documented ISEA icosahedron placement: vertex 0 at the authalic
+# latitude of arctan(golden ratio) N, 11.20 E, azimuth 0 — dggal's README
+# states these exact DGGRID settings. Scripts whose grid must coincide
+# cell-for-cell with a dggal implementation pass this as `params`;
+# DGGRID's own default differs only in longitude (11.25 E). ONE home: a
+# drifted copy would silently de-align a pair and read as a spurious
+# rotation in `just cross-impl` — the very artifact the alignment kills.
+DGGAL_ORIENTATION = {
+    'dggs_vert0_lon': '11.20',
+    'dggs_vert0_lat': '58.282525588538994675786',
+    'dggs_vert0_azimuth': '0.0',
+}
+
 
 def _run(params, workdir):
     """Write a metafile from `params` and run dggrid on it in `workdir`."""
