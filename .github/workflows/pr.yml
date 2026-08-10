@@ -17,12 +17,14 @@ concurrency:
   cancel-in-progress: true
 
 # A called workflow can't hold more permission than its caller grants,
-# so this must cover the publish JOB's contents:write declaration (its
-# release-upload step is skipped here regardless). Every other job runs
-# under data-release.yml's workflow-level contents:read — the jobs that
-# execute the PR's code never see a write-capable token.
+# so this must cover the publish JOB's declaration (contents:write +
+# actions:read; the release-upload and timing steps that use them are
+# skipped here regardless). Every other job runs under data-release.yml's
+# workflow-level contents:read — the jobs that execute the PR's code
+# never see a write-capable token.
 permissions:
   contents: write
+  actions: read
 
 jobs:
   pipeline:

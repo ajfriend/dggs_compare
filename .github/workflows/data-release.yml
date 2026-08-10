@@ -171,6 +171,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+      actions: read     # gh run view, for the timing table
     steps:
       - uses: actions/checkout@v6
       # No cache-suffix: the default key is already distinct from the
@@ -196,3 +197,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: just data-publish '${{ inputs.tag }}'
+      # The timing table outlives the 90-day Actions log retention by
+      # riding in the release notes. The build jobs' numbers are final by
+      # the time this job runs; its own steps report only partially.
+      - name: append the timing table to the release notes
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          just timing-report ${{ github.run_id }} > timing.txt
+          { gh release view '${{ inputs.tag }}' --json body --jq .body
+            printf '\n## Timing (run %s)\n\n```\n' '${{ github.run_id }}'
+            cat timing.txt
+            printf '```\n'; } > notes.md
+          gh release edit '${{ inputs.tag }}' --notes-file notes.md
