@@ -1,7 +1,7 @@
-"""Shared DGGRID glue — the batch-subprocess engine behind the
-DGGRID-backed scripts here (isea4t). Underscore-prefixed: shared script
-code, not a registry entry, not part of the library (see _dggal_engine's
-docstring for the pattern).
+"""Shared DGGRID glue — the batch-subprocess engine and the GridImpl
+adapter behind the DGGRID-backed scripts here. Underscore-prefixed:
+shared script code, not a registry entry, not part of the library (see
+_dggal_engine's docstring for the pattern).
 
 DGGRID (Kevin Sahr's reference DGGS implementation, C++) has no supported
 in-process API: the canonical interface is a metafile-driven CLI with
@@ -123,7 +123,12 @@ class Engine:
                 'precision': PRECISION}
 
     def enumerate_ids(self, res):
-        """Every seqnum at `res` (whole-earth generation, ids only)."""
+        """Every seqnum at `res` by whole-earth generation (ids only).
+
+        Not the pipeline path — Adapter.enumerate_cells uses the 1..N
+        closed form. This is how that assumption gets re-verified when a
+        new dggs_type joins: assert this equals range(1, N+1) at a few
+        coarse resolutions."""
         with tempfile.TemporaryDirectory() as d:
             self._generate(res, d, clip=None)
             yield from _parse_aigen_ids(Path(d) / 'cells.gen')
@@ -184,3 +189,46 @@ class Engine:
                            'input_address_type': 'SEQNUM',
                            'clip_region_files': clip})
         _run(params, workdir)
+
+
+class Adapter:
+    """The GridImpl contract over one DGGRID dggs_type — each script
+    passes its identity and count formula (the mirror of
+    _dggal_engine.Adapter). `grid` derives from the dggs_type; `impl` is
+    always 'dggrid'; `packages` is empty because the binary is not a
+    python package (see the module docstring)."""
+
+    impl = 'dggrid'
+    packages = ()
+
+    def __init__(self, dggs_type, max_res, num_cells):
+        self.grid = dggs_type.lower()
+        self.max_res = max_res
+        self._num_cells = num_cells
+        self._engine = Engine(dggs_type)
+        # Zero-padded to the max seqnum's width: rows are sorted by cid
+        # TEXT for spatially coherent Parquet pages, and variable-width
+        # decimals would sort '10' < '9'.
+        self._cid_width = len(str(num_cells(max_res)))
+
+    def resolutions(self):
+        return range(self.max_res + 1)
+
+    def num_cells(self, res):
+        return self._num_cells(res)
+
+    def cells_at(self, res, points):
+        return self._engine.cells_at(res, points)
+
+    def cid_strs(self, cells):
+        return [f'{c:0{self._cid_width}d}' for c in cells]
+
+    def boundaries(self, res, cells, samples_per_edge=0):
+        return self._engine.boundaries(res, cells, samples_per_edge)
+
+    def enumerate_cells(self, res):
+        # SEQNUMs are 1..N contiguous ascending, which is also exactly
+        # the order whole-earth AIGEN output arrives in (verified for
+        # ISEA3H and ISEA4T) — the closed form replaces a whole-earth
+        # generation subprocess and its full-geometry text parse.
+        return range(1, self._num_cells(res) + 1)

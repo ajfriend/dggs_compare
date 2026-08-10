@@ -94,6 +94,10 @@ matrix is derived from it. A new implementation touches:
    (`just calibrate` picks it from the closed-form counts — no tables
    needed), `SYS_COLOR`, `PRIMARY_IMPL`.
 
+A second implementation of an existing grid touches only step 1 — the
+grid's `PER_SYSTEM` entries already exist; the one decision is whether
+`PRIMARY_IMPL` should point at it.
+
 `just metrics` then applies the convergence admission gate (density-0
 vertex lists must be faithful inputs to the AR measurement), and
 `just dnc-check` fails its publish gate unless every registry
