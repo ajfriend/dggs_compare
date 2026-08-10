@@ -40,7 +40,7 @@ CONV_SCHEMA = pa.schema([('res', pa.int32()), ('cid', pa.string()),
 # metrics stage. Anything else in a raw file's metadata stays behind.
 META_KEYS = ('grid', 'impl', 'seed', 'per_res_seed', 'n_cells',
              'resolutions', 'conv_seed', 'conv_levels', 'conv_k',
-             'conv_samples')
+             'conv_samples', 'engine_params')
 META_VERSION_PREFIX = 'version_'
 
 
@@ -68,6 +68,11 @@ def _metadata(impl, n_cells):
         'conv_k': str(config.CONV_K),
         'conv_samples': str(config.CONV_SAMPLES),
     }
+    # The contract's optional metadata attr (identity-affecting engine
+    # settings — see interface.GridImpl); must not shadow the fixed keys.
+    extra = getattr(impl, 'metadata', None) or {}
+    assert not extra.keys() & meta.keys(), extra
+    meta.update(extra)
     for pkg in ('dggs_compare', *impl.packages):
         try:
             meta[f'{META_VERSION_PREFIX}{pkg}'] = _pkg_version(pkg)

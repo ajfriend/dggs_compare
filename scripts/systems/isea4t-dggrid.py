@@ -12,7 +12,8 @@
 Batch subprocess calls instead of per-cell FFI (see _dggrid_engine; the
 dggrid binary comes from `just install-dggrid` or DGGS_COMPARE_DGGRID).
 Cells are plain SEQNUM ints; they are only unique within a resolution,
-which is why the contract passes `res` alongside.
+which is why the contract passes `res` alongside. Uses DGGRID's default
+orientation (vert0 11.25 E) — no dggal counterpart to align with.
 
 max_res 28: DGGRID accepts finer, but 20*4^r overflows uint64 seqnums
 past r30 (observed: r31 ids come out smaller than r30's), and r28 cells
