@@ -69,7 +69,13 @@ def parse_job(job):
                             'upload', 'other')}
     for step in job['steps']:
         row[col_of(step['name'])] += step_secs(step)
-    log = sh('gh', 'run', 'view', '--job', str(job['databaseId']), '--log')
+    # The REST job-logs endpoint, NOT `gh run view --job --log`: gh
+    # refuses logs while the RUN is in progress, and the release workflow
+    # runs this report from inside its own publish job. The endpoint
+    # serves any COMPLETED job regardless of run state. (Raw format has
+    # no job/step prefix, but the phase regexes search, not anchor.)
+    log = sh('gh', 'api', f'repos/{{owner}}/{{repo}}/actions/jobs/'
+             f'{job["databaseId"]}/logs')
     cells = engine = measured = t_measure = conv = 0.0
     for line in log.splitlines():
         if (m := GEN_PAT.search(line)):
