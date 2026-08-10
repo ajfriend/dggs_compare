@@ -73,6 +73,7 @@ just survey            # AR comparison plots -> out/
 just calibrate         # area-match resolutions across systems (closed-form)
 just dnc-check         # assert the DNC invariants (pass/fail)
 just convergence       # report the stamped convergence residuals
+just cross-impl isea3h # cross-implementation agreement report (from data/raw/)
 just site              # build the static site into web/out/ (survey plots + globes)
 just web               # build the site, then serve it at :8000
 ```
