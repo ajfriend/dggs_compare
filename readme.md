@@ -129,7 +129,13 @@ equal-area here (the methodology issue: #42).
 Provenance (seed policy, budgets, csar settings, library versions) rides in
 each file's Parquet metadata. Coarse resolutions are enumerated in full;
 finer ones hold exactly 1,000,000 sampled cells (enumerate-and-subsample
-near the cap, draw-until-n beyond it — see `config.N_CELLS`).
+near the cap, draw-until-n beyond it — see `config.N_CELLS`). Sample
+points are drawn uniformly on the sphere and handed to each
+implementation in its own coordinate convention (geodetic for
+WGS84-declared systems), so the effective sampling measure deviates from
+uniform by at most the authalic map's ~0.1% density distortion — this
+shifts only which cells are sampled, never any measured value, and is
+why `just cross-impl` compares full enumerations only.
 
 ## Data releases
 
