@@ -39,7 +39,6 @@ from _dggrid_engine import Adapter
 from dggs_compare import runner
 
 ORIENTATION = {
-    'dggs_orient_specify_type': 'SPECIFIED',
     'dggs_vert0_lon': '11.20',
     'dggs_vert0_lat': '58.282525588538994675786',
     'dggs_vert0_azimuth': '0.0',

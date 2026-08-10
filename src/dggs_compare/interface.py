@@ -26,6 +26,12 @@ class GridImpl(Protocol):
     grid: str                   # the grid, e.g. 'isea3h'
     impl: str                   # the implementation, e.g. 'dggal'
     packages: Sequence[str]     # distributions whose versions to record
+    # OPTIONAL: extra provenance strings merged into the raw files'
+    # metadata (and forwarded to the published tables if named in
+    # runner.META_KEYS). For identity-affecting engine settings the
+    # script chooses — e.g. a pinned DGGRID orientation — which must be
+    # readable from the artifact, not only from script source.
+    # metadata: dict[str, str]
 
     def resolutions(self) -> range:
         """Generatable resolutions (0..finest)."""

@@ -122,6 +122,11 @@ class Engine:
     def __init__(self, dggs_type, params=None):
         self.dggs_type = dggs_type
         self._params = dict(params or {})
+        # These three carry the Engine's own contract (identity, per-call
+        # res, the float64 text round-trip) — a param override would be a
+        # silent lie about all of them.
+        assert not self._params.keys() & {'dggs_type', 'dggs_res_spec',
+                                          'precision'}, self._params
 
     def _base(self, res):
         return {'dggs_type': self.dggs_type, 'dggs_res_spec': res,
@@ -211,6 +216,12 @@ class Adapter:
         self.max_res = max_res
         self._num_cells = num_cells
         self._engine = Engine(dggs_type, params)
+        if params:
+            # Non-default metafile settings change which cells exist, so
+            # they are artifact identity — record them in the provenance
+            # (runner merges the contract's optional metadata attr).
+            self.metadata = {'engine_params': '; '.join(
+                f'{k} {v}' for k, v in params.items())}
         # Zero-padded to the max seqnum's width: rows are sorted by cid
         # TEXT for spatially coherent Parquet pages, and variable-width
         # decimals would sort '10' < '9'.
