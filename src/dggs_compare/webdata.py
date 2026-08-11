@@ -7,15 +7,15 @@ web/out/ (gitignored):
 
 - globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,area.f32,ids.json} — ajglobe's
   native flat-binary polygon format plus one f32 per cell per metric (AR, and
-  area normalized by the resolution's exact mean 4*pi/N). One globe per
-  system, all at a common cell size: the resolution whose cell count is
-  closest to H3's at config.GLOBE_H3_RES. Equal-area grids -> matching cell
-  count matches average cell area, so this is an area match computed from the
-  closed-form counts (no table reads).
+  area normalized by the resolution's exact mean 4*pi/N; the viewer derives
+  each metric's shared color domain from these). One globe per system, all at
+  a common cell size: the resolution whose cell count is closest to H3's at
+  config.GLOBE_H3_RES. Equal-area grids -> matching cell count matches
+  average cell area, so this is an area match computed from the closed-form
+  counts (no table reads).
 - manifest.json — the data-release tag, per-system web colors/labels, the
   chosen globe resolution per system, csar's gap tolerance, and the shared
-  globe AR max + relative-area range (every globe colors on one comparable
-  scale per metric).
+  globe AR max (the viewer's provisional color domain while binaries load).
 """
 
 import json
@@ -46,12 +46,10 @@ def globe_res_for(sys, anchor_n):
 
 def build_globe():
     """Write ajglobe's flat binaries for each system's area-matched globe.
-    Returns {system: res}, the shared AR max, and the shared relative-area
-    [lo, hi] over those globes' cells."""
+    Returns {system: res} and the shared AR max over those globes' cells."""
     GLOBE_DIR.mkdir(parents=True, exist_ok=True)
     anchor_n = config.CELLS_PER_RES['h3'](config.GLOBE_H3_RES)
     chosen, globe_max = {}, 1.0
-    area_lo, area_hi = 1.0, 1.0
     for s in systems():
         res = globe_res_for(s, anchor_n)
         chosen[s] = res
@@ -61,8 +59,6 @@ def build_globe():
         if finite.size:
             globe_max = max(globe_max, float(finite.max()))
         rel = cols['area'] / config.mean_cell_area(s, res)
-        area_lo = min(area_lo, float(rel.min()))
-        area_hi = max(area_hi, float(rel.max()))
         pos, starts = [], [0]
         for latlng in cols['verts']:
             pos.append(np.asarray(latlng, dtype='<f4')[:, ::-1])   # -> [lng, lat]
@@ -75,7 +71,7 @@ def build_globe():
         Path(f'{stem}_ids.json').write_text(json.dumps(cols['cid']))
         print(f'  globe {s} r{res}: {len(cols["cid"]):,} cells '
               f'(anchor {anchor_n:,}) -> {stem.name}_*')
-    return chosen, globe_max, (area_lo, area_hi)
+    return chosen, globe_max
 
 
 def build_all():
@@ -83,7 +79,7 @@ def build_all():
     WEB_OUT.mkdir(parents=True, exist_ok=True)
 
     print(f'building globe binaries (H3 r{config.GLOBE_H3_RES} anchor)...')
-    globe_res, globe_max, area_range = build_globe()
+    globe_res, globe_max = build_globe()
 
     manifest = {
         # Which data release these artifacts were built from (set by pages.yml
@@ -97,7 +93,6 @@ def build_all():
         'globe_res': globe_res,              # {system: resolution} — area-matched
         'globe_h3_res': config.GLOBE_H3_RES,
         'globe_ar_max': globe_max,
-        'globe_area_range': list(area_range),
         'gap_tol': config.GAP_TOL,
     }
     (WEB_OUT / 'manifest.json').write_text(json.dumps(manifest, indent=2))

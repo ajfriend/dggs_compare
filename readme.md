@@ -46,7 +46,8 @@ scripts/systems/      ONE PEP 723 SCRIPT PER (grid, implementation), named
 scripts/              thin callers: metrics, survey, calibrate, dnc_check,
                       convergence, web_*, explorations/
 web/                  the static comparison site (survey plots + ajglobe
-                      globes colored by AR); data from web/out/
+                      globes colored by a selectable metric: AR or relative
+                      area); data from web/out/
 data/raw/             stage-1 geometry (gitignored, intermediate)
 data/cells/           the published tables (gitignored; data releases)
 notebooks/            interactive companions
@@ -179,7 +180,9 @@ release's tables — the site is a pure function of the data artifact. A full ru
 also caches the built `web/out/` (keyed per tag); `rebuild=false` restores that
 cache and only re-copies the static files (HTML/CSS/JS), so a viewer-only change
 deploys in ~30s instead of re-fetching all the tables. The first run after a
-data release must be a full one, to seed the cache.
+data release must be a full one, to seed the cache — and so must the first
+run after a change to what `just site` emits (a stale cache lacks the new
+files; the viewer degrades gracefully but incompletely).
 
 ## Relationship to csar_py
 

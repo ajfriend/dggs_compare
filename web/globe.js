@@ -10,10 +10,11 @@
 // - all globes rotate/zoom together.
 import { Orb } from './vendor/ajglobe.min.js';
 
-// ---- the two dropdown axes. One entry per option, in menu order; the FIRST
-// entry of each list is the default (labeled so in the UI at build time).
-// Adding a colormap or transform is one new object here — the dropdowns and
-// lookups all derive from these lists.
+// ---- the three dropdown axes (colormap, transform, metric — METRICS sits
+// below the transforms it feeds). One entry per option, in menu order; the
+// FIRST entry of each list is the default (labeled so in the UI at build
+// time). Adding an option is one new object in its list — the dropdowns and
+// lookups all derive from these.
 // Colormap stops: RGB control points (0–255), linearly interpolated.
 const CMAPS = [
   { key: 'viridis', label: 'Viridis (perceptually uniform)',
@@ -63,13 +64,16 @@ const TFS = [
     fn: (v, d) => (d.max > d.lo ? Math.log(v / d.lo) / Math.log(d.max / d.lo) : 0) },
 ];
 
-// The metric axis: which per-cell value the globes color by. `file` is the
-// binary's suffix; `fixedLo` pins the domain floor (AR starts at 1 by
-// definition; area's floor is data-driven).
+// The metric axis: which per-cell value the globes color by. `key` doubles
+// as the binary suffix (out/globe/*_{key}.f32) and the panel channel name;
+// `name` prefixes tooltips/histograms; `stat` renders the per-globe line;
+// `fixedLo` pins the domain floor (AR starts at 1 by definition; area's
+// floor is data-driven).
 const METRICS = [
-  { key: 'ar', label: 'Aspect ratio', name: 'AR', file: 'ar', fixedLo: 1 },
+  { key: 'ar', label: 'Aspect ratio', name: 'AR', fixedLo: 1,
+    stat: (lo, hi) => `max AR ${fmt(hi, 3)}` },
   { key: 'area', label: 'Relative area (cell / mean)', name: 'area',
-    file: 'area', fixedLo: null },
+    fixedLo: null, stat: (lo, hi) => `area ${fmt(lo, 3)}–${fmt(hi, 3)}` },
 ];
 
 const DNC_GREY = [68, 68, 68, 255];
@@ -84,7 +88,7 @@ async function fetchBin(path, Ctor) {
 }
 
 const DOMAIN = { lo: 1, max: 1, p99: 1 };  // shared domain of the ACTIVE metric
-const PANELS = [];            // { sys, label, color, orb, layer, vals, hist }
+const PANELS = [];   // { sys, label, color, orb, layer, vals, hist, meta, n }
 let scale = { cmap: CMAPS[0], tf: TFS[0] };   // the current pick (defaults)
 let metric = METRICS[0];
 
@@ -116,23 +120,33 @@ function applyScale() {
   for (const p of PANELS) p.layer.update({ fill: makeFill(vals(p), scale) });
 }
 
-// ---- shared metric domain + per-globe histograms (scale-independent) ----
+// ---- shared metric domain + per-globe histograms (scale-independent).
+// Memoized per metric: the data is static, so a metric switch after the
+// first is a lookup, not a ~400k-value re-sort.
+const DOMAINS = {};   // metric key -> { lo, max, p99, hists: Map(panel -> hist) }
 function computeDomainAndHists() {
-  const all = [];
-  for (const p of PANELS) for (const a of vals(p)) if (Number.isFinite(a)) all.push(a);
-  all.sort((x, y) => x - y);
-  DOMAIN.lo = metric.fixedLo ?? (all.length ? all[0] : 0);
-  DOMAIN.max = all.length ? all[all.length - 1] : DOMAIN.lo + 1;
-  DOMAIN.p99 = all.length ? all[Math.floor(0.99 * (all.length - 1))] : DOMAIN.max;
-  const span = DOMAIN.max - DOMAIN.lo || 1;
-  for (const p of PANELS) {
-    const counts = new Array(HBINS).fill(0);
-    for (const a of vals(p)) {
-      if (!Number.isFinite(a)) continue;
-      counts[Math.min(HBINS - 1, Math.max(0, Math.floor((a - DOMAIN.lo) / span * HBINS)))]++;
+  let c = DOMAINS[metric.key];
+  if (!c) {
+    const all = [];
+    for (const p of PANELS) for (const a of vals(p)) if (Number.isFinite(a)) all.push(a);
+    const s = Float32Array.from(all).sort();   // typed: numeric, no comparator
+    const lo = metric.fixedLo ?? (s.length ? s[0] : 0);
+    const max = s.length ? s[s.length - 1] : lo + 1;
+    const p99 = s.length ? s[Math.floor(0.99 * (s.length - 1))] : max;
+    const span = max - lo || 1;
+    const hists = new Map();
+    for (const p of PANELS) {
+      const counts = new Array(HBINS).fill(0);
+      for (const a of vals(p)) {
+        if (!Number.isFinite(a)) continue;
+        counts[Math.min(HBINS - 1, Math.max(0, Math.floor((a - lo) / span * HBINS)))]++;
+      }
+      hists.set(p, { counts, cmax: Math.max(1, ...counts) });
     }
-    p.hist = { counts, cmax: Math.max(1, ...counts) };
+    c = DOMAINS[metric.key] = { lo, max, p99, hists };
   }
+  Object.assign(DOMAIN, { lo: c.lo, max: c.max, p99: c.p99 });
+  for (const p of PANELS) p.hist = c.hists.get(p);
 }
 
 // ---- the dynamic histogram canvas (shows the hovered globe) ----
@@ -217,8 +231,7 @@ async function buildGlobe(M, sys) {
     fetchBin(`out/globe/${key}_pos.f32`, Float32Array),
     fetchBin(`out/globe/${key}_idx.u32`, Uint32Array),
     fetchBin(`out/globe/${key}_ar.f32`, Float32Array),
-    // Tolerate a cached pre-area build: the AR view still works and the
-    // Metric menu disables the area option (see main()).
+    // Tolerate a cached pre-area build (see the guard in main()).
     fetchBin(`out/globe/${key}_area.f32`, Float32Array).catch(() => null),
     fetch(`out/globe/${key}_ids.json`).then((r) => r.json()),
   ]);
@@ -249,13 +262,9 @@ async function buildGlobe(M, sys) {
 
 // Per-globe stat line under each canvas, restated for the active metric.
 function setMeta(p) {
-  const v = vals(p);
   let lo = Infinity, hi = -Infinity;
-  for (const a of v) if (Number.isFinite(a)) { if (a < lo) lo = a; if (a > hi) hi = a; }
-  const stat = metric.key === 'ar'
-    ? `max AR ${fmt(hi, 3)}`
-    : `area ${fmt(lo, 3)}–${fmt(hi, 3)}`;
-  p.meta.textContent = `${p.n.toLocaleString()} cells · ${stat}`;
+  for (const a of vals(p)) if (Number.isFinite(a)) { if (a < lo) lo = a; if (a > hi) hi = a; }
+  p.meta.textContent = `${p.n.toLocaleString()} cells · ${metric.stat(lo, hi)}`;
 }
 
 // Click any plot (static histogram/extremes or a dynamically-added by-res
@@ -318,10 +327,8 @@ async function main() {
   // A cached pre-area build has no area binaries: keep the option visible
   // but unusable, rather than silently showing wrong data.
   if (PANELS.some((p) => !p.vals.area)) {
-    [...metricSel.options].find((o) => o.value === 'area').disabled = true;
+    metricSel.querySelector('option[value="area"]').disabled = true;
   }
-  computeDomainAndHists();
-  onPick();                           // apply the selects' current state
-  drawHist(PANELS[0], null);          // seed the histogram before any hover
+  onMetric();   // seed domain/hists/legend/meta for the default metric
 }
 main();
