@@ -101,6 +101,13 @@ def count_match_res(sys, anchor_n, resolutions=range(40)):
     return min(resolutions, key=lambda r: abs(math.log(n_of(r) / anchor_n)))
 
 
+def mean_cell_area(sys, res):
+    """Exact mean cell area at `res` in steradians: cells partition the
+    sphere, so 4*pi / N(res) — closed form, no tables read. THE
+    normalizer for relative-area statistics (survey, web viewer)."""
+    return 4.0 * math.pi / CELLS_PER_RES[sys](res)
+
+
 # Every per-system dict a new grid must appear in. The dnc-check release
 # gate asserts each registry system is present in all of these, so adding
 # a dict here extends the gate for free (FULL_RES stays optional;
