@@ -140,7 +140,11 @@ implementation in its own coordinate convention (geodetic for
 WGS84-declared systems), so the effective sampling measure deviates from
 uniform by at most the authalic map's ~0.1% density distortion — this
 shifts only which cells are sampled, never any measured value, and is
-why `just cross-impl` compares full enumerations only.
+why `just cross-impl` compares full enumerations only. Consumers note:
+a point-sampled table's ROWS are size-biased (cells appear
+~proportionally to their area), so distributions computed from one are
+size-biased unless weighted by 1/area — the published plots do exactly
+that; per-cell values are unaffected.
 
 ## Data releases
 

@@ -17,7 +17,7 @@ requires-python = ">=3.11,<3.14"
 # for the csar pre-release regression gate, point a [tool.uv.sources] entry
 # at a csar_py branch/rev.
 dependencies = [
-    "numpy>=1.24",
+    "numpy>=2",
     "pyarrow>=15",
     "matplotlib>=3",
     "csar>=0.1.1",

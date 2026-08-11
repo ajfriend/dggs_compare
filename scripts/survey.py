@@ -58,8 +58,12 @@ def sweep_system(name):
     (re-solved — two cells — so the extremes plot can draw the certified
     ellipse). Full per-cell area arrays are kept ONLY at the target
     resolution (the histogram input): retained everywhere they'd cost
-    ~2.5 GB at the full budget for values only ever reduced to scalars."""
+    ~2.5 GB at the full budget for values only ever reduced to scalars.
+    Weights are the exception — the by-resolution histograms consume them
+    at every sampled resolution — kept lean as float32 and None where
+    uniform (~0.6 GB at the full budget)."""
     target = RES[name]
+    impl = config.PRIMARY_IMPL[name]
     by_res = {}
     for res in cache.available_resolutions(name):
         cols = cache.load_columns(name, res, ['ar', 'area', 'irregular'])
@@ -67,17 +71,18 @@ def sweep_system(name):
         rel = cols['area'] / config.mean_cell_area(name, res)
         irr = cols['irregular']
         # Point-draw-sampled tables include a cell with probability
-        # ~proportional to its area; inverse-area weights restore the
-        # per-cell-uniform measure every distribution here reports (the
-        # raw size-biased mean of rel sits at ~1+CV^2). Enumerated and
-        # subsampled tables are already uniform — the regime is derivable
-        # from the closed-form count. Constant for equal-area grids;
-        # worst-case stats are weighting-free either way.
-        n_total = config.CELLS_PER_RES[name](res)
-        sampled = n_total > config.SUBSAMPLE_MAX_RATIO * config.N_CELLS
-        w = 1.0 / rel if sampled else np.ones_like(rel)
-        d = {'ars': a[~np.isnan(a)], 'w_ars': w[~np.isnan(a)],
-             'dnc': int(np.isnan(a).sum()),
+        # ~proportional to its area; inverse-area weights (None = the
+        # table is already per-cell uniform; float32 — histogram bars and
+        # quantile crossings don't need better) restore the per-cell
+        # measure every distribution here reports. The raw size-biased
+        # mean of rel sits at ~1+CV^2. Classified at the table's own
+        # STAMPED budget, so override-budget builds weight correctly too.
+        budget = int(cache.table_metadata(name, impl, res)['n_cells'])
+        sampled = config.sampling_regime(name, res, budget) == 'sample'
+        w = (1.0 / rel).astype(np.float32) if sampled else None
+        bad = np.isnan(a)
+        d = {'ars': a[~bad], 'w_ars': None if w is None else w[~bad],
+             'dnc': int(bad.sum()),
              'ratio': area_ratio(rel, irr),
              # The pentagons' relative areas, kept only where both cell
              # classes are present (empty for all-pentagon coarse levels
@@ -101,28 +106,20 @@ def sweep_system(name):
             'worst': record(int(np.nanargmax(cols['ar'])))}
 
 
-def regular_areas(area, irr):
-    """The REGULAR cells' normalized areas — the pentagon deficit is a
-    design constant (exactly 5/6 for the ISEA family), not distortion,
-    so the area statistics exclude it. A resolution with no regular
-    cells (ISEA-family r0: all 12 cells ARE the pentagons) uses every
-    cell. THE selection rule: every area stat and histogram goes through
-    here."""
-    a = area[~irr]
-    return a if a.size else area
+def regular_mask(irr):
+    """True for the REGULAR cells — the pentagon deficit is a design
+    constant (exactly 5/6 for the ISEA family), not distortion, so the
+    area statistics exclude it. A resolution with no regular cells
+    (ISEA-family r0: all 12 cells ARE the pentagons) keeps every cell.
+    THE selection rule: every area stat and histogram goes through here."""
+    m = ~irr
+    return m if m.any() else np.ones_like(irr)
 
 
 def area_ratio(area, irr):
-    """max/min normalized area over regular cells (see regular_areas)."""
-    a = regular_areas(area, irr)
+    """max/min normalized area over regular cells (see regular_mask)."""
+    a = area[regular_mask(irr)]
     return float(a.max() / a.min())
-
-
-def wquantile(x, w, q):
-    """Weighted quantile: the value where cumulative weight crosses `q`."""
-    i = np.argsort(x)
-    c = np.cumsum(w[i])
-    return float(x[i][np.searchsorted(c, q * c[-1])])
 
 
 def _save(fig, name, dpi=DPI):
@@ -134,16 +131,16 @@ def _save(fig, name, dpi=DPI):
 
 # ----- plotting ----------------------------------------------------------
 def plot_histograms(results):
-    """Cross-system AR distributions at each system's working resolution
-    (per-cell uniform: sampled tables inverse-area weighted, see
-    sweep_system)."""
+    """Cross-system AR distributions at each system's working resolution."""
     ars = {s: results[s]['by_res'][RES[s]]['ars'] for s in SYSTEMS}
     ws = {s: results[s]['by_res'][RES[s]]['w_ars'] for s in SYSTEMS}
     dnc = {s: results[s]['by_res'][RES[s]]['dnc'] for s in SYSTEMS}
 
     def stat(a, w):
-        return dict(n=a.size, min=float(a.min()), median=wquantile(a, w, 0.5),
-                    p99=wquantile(a, w, 0.99), max=float(a.max()))
+        med, p99 = np.quantile(a, [0.5, 0.99], weights=w,
+                               method='inverted_cdf')
+        return dict(n=a.size, min=float(a.min()), median=float(med),
+                    p99=float(p99), max=float(a.max()))
 
     st = {s: stat(ars[s], ws[s]) for s in SYSTEMS}
 
@@ -179,13 +176,13 @@ def plot_area_histograms(results):
     for s in SYSTEMS:
         by_res = results[s]['by_res']
         d = by_res[RES[s]]
-        # regular_areas selects on `irr` alone, so it slices the weights
-        # identically to the values.
-        reg = regular_areas(d['area'], d['irr'])
-        wr = regular_areas(d['w'], d['irr'])
+        m = regular_mask(d['irr'])
+        reg = d['area'][m]
+        wr = None if d['w'] is None else d['w'][m]
         pent_res = next((r for r in sorted(by_res, reverse=True)
                          if by_res[r]['pent'].size), None)
-        data[s] = {'reg': reg, 'wr': wr, 'med': wquantile(reg, wr, 0.5),
+        data[s] = {'reg': reg, 'wr': wr, 'med': float(np.quantile(reg, 0.5, weights=wr,
+                                            method='inverted_cdf')),
                    'ratio': d['ratio'],
                    'all_ratio': float(d['area'].max() / d['area'].min()),
                    'pent_res': pent_res,

@@ -108,6 +108,23 @@ def mean_cell_area(sys, res):
     return 4.0 * math.pi / CELLS_PER_RES[sys](res)
 
 
+def sampling_regime(sys, res, n_cells=None):
+    """'all' | 'subsam' | 'sample' — the selection regime the runner uses
+    for (sys, res) at budget `n_cells` (default N_CELLS; pass a table's
+    STAMPED n_cells to classify override-budget builds, where FULL_RES
+    is also disabled). The closed-form home of the three-regime boundary
+    described at N_CELLS above; runner's selection implements it."""
+    n = N_CELLS if n_cells is None else n_cells
+    if n == N_CELLS and res in FULL_RES.get(sys, ()):
+        return 'all'
+    total = CELLS_PER_RES[sys](res)
+    if total <= n:
+        return 'all'
+    if total <= SUBSAMPLE_MAX_RATIO * n:
+        return 'subsam'
+    return 'sample'
+
+
 # Every per-system dict a new grid must appear in. The dnc-check release
 # gate asserts each registry system is present in all of these, so adding
 # a dict here extends the gate for free (FULL_RES stays optional;
