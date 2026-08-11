@@ -224,10 +224,13 @@ class Adapter:
     impl = 'dggrid'
     packages = ()
 
-    def __init__(self, dggs_type, max_res, num_cells, params=None):
+    def __init__(self, dggs_type, max_res, num_cells, params=None,
+                 pentagons=False):
         self.grid = dggs_type.lower()
         self.max_res = max_res
         self._num_cells = num_cells
+        self._pentagons = pentagons
+        self._pent_ids = {}          # res -> frozenset of pentagon seqnums
         self._engine = Engine(dggs_type, params)
         if params:
             # Non-default metafile settings change which cells exist, so
@@ -261,3 +264,24 @@ class Adapter:
         # ISEA3H and ISEA4T) — the closed form replaces a whole-earth
         # generation subprocess and its full-geometry text parse.
         return range(1, self._num_cells(res) + 1)
+
+    def irregular(self, res, cells):
+        """Contract declaration (interface.py): the 12 pentagons for the
+        hexagonal grids (`pentagons=True`); otherwise every cell is
+        regular. DGGRID's SEQNUM layout puts the pentagons at
+        {1, 2, 2+q, ..., 2+10q} with q = (N-2)/10 (each block's pentagon
+        comes first; degenerates to 1..12 at r0) — VERIFIED per
+        resolution by checking all 12 boundaries have 5 corners, so a
+        numbering change in a future DGGRID fails loudly. (A point-lookup
+        alternative misfired at deep odd levels: TRANSFORM_POINTS near an
+        icosahedron vertex is knife-edge once pentagons are meters wide.)"""
+        if not self._pentagons:
+            return [False] * len(cells)
+        if res not in self._pent_ids:
+            q = (self._num_cells(res) - 2) // 10
+            ids = [1, 2] + [2 + k * q for k in range(1, 11)]
+            nv = [len(r) for r in self._engine.boundaries(res, ids)]
+            assert nv == [5] * 12, (res, ids, nv)
+            self._pent_ids[res] = frozenset(ids)
+        pent = self._pent_ids[res]
+        return [c in pent for c in cells]

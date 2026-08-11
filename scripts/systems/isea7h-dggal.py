@@ -17,4 +17,5 @@ from _dggal_engine import Adapter
 from dggs_compare import runner, stats
 
 if __name__ == '__main__':
-    runner.generate(Adapter('ISEA7H', to_sphere=stats.authalic_rings))
+    runner.generate(Adapter('ISEA7H', to_sphere=stats.authalic_rings,
+                            pentagons=True))

@@ -27,7 +27,33 @@ import glob
 import importlib.util
 import os
 
-from dggs_compare.stats import orient_ccw
+import numpy as np
+
+from dggs_compare.stats import authalic_lat, authalic_rings, orient_ccw
+
+
+def _geodetic_lat(xi):
+    """Geodetic latitude whose authalic latitude is `xi` degrees
+    (bisection; the map is monotone; ~1e-13 deg after 60 halvings)."""
+    lo, hi = -90.0, 90.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if authalic_lat(mid) < xi:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
+def _unit_mean(ring):
+    """Normalized mean of an open (lat, lng)-degree ring's unit vectors,
+    as (lat, lng) degrees — for a ring symmetric about an axis, the axis."""
+    la, lo = np.radians(np.asarray(ring, float)).T
+    v = np.column_stack([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo),
+                         np.sin(la)]).mean(0)
+    v /= np.linalg.norm(v)
+    return (float(np.degrees(np.arcsin(v[2]))),
+            float(np.degrees(np.arctan2(v[1], v[0]))))
 
 
 def _preload_native():
@@ -109,10 +135,13 @@ class Adapter:
     impl = 'dggal'
     packages = ('dggal',)
 
-    def __init__(self, cls, to_sphere=None, grid=None):
+    def __init__(self, cls, to_sphere=None, grid=None, pentagons=False):
         self.name = cls
         self.grid = cls.lower() if grid is None else grid
         self._to_sphere = to_sphere
+        self._pentagons = pentagons
+        self._pent_centers = None    # geodetic (lat, lng) of the 12 vertices
+        self._pent_zones = {}        # res -> frozenset of pentagon zones
         self.dggrs = globals()[cls]()
         # One reused query point: a GeoPoint constructed per zone_at call
         # is never freed by the binding (~1M leaked instances per sampled
@@ -150,6 +179,39 @@ class Adapter:
             yield from arr
         finally:
             Instance.delete(arr)   # the binding never frees the zone Array
+
+    def irregular(self, res, cells):
+        """Contract declaration (interface.py): the 12 pentagons — the
+        cells centered on the icosahedron vertices — for the hexagonal
+        grids (`pentagons=True`); otherwise every cell is regular."""
+        if not self._pentagons:
+            return [False] * len(cells)
+        if res not in self._pent_zones:
+            if self._pent_centers is None:
+                # The r0 cells ARE the 12 pentagons, each 5-fold symmetric
+                # about its icosahedron vertex ON THE SPHERE — so the
+                # unit-vector mean of the sphere-frame corners IS the
+                # vertex (to numerics), mapped back to the geodetic frame
+                # zone_at expects. Exactness matters: a deep-level
+                # pentagon is centimeters wide.
+                self._pent_centers = []
+                for z in self.enumerate_cells(0):
+                    ring = authalic_rings([self.cell_boundary(z)])[0]
+                    lat, lng = _unit_mean(ring)
+                    self._pent_centers.append((_geodetic_lat(lat), lng))
+                assert len(self._pent_centers) == 12, self._pent_centers
+            zones = self.cells_at(res, self._pent_centers)
+            assert None not in zones, zones
+            # Self-verifying declaration: all 12 must actually be
+            # pentagons (guards vertex-lookup drift at depths where a
+            # pentagon is centimeters wide, and future dggal versions).
+            assert all(len(self.cell_boundary(z)) == 5 for z in zones), zones
+            # int(zone) is the canonical id: listZones yields typed
+            # (unhashable) zone objects while zone_at returns plain ints.
+            self._pent_zones[res] = frozenset(int(z) for z in zones)
+            assert len(self._pent_zones[res]) == 12, zones
+        pent = self._pent_zones[res]
+        return [int(c) in pent for c in cells]
 
     # ----- geometry -----------------------------------------------------
     def cell_boundary(self, zone):

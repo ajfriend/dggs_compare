@@ -117,6 +117,7 @@ One Parquet file per `(grid, implementation, resolution)` at
 | `verts` | list<[lat, lng] f64> | vertex list, degrees, open; on the unit sphere (see below) |
 | `ar` | float64 | enclosing-cone aspect ratio; NaN = did-not-certify |
 | `area` | float64 | spherical area, steradians |
+| `irregular` | bool | the implementation's DECLARED exceptional cells (a hex grid's 12 pentagons); never inferred from geometry |
 
 Every cell is a **spherical polygon**: `verts` are sphere coordinates and
 edges are great circles, and all metrics are measured on that object.

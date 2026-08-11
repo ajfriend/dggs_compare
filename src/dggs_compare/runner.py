@@ -31,7 +31,8 @@ RAW_DIR = Path(__file__).resolve().parents[2] / 'data' / 'raw'
 RAW_COMPRESSION_LEVEL = 3   # written once, read once — don't pay zstd 19
 MAX_DRAW_FACTOR = 60        # safety cap on point draws in the sample regime
 
-RAW_SCHEMA = pa.schema([('cid', pa.string()), ('verts', VERTS_TYPE)])
+RAW_SCHEMA = pa.schema([('cid', pa.string()), ('verts', VERTS_TYPE),
+                        ('irregular', pa.bool_())])
 CONV_SCHEMA = pa.schema([('res', pa.int32()), ('cid', pa.string()),
                          ('verts', VERTS_TYPE), ('verts_dense', VERTS_TYPE)])
 
@@ -161,12 +162,17 @@ def _write_res(impl, res, meta, n_cells, full):
             cids, clist = zip(*chunk)
             tb = time.perf_counter()
             verts = impl.boundaries(res, clist)
+            # The contract's optional declaration of exceptional cells
+            # (see interface.py); absent = every cell regular.
+            flags = (impl.irregular(res, clist)
+                     if hasattr(impl, 'irregular') else [False] * len(clist))
             t_bounds += time.perf_counter() - tb
             # Rebind to the arrow array: the Python list is batch-sized
             # memory that must not outlive its conversion.
             verts = pa.array(verts, VERTS_TYPE)
             writer.write_table(pa.table(
-                {'cid': pa.array(cids, pa.string()), 'verts': verts},
+                {'cid': pa.array(cids, pa.string()), 'verts': verts,
+                 'irregular': pa.array(flags, pa.bool_())},
                 schema=RAW_SCHEMA))
     finally:
         writer.close()
