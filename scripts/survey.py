@@ -18,6 +18,11 @@ indicatrix. AR == 1 is isotropic; AR > 1 is anisotropic ("squished"). For an
 equal-area DGGS the areal factor a*b is ~fixed by construction, so AR is
 where the unavoidable distortion shows up.
 
+Every distribution and quantile is PER-CELL UNIFORM: point-draw-sampled
+tables include cells ~proportionally to their area, so they are
+inverse-area weighted back (see sweep_system). Worst-case stats are
+weighting-free.
+
 Run with:  just survey
 No CLI args (project convention).
 """
@@ -53,22 +58,38 @@ def sweep_system(name):
     (re-solved — two cells — so the extremes plot can draw the certified
     ellipse). Full per-cell area arrays are kept ONLY at the target
     resolution (the histogram input): retained everywhere they'd cost
-    ~2.5 GB at the full budget for values only ever reduced to scalars."""
+    ~2.5 GB at the full budget for values only ever reduced to scalars.
+    Weights are the exception — the by-resolution histograms consume them
+    at every sampled resolution — kept lean as float32 and None where
+    uniform (~0.6 GB at the full budget)."""
     target = RES[name]
+    impl = config.PRIMARY_IMPL[name]
     by_res = {}
     for res in cache.available_resolutions(name):
         cols = cache.load_columns(name, res, ['ar', 'area', 'irregular'])
         a = cols['ar']
         rel = cols['area'] / config.mean_cell_area(name, res)
         irr = cols['irregular']
-        d = {'ars': a[~np.isnan(a)], 'dnc': int(np.isnan(a).sum()),
+        # Point-draw-sampled tables include a cell with probability
+        # ~proportional to its area; inverse-area weights (None = the
+        # table is already per-cell uniform; float32 — histogram bars and
+        # quantile crossings don't need better) restore the per-cell
+        # measure every distribution here reports. The raw size-biased
+        # mean of rel sits at ~1+CV^2. Classified at the table's own
+        # STAMPED budget, so override-budget builds weight correctly too.
+        budget = int(cache.table_metadata(name, impl, res)['n_cells'])
+        sampled = config.sampling_regime(name, res, budget) == 'sample'
+        w = (1.0 / rel).astype(np.float32) if sampled else None
+        bad = np.isnan(a)
+        d = {'ars': a[~bad], 'w_ars': None if w is None else w[~bad],
+             'dnc': int(bad.sum()),
              'ratio': area_ratio(rel, irr),
              # The pentagons' relative areas, kept only where both cell
              # classes are present (empty for all-pentagon coarse levels
              # and for samples that caught none).
              'pent': rel[irr] if irr.any() and not irr.all() else rel[:0]}
         if res == target:
-            d['area'], d['irr'] = rel, irr
+            d['area'], d['irr'], d['w'] = rel, irr, w
         by_res[res] = d
 
     cols = cache.load_columns(name, target, ['cid', 'verts', 'ar'])
@@ -85,20 +106,19 @@ def sweep_system(name):
             'worst': record(int(np.nanargmax(cols['ar'])))}
 
 
-def regular_areas(area, irr):
-    """The REGULAR cells' normalized areas — the pentagon deficit is a
-    design constant (exactly 5/6 for the ISEA family), not distortion,
-    so the area statistics exclude it. A resolution with no regular
-    cells (ISEA-family r0: all 12 cells ARE the pentagons) uses every
-    cell. THE selection rule: every area stat and histogram goes through
-    here."""
-    a = area[~irr]
-    return a if a.size else area
+def regular_mask(irr):
+    """True for the REGULAR cells — the pentagon deficit is a design
+    constant (exactly 5/6 for the ISEA family), not distortion, so the
+    area statistics exclude it. A resolution with no regular cells
+    (ISEA-family r0: all 12 cells ARE the pentagons) keeps every cell.
+    THE selection rule: every area stat and histogram goes through here."""
+    m = ~irr
+    return m if m.any() else np.ones_like(irr)
 
 
 def area_ratio(area, irr):
-    """max/min normalized area over regular cells (see regular_areas)."""
-    a = regular_areas(area, irr)
+    """max/min normalized area over regular cells (see regular_mask)."""
+    a = area[regular_mask(irr)]
     return float(a.max() / a.min())
 
 
@@ -113,13 +133,16 @@ def _save(fig, name, dpi=DPI):
 def plot_histograms(results):
     """Cross-system AR distributions at each system's working resolution."""
     ars = {s: results[s]['by_res'][RES[s]]['ars'] for s in SYSTEMS}
+    ws = {s: results[s]['by_res'][RES[s]]['w_ars'] for s in SYSTEMS}
     dnc = {s: results[s]['by_res'][RES[s]]['dnc'] for s in SYSTEMS}
 
-    def stat(a):
-        return dict(n=a.size, min=float(a.min()), median=float(np.median(a)),
-                    p99=float(np.percentile(a, 99)), max=float(a.max()))
+    def stat(a, w):
+        med, p99 = np.quantile(a, [0.5, 0.99], weights=w,
+                               method='inverted_cdf')
+        return dict(n=a.size, min=float(a.min()), median=float(med),
+                    p99=float(p99), max=float(a.max()))
 
-    st = {s: stat(ars[s]) for s in SYSTEMS}
+    st = {s: stat(ars[s], ws[s]) for s in SYSTEMS}
 
     print(f'{"sys":5} {"n_conv":>8} {"n_dnc":>7} {"min":>10} {"median":>10} {"p99":>10} {"max":>10}')
     for s in SYSTEMS:
@@ -131,7 +154,8 @@ def plot_histograms(results):
     fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
     for ax, s in zip(axes, SYSTEMS):
         d = st[s]
-        ax.hist(ars[s], bins=bins, color=SYS_COLOR[s], edgecolor='white', linewidth=0.3)
+        ax.hist(ars[s], bins=bins, weights=ws[s], color=SYS_COLOR[s],
+                edgecolor='white', linewidth=0.3)
         ax.set_yscale('log')
         ax.set_ylabel('count (log)')
         ax.set_title(f'{SYS_LABEL[s]}  (median {d["median"]:.4f}, max {d["max"]:.4f}, DNC {dnc[s]})',
@@ -152,10 +176,13 @@ def plot_area_histograms(results):
     for s in SYSTEMS:
         by_res = results[s]['by_res']
         d = by_res[RES[s]]
-        reg = regular_areas(d['area'], d['irr'])
+        m = regular_mask(d['irr'])
+        reg = d['area'][m]
+        wr = None if d['w'] is None else d['w'][m]
         pent_res = next((r for r in sorted(by_res, reverse=True)
                          if by_res[r]['pent'].size), None)
-        data[s] = {'reg': reg, 'med': float(np.median(reg)),
+        data[s] = {'reg': reg, 'wr': wr, 'med': float(np.quantile(reg, 0.5, weights=wr,
+                                            method='inverted_cdf')),
                    'ratio': d['ratio'],
                    'all_ratio': float(d['area'].max() / d['area'].min()),
                    'pent_res': pent_res,
@@ -179,8 +206,8 @@ def plot_area_histograms(results):
     fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
     for ax, s in zip(axes, SYSTEMS):
         v = data[s]
-        ax.hist(v['reg'], bins=bins, color=SYS_COLOR[s], edgecolor='white',
-                linewidth=0.3)
+        ax.hist(v['reg'], bins=bins, weights=v['wr'], color=SYS_COLOR[s],
+                edgecolor='white', linewidth=0.3)
         ax.set_yscale('log')
         ax.set_ylabel('count (log)')
         if v['pent'].size:
@@ -311,7 +338,7 @@ def plot_by_resolution(name, by_res):
         d = by_res[res]
         a, dnc = d['ars'], d['dnc']
         red = bool(dnc)
-        counts = (ax.hist(a, bins=bins, color=SYS_COLOR[name],
+        counts = (ax.hist(a, bins=bins, weights=d['w_ars'], color=SYS_COLOR[name],
                           edgecolor='white', linewidth=0.3)[0]
                   if a.size else np.zeros(1))
         ax.set_yscale('log')
