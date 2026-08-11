@@ -19,9 +19,15 @@ max_res 28: DGGRID accepts finer, but 20*4^r overflows uint64 seqnums
 past r30 (observed: r31 ids come out smaller than r30's), and r28 cells
 are already ~6 cm^2.
 
-Density-0 stats are exact here (spot-checked to ~1e-12 against densely
+Density-0 AR is exact here (spot-checked to ~1e-12 against densely
 sampled boundaries): the aperture-4 triangle lattice keeps icosahedron
-edges ON cell edges at every level, so there are no distortion vertices.
+edges ON cell edges at every level, so no cell straddles a fold.
+Density-0 AREA is not: ISEA's angular distortion curves the projected-
+straight edges, so the 3-corner chord under/over-covers the true cell —
+broadly at coarse levels (14% of r4 cells off by >2%), and by a
+scale-invariant ±16% for the icosa-edge-adjacent class at every level
+(~30*2^r of the 20*4^r cells; densified boundaries restore 1.000 —
+measured, see issue #53). The true cells are exactly equal-area.
 
 Run with:  uv run scripts/systems/isea4t-dggrid.py
 """
