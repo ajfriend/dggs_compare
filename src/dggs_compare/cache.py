@@ -11,6 +11,9 @@ Schema:
     ar     float64                           enclosing-cone aspect ratio (csar);
                                              NaN = did-not-converge at GAP_TOL
     area   float64                           spherical area, steradians (sparea)
+    irregular  bool                         implementation-DECLARED exceptional
+                                            cells (a hex grid's 12 pentagons);
+                                            see interface.py
 
 Files: data/cells/{grid}-{impl}_r{res}.parquet (gitignored; published as
 GitHub data releases, one asset per table). Written by the metrics stage
@@ -46,6 +49,7 @@ SCHEMA = pa.schema([
     ('verts', VERTS_TYPE),
     ('ar', pa.float64()),
     ('area', pa.float64()),
+    ('irregular', pa.bool_()),
 ])
 
 BATCH = 50_000        # cells per streamed row group (bounds build memory)
