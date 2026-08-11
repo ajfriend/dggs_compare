@@ -291,7 +291,7 @@ function initLightbox() {
 async function main() {
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
-    `${M.systems.length} systems · aspect ratio via csar's enclosing-cone solver`
+    `${M.systems.length} systems · shape via csar's enclosing-cone solver, area via sparea`
     + ` · gap_tol ${M.gap_tol.toExponential()}`;
   if (M.tag) $('#tag').textContent = M.tag;
 

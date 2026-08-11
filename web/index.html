@@ -3,20 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DGGS aspect-ratio comparison</title>
+  <title>DGGS shape &amp; area comparison</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
-    <h1>DGGS aspect-ratio comparison</h1>
+    <h1>DGGS shape &amp; area comparison</h1>
     <p class="subtitle" id="subtitle">loading…</p>
     <p class="lede">
       Discrete global grid systems — <b>H3, S2, A5, ISEA7H, IVEA7H, ISEA3H,
-      IVEA3H, ISEA4T, rHEALPix, hex9</b> — compared by per-cell shape. <b>Aspect ratio (AR)</b> is the
-      major/minor axis ratio of a cell's tightest enclosing-cone ellipse (the
-      per-cell analogue of Tissot's indicatrix): AR&nbsp;=&nbsp;1 is isotropic,
-      AR&nbsp;&gt;&nbsp;1 is squished. Since these grids are ~equal-area, AR is
-      where the unavoidable distortion surfaces.
+      IVEA3H, ISEA4T, rHEALPix, hex9</b> — compared by per-cell shape and
+      area. <b>Aspect ratio (AR)</b> is the major/minor axis ratio of a
+      cell's tightest enclosing-cone ellipse (the per-cell analogue of
+      Tissot's indicatrix): AR&nbsp;=&nbsp;1 is isotropic,
+      AR&nbsp;&gt;&nbsp;1 is squished. <b>Area</b> is compared to each
+      resolution's exact mean, 4π/N — a perfectly equal-area grid reads
+      1.0 everywhere, so the spread is the areal distortion.
     </p>
     <p class="note">
       <b>Methodology:</b> every cell is measured as a spherical polygon —
@@ -40,9 +42,8 @@
     <section>
       <h2>Cell-area distributions</h2>
       <p class="caption">Cell area at the same working resolutions, normalized
-        by each resolution's exact mean 4π/N — 1.0 is a perfectly average cell.
-        Regular cells only; a hexagonal system's 12 pentagons appear as the
-        dashed tick.</p>
+        by the exact mean as above. Regular cells only; a hexagonal system's
+        12 pentagons appear as the dashed tick.</p>
       <img class="plot" src="out/area_histograms.png"
            alt="Cell-area distributions per system">
     </section>
@@ -85,7 +86,8 @@
         resolution, colored on a <b>shared</b> scale so the systems compare
         directly. The <b>Metric</b> menu picks what is colored: aspect ratio,
         or cell area relative to the resolution's exact mean (equal-area
-        systems read near-constant, with the 12 pentagons popping out at 5/6).
+        systems read near-constant, with the 12 pentagons popping out well
+        below the mean).
         Drag to rotate, scroll to zoom, hover for a cell's id and value.
         The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu picks
         where along the value axis they are spent — hold one fixed and switch
@@ -123,7 +125,8 @@
   <footer>
     <p>Data release <span id="tag">—</span> · generated from the published
       Parquet tables. Aspect ratio via
-      <a href="https://github.com/ajfriend/csar_py">csar</a>; globes rendered
+      <a href="https://github.com/ajfriend/csar_py">csar</a>; area via
+      <a href="https://pypi.org/project/sparea/">sparea</a>; globes rendered
       with <a href="https://github.com/ajfriend/ajglobe">ajglobe</a>.</p>
   </footer>
 
