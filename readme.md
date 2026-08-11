@@ -69,7 +69,7 @@ shells out to a DGGRID binary (no wheels exist anywhere) —
 just gen               # stage 1: raw geometry, one env per system -> data/raw/
 just gen hex9-hex9     # ... just one implementation
 just metrics           # stage 2: measure + gate -> the tables in data/cells/
-just survey            # AR comparison plots -> out/
+just survey            # AR + area comparison plots -> out/
 just calibrate         # area-match resolutions across systems (closed-form)
 just dnc-check         # assert the DNC invariants (pass/fail)
 just convergence       # report the stamped convergence residuals
