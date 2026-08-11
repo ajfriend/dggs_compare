@@ -16,10 +16,9 @@
       area. <b>Aspect ratio (AR)</b> is the major/minor axis ratio of a
       cell's tightest enclosing-cone ellipse (the per-cell analogue of
       Tissot's indicatrix): AR&nbsp;=&nbsp;1 is isotropic,
-      AR&nbsp;&gt;&nbsp;1 is squished. <b>Area</b> is compared relative to
-      each resolution's exact mean cell area, 4π/N — for a perfectly
-      equal-area grid every cell reads 1.0, so the spread is the areal
-      distortion.
+      AR&nbsp;&gt;&nbsp;1 is squished. <b>Area</b> is compared to each
+      resolution's exact mean, 4π/N — a perfectly equal-area grid reads
+      1.0 everywhere, so the spread is the areal distortion.
     </p>
     <p class="note">
       <b>Methodology:</b> every cell is measured as a spherical polygon —
@@ -43,9 +42,8 @@
     <section>
       <h2>Cell-area distributions</h2>
       <p class="caption">Cell area at the same working resolutions, normalized
-        by each resolution's exact mean 4π/N — 1.0 is a perfectly average cell.
-        Regular cells only; a hexagonal system's 12 pentagons appear as the
-        dashed tick.</p>
+        by the exact mean as above. Regular cells only; a hexagonal system's
+        12 pentagons appear as the dashed tick.</p>
       <img class="plot" src="out/area_histograms.png"
            alt="Cell-area distributions per system">
     </section>
@@ -127,7 +125,8 @@
   <footer>
     <p>Data release <span id="tag">—</span> · generated from the published
       Parquet tables. Aspect ratio via
-      <a href="https://github.com/ajfriend/csar_py">csar</a>; globes rendered
+      <a href="https://github.com/ajfriend/csar_py">csar</a>; area via
+      <a href="https://pypi.org/project/sparea/">sparea</a>; globes rendered
       with <a href="https://github.com/ajfriend/ajglobe">ajglobe</a>.</p>
   </footer>
 

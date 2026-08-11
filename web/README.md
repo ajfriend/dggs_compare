@@ -1,12 +1,13 @@
-# DGGS aspect-ratio site
+# DGGS shape & area site
 
-A static page comparing the grids by per-cell aspect ratio: the survey's
-matplotlib plots (cross-system + by-resolution distributions, best/worst
-cells) plus a grid of [ajglobe](https://github.com/ajfriend/ajglobe) globes,
-one per system, with cells colored by AR on a shared scale. No build step, no
-framework, no server — just `index.html` + `style.css` + `globe.js` (ES
-module) and the vendored ajglobe bundle under `vendor/` (refresh with
-`just web-vendor`).
+A static page comparing the grids by per-cell shape (aspect ratio) and
+area: the survey's matplotlib plots (cross-system + by-resolution
+distributions, the shape-vs-area tradeoff, best/worst cells) plus a grid
+of [ajglobe](https://github.com/ajfriend/ajglobe) globes, one per system,
+with cells colored by a selectable metric (AR, or area relative to the
+resolution's mean) on a shared scale. No build step, no framework, no
+server — just `index.html` + `style.css` + `globe.js` (ES module) and the
+vendored ajglobe bundle under `vendor/` (refresh with `just web-vendor`).
 
 ```sh
 just site   # build everything into web/out/ from the tables (survey PNGs + globes + manifest)
@@ -19,11 +20,13 @@ Everything the page shows is generated from the Parquet tables — nothing is
 hand-authored or pre-baked into git. `just site` runs two steps into `web/out/`
 (gitignored):
 
-- **`scripts/survey.py`** → `histograms.png`, `extremes.png`,
-  `by_res_<sys>.png` — the distribution and best/worst-cell plots (matplotlib).
+- **`scripts/survey.py`** → `histograms.png`, `area_histograms.png`,
+  `area_ratio_by_res.png`, `tradeoff.png`, `extremes.png`,
+  `by_res_<sys>.png` — the distribution, tradeoff, and best/worst-cell
+  plots (matplotlib).
 - **`scripts/web_data.py`** (via `dggs_compare.webdata`) → `manifest.json` and
-  `globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,ids.json}` — ajglobe's flat-binary
-  polygons, one globe per system.
+  `globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,area.f32,ids.json}` — ajglobe's
+  flat-binary polygons plus one f32 per cell per metric, one globe per system.
 
 **Globe resolution is area-matched.** Each system's globe uses the resolution
 whose cell count is closest (in log-ratio) to H3's at `config.GLOBE_H3_RES`
@@ -34,18 +37,22 @@ globes, lower for coarser/lighter ones; changing it needs a full site rebuild.
 
 ## Viewer features (`globe.js`)
 
-- **Globes** — one per system, cells colored by AR on a shared domain so
-  systems compare directly. Drag to rotate, scroll to zoom; **all globes are
-  synced** (moving one moves all). Hover a cell for its id + AR.
-- **Color-scale dropdown** — pick a `(colormap, value-transform)`: viridis
+- **Globes** — one per system, cells colored by the selected metric on a
+  shared domain so systems compare directly. Drag to rotate, scroll to zoom;
+  **all globes are synced** (moving one moves all). Hover a cell for its
+  id + value.
+- **Metric dropdown** — aspect ratio, or cell area relative to the
+  resolution's exact mean; switching re-domains the legend, histograms, and
+  per-globe stat lines together.
+- **Color-scale dropdowns** — pick a `(colormap, value-transform)`: viridis
   (linear / γ0.4 / p99 / log), cividis, magma, turbo, grayscale. The globes and
-  the legend recolor together. The AR axis stays linear; only the color mapping
-  changes (so, e.g., linear-viridis vs. the stretched default is directly
-  comparable — the stretched one is the historical default that keeps the
-  low-AR bulk legible).
-- **Hovered-globe histogram** — above the color bar, the AR distribution of the
-  globe under the cursor (log-count bars, shared AR axis), with a line marking
-  the hovered cell — aligned to the color bar below.
+  the legend recolor together. The value axis stays linear; only the color
+  mapping changes (so, e.g., linear-viridis vs. the stretched default is
+  directly comparable — the stretched one is the historical default that keeps
+  the low-AR bulk legible).
+- **Hovered-globe histogram** — above the color bar, the hovered globe's
+  distribution of the active metric (log-count bars, shared value axis), with
+  a line marking the hovered cell — aligned to the color bar below.
 - **Full-screen plots** — click any survey plot to view it full-screen; there's
   an "open full-size" link to the original PNG. Esc / backdrop / × to close.
 
