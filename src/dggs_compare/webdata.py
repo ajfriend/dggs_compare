@@ -5,14 +5,17 @@ nothing is measured here. The site's distribution plots are the matplotlib PNGs
 from `scripts/survey.py`; this module only emits the globe layer, into
 web/out/ (gitignored):
 
-- globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,ids.json} — ajglobe's native
-  flat-binary polygon format. One globe per system, all at a common cell size:
-  the resolution whose cell count is closest to H3's at config.GLOBE_H3_RES.
-  Equal-area grids -> matching cell count matches average cell area, so this is
-  an area match computed from the closed-form counts (no table reads).
+- globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,area.f32,ids.json} — ajglobe's
+  native flat-binary polygon format plus one f32 per cell per metric (AR, and
+  area normalized by the resolution's exact mean 4*pi/N; the viewer derives
+  each metric's shared color domain from these). One globe per system, all at
+  a common cell size: the resolution whose cell count is closest to H3's at
+  config.GLOBE_H3_RES. Equal-area grids -> matching cell count matches
+  average cell area, so this is an area match computed from the closed-form
+  counts (no table reads).
 - manifest.json — the data-release tag, per-system web colors/labels, the
-  chosen globe resolution per system, csar's gap tolerance, and the shared globe
-  AR max (so every globe colors on one comparable scale).
+  chosen globe resolution per system, csar's gap tolerance, and the shared
+  globe AR max (the viewer's provisional color domain while binaries load).
 """
 
 import json
@@ -50,11 +53,12 @@ def build_globe():
     for s in systems():
         res = globe_res_for(s, anchor_n)
         chosen[s] = res
-        cols = cache.load_columns(s, res, ['cid', 'verts', 'ar'])
+        cols = cache.load_columns(s, res, ['cid', 'verts', 'ar', 'area'])
         cell_ars = cols['ar']
         finite = cell_ars[~np.isnan(cell_ars)]
         if finite.size:
             globe_max = max(globe_max, float(finite.max()))
+        rel = cols['area'] / config.mean_cell_area(s, res)
         pos, starts = [], [0]
         for latlng in cols['verts']:
             pos.append(np.asarray(latlng, dtype='<f4')[:, ::-1])   # -> [lng, lat]
@@ -63,6 +67,7 @@ def build_globe():
         np.concatenate(pos).tofile(f'{stem}_pos.f32')
         np.asarray(starts, dtype='<u4').tofile(f'{stem}_idx.u32')
         cell_ars.astype('<f4').tofile(f'{stem}_ar.f32')
+        rel.astype('<f4').tofile(f'{stem}_area.f32')
         Path(f'{stem}_ids.json').write_text(json.dumps(cols['cid']))
         print(f'  globe {s} r{res}: {len(cols["cid"]):,} cells '
               f'(anchor {anchor_n:,}) -> {stem.name}_*')

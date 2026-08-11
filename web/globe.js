@@ -1,17 +1,20 @@
-// Static DGGS aspect-ratio site: a grid of ajglobe globes, one per system,
-// cells colored by aspect ratio on a SHARED scale so systems compare directly.
-// - two dropdowns pick the colormap and the value transform independently
-//   (any combination is valid); globes + legend recolor together.
-// - hovering a globe shows THAT globe's AR distribution as a histogram above
-//   the legend, with a line marking the hovered cell's AR (aligned to the
-//   color bar, so you see where that cell sits in both distribution and color).
+// Static DGGS comparison site: a grid of ajglobe globes, one per system,
+// cells colored by the selected METRIC (aspect ratio, or area relative to
+// the resolution's exact mean) on a SHARED scale so systems compare directly.
+// - three dropdowns pick the metric, the colormap, and the value transform
+//   independently; globes + legend + histogram recolor together.
+// - hovering a globe shows THAT globe's distribution of the active metric as
+//   a histogram above the legend, with a line marking the hovered cell
+//   (aligned to the color bar, so you see where the cell sits in both the
+//   distribution and the color scale).
 // - all globes rotate/zoom together.
 import { Orb } from './vendor/ajglobe.min.js';
 
-// ---- the two dropdown axes. One entry per option, in menu order; the FIRST
-// entry of each list is the default (labeled so in the UI at build time).
-// Adding a colormap or transform is one new object here — the dropdowns and
-// lookups all derive from these lists.
+// ---- the three dropdown axes (colormap, transform, metric — METRICS sits
+// below the transforms it feeds). One entry per option, in menu order; the
+// FIRST entry of each list is the default (labeled so in the UI at build
+// time). Adding an option is one new object in its list — the dropdowns and
+// lookups all derive from these.
 // Colormap stops: RGB control points (0–255), linearly interpolated.
 const CMAPS = [
   { key: 'viridis', label: 'Viridis (perceptually uniform)',
@@ -45,18 +48,32 @@ function interp(stops, t) {
 const LUTS = {};
 const lutFor = (cmap) => (LUTS[cmap.key] ??= Array.from({ length: 256 }, (_, i) => interp(cmap.stops, i / 255)));
 
-// Value transforms: aspect ratio (>= 1) -> t in [0,1] for the COLOR. The AR
-// axis (histogram + legend position) stays linear over [1, max]; only the
-// color placement changes, so a stretched scale shows saturation visibly.
+// Value transforms: metric value in [lo, max] -> t in [0,1] for the COLOR.
+// The value axis (histogram + legend position) stays linear over [lo, max];
+// only the color placement changes, so a stretched scale shows saturation
+// visibly. For AR lo == 1 (its floor); for relative area lo is the smallest
+// cell across the globes.
 const TFS = [
   { key: 'power', label: 'γ0.4 stretch',
-    fn: (ar, d) => Math.pow((ar - 1) / (d.max - 1), 0.4) },
-  { key: 'linear', label: 'linear in AR',
-    fn: (ar, d) => (ar - 1) / (d.max - 1) },
+    fn: (v, d) => Math.pow((v - d.lo) / (d.max - d.lo), 0.4) },
+  { key: 'linear', label: 'linear in the value',
+    fn: (v, d) => (v - d.lo) / (d.max - d.lo) },
   { key: 'p99', label: 'linear, saturates at p99',
-    fn: (ar, d) => clamp01((ar - 1) / (d.p99 - 1)) },
+    fn: (v, d) => clamp01((v - d.lo) / (d.p99 - d.lo)) },
   { key: 'log', label: 'log',
-    fn: (ar, d) => (d.max > 1 ? Math.log(ar) / Math.log(d.max) : 0) },
+    fn: (v, d) => (d.max > d.lo ? Math.log(v / d.lo) / Math.log(d.max / d.lo) : 0) },
+];
+
+// The metric axis: which per-cell value the globes color by. `key` doubles
+// as the binary suffix (out/globe/*_{key}.f32) and the panel channel name;
+// `name` prefixes tooltips/histograms; `stat` renders the per-globe line;
+// `fixedLo` pins the domain floor (AR starts at 1 by definition; area's
+// floor is data-driven).
+const METRICS = [
+  { key: 'ar', label: 'Aspect ratio', name: 'AR', fixedLo: 1,
+    stat: (lo, hi) => `max AR ${fmt(hi, 3)}` },
+  { key: 'area', label: 'Relative area (cell / mean)', name: 'area',
+    fixedLo: null, stat: (lo, hi) => `area ${fmt(lo, 3)}–${fmt(hi, 3)}` },
 ];
 
 const DNC_GREY = [68, 68, 68, 255];
@@ -70,26 +87,29 @@ async function fetchBin(path, Ctor) {
   return new Ctor(await r.arrayBuffer());
 }
 
-const DOMAIN = { max: 1, p99: 1 };   // shared AR domain over all globe cells
-const PANELS = [];                   // { sys, label, color, orb, layer, ar, hist }
+const DOMAIN = { lo: 1, max: 1, p99: 1 };  // shared domain of the ACTIVE metric
+const PANELS = [];   // { sys, label, color, orb, layer, vals, hist, meta, n }
 let scale = { cmap: CMAPS[0], tf: TFS[0] };   // the current pick (defaults)
+let metric = METRICS[0];
 
-const makeFill = (ar, sc) => {
+const vals = (p) => p.vals[metric.key];
+
+const makeFill = (v, sc) => {
   const lut = lutFor(sc.cmap), tf = sc.tf.fn;
   return (i) => {
-    const a = ar[i];
+    const a = v[i];
     if (!Number.isFinite(a)) return DNC_GREY;
     return lut[Math.min(255, Math.max(0, (tf(a, DOMAIN) * 255) | 0))];
   };
 };
 
 function drawLegend(sc) {
-  $('#legLo').textContent = '1.0';
+  $('#legLo').textContent = fmt(DOMAIN.lo, 2);
   $('#legHi').textContent = fmt(DOMAIN.max, 2);
   const lut = lutFor(sc.cmap), tf = sc.tf.fn, n = 96;
   const stops = Array.from({ length: n }, (_, i) => {
-    const p = i / (n - 1), ar = 1 + p * (DOMAIN.max - 1);
-    const c = lut[Math.min(255, (tf(ar, DOMAIN) * 255) | 0)];
+    const p = i / (n - 1), v = DOMAIN.lo + p * (DOMAIN.max - DOMAIN.lo);
+    const c = lut[Math.min(255, (tf(v, DOMAIN) * 255) | 0)];
     return `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0}) ${100 * p}%`;
   }).join(',');
   $('#legendGrad').style.background = `linear-gradient(90deg, ${stops})`;
@@ -97,25 +117,36 @@ function drawLegend(sc) {
 
 function applyScale() {
   drawLegend(scale);
-  for (const p of PANELS) p.layer.update({ fill: makeFill(p.ar, scale) });
+  for (const p of PANELS) p.layer.update({ fill: makeFill(vals(p), scale) });
 }
 
-// ---- shared AR domain + per-globe histograms (bars are scale-independent) ----
+// ---- shared metric domain + per-globe histograms (scale-independent).
+// Memoized per metric: the data is static, so a metric switch after the
+// first is a lookup, not a ~400k-value re-sort.
+const DOMAINS = {};   // metric key -> { lo, max, p99, hists: Map(panel -> hist) }
 function computeDomainAndHists() {
-  const all = [];
-  for (const p of PANELS) for (const a of p.ar) if (Number.isFinite(a)) all.push(a);
-  all.sort((x, y) => x - y);
-  DOMAIN.max = all.length ? all[all.length - 1] : 1;
-  DOMAIN.p99 = all.length ? all[Math.floor(0.99 * (all.length - 1))] : DOMAIN.max;
-  const span = DOMAIN.max - 1 || 1;
-  for (const p of PANELS) {
-    const counts = new Array(HBINS).fill(0);
-    for (const a of p.ar) {
-      if (!Number.isFinite(a)) continue;
-      counts[Math.min(HBINS - 1, Math.max(0, Math.floor((a - 1) / span * HBINS)))]++;
+  let c = DOMAINS[metric.key];
+  if (!c) {
+    const all = [];
+    for (const p of PANELS) for (const a of vals(p)) if (Number.isFinite(a)) all.push(a);
+    const s = Float32Array.from(all).sort();   // typed: numeric, no comparator
+    const lo = metric.fixedLo ?? (s.length ? s[0] : 0);
+    const max = s.length ? s[s.length - 1] : lo + 1;
+    const p99 = s.length ? s[Math.floor(0.99 * (s.length - 1))] : max;
+    const span = max - lo || 1;
+    const hists = new Map();
+    for (const p of PANELS) {
+      const counts = new Array(HBINS).fill(0);
+      for (const a of vals(p)) {
+        if (!Number.isFinite(a)) continue;
+        counts[Math.min(HBINS - 1, Math.max(0, Math.floor((a - lo) / span * HBINS)))]++;
+      }
+      hists.set(p, { counts, cmax: Math.max(1, ...counts) });
     }
-    p.hist = { counts, cmax: Math.max(1, ...counts) };
+    c = DOMAINS[metric.key] = { lo, max, p99, hists };
   }
+  Object.assign(DOMAIN, { lo: c.lo, max: c.max, p99: c.p99 });
+  for (const p of PANELS) p.hist = c.hists.get(p);
 }
 
 // ---- the dynamic histogram canvas (shows the hovered globe) ----
@@ -129,9 +160,9 @@ function initHist() {
   hctx = c.getContext('2d');
   hctx.scale(dpr, dpr);
 }
-function drawHist(panel, hlAR) {
+function drawHist(panel, hl) {
   $('#histLabel').innerHTML = panel
-    ? `<span class="swatch" style="background:${panel.color}"></span>${panel.label} — ${panel.ar.length.toLocaleString()} cells`
+    ? `<span class="swatch" style="background:${panel.color}"></span>${panel.label} — ${vals(panel).length.toLocaleString()} cells`
     : 'hover a globe to see its distribution';
   hctx.clearRect(0, 0, hcw, hch);
   if (!panel) return;
@@ -142,12 +173,12 @@ function drawHist(panel, hlAR) {
     const h = (Math.log(counts[i] + 1) / logmax) * (hch - 3);
     hctx.fillRect(i * bw, hch - h, Math.max(1, bw - 0.6), h);
   }
-  if (hlAR != null && Number.isFinite(hlAR)) {
-    const x = clamp01((hlAR - 1) / (DOMAIN.max - 1)) * hcw;
+  if (hl != null && Number.isFinite(hl)) {
+    const x = clamp01((hl - DOMAIN.lo) / (DOMAIN.max - DOMAIN.lo)) * hcw;
     hctx.strokeStyle = '#fff'; hctx.lineWidth = 1.5;
     hctx.beginPath(); hctx.moveTo(x, 0); hctx.lineTo(x, hch); hctx.stroke();
     hctx.fillStyle = '#fff'; hctx.font = '11px ui-monospace, Menlo, monospace';
-    const t = `AR ${hlAR.toFixed(3)}`, tw = hctx.measureText(t).width;
+    const t = `${metric.name} ${hl.toFixed(3)}`, tw = hctx.measureText(t).width;
     hctx.fillText(t, x + tw + 6 > hcw ? x - 4 - tw : x + 4, 11);
   }
 }
@@ -196,37 +227,44 @@ async function buildGlobe(M, sys) {
   orb.borders({ color: '#2a3340', width: 1 });
 
   const key = `${sys}_r${res}`;
-  const [pos, starts, ar, ids] = await Promise.all([
+  const [pos, starts, ar, area, ids] = await Promise.all([
     fetchBin(`out/globe/${key}_pos.f32`, Float32Array),
     fetchBin(`out/globe/${key}_idx.u32`, Uint32Array),
     fetchBin(`out/globe/${key}_ar.f32`, Float32Array),
+    // Tolerate a cached pre-area build (see the guard in main()).
+    fetchBin(`out/globe/${key}_area.f32`, Float32Array).catch(() => null),
     fetch(`out/globe/${key}_ids.json`).then((r) => r.json()),
   ]);
 
-  let amax = 1;
-  for (const a of ar) if (Number.isFinite(a) && a > amax) amax = a;
-  card.querySelector('.globe-meta').textContent =
-    `${ids.length.toLocaleString()} cells · max AR ${fmt(amax, 3)}`;
-
   const layer = orb.polygons({ lnglat: pos, starts, fill: makeFill(ar, scale) });
-  const panel = { sys, label: `${M.labels[sys]} ${M.res_prefix[sys]}${res}`, color: M.colors[sys], orb, layer, ar };
+  const panel = { sys, label: `${M.labels[sys]} ${M.res_prefix[sys]}${res}`,
+                  color: M.colors[sys], orb, layer, vals: { ar, area },
+                  meta: card.querySelector('.globe-meta'), n: ids.length };
   PANELS.push(panel);
+  setMeta(panel);
 
   orb.on('viewchange', () => syncFrom(orb));
 
   const tip = $('#tooltip');
   orb.on('hover', (e) => {
     orb.highlight(e.index ?? -1, layer);
-    const a = e.index == null ? null : ar[e.index];
+    const a = e.index == null ? null : vals(panel)[e.index];
     drawHist(panel, Number.isFinite(a) ? a : null);   // this globe's distribution + line
     if (e.index == null) { tip.style.opacity = 0; return; }
-    tip.innerHTML = `${ids[e.index]}<br>AR ${Number.isFinite(a) ? fmt(a, 4) : 'DNC'}`;
+    tip.innerHTML = `${ids[e.index]}<br>${metric.name} ${Number.isFinite(a) ? fmt(a, 4) : 'DNC'}`;
     const r = canvas.getBoundingClientRect();
     tip.style.left = `${r.left + e.x + 14}px`;
     tip.style.top = `${r.top + e.y + 14}px`;
     tip.style.opacity = 1;
   });
   canvas.addEventListener('pointerleave', () => { tip.style.opacity = 0; drawHist(panel, null); });
+}
+
+// Per-globe stat line under each canvas, restated for the active metric.
+function setMeta(p) {
+  let lo = Infinity, hi = -Infinity;
+  for (const a of vals(p)) if (Number.isFinite(a)) { if (a < lo) lo = a; if (a > hi) hi = a; }
+  p.meta.textContent = `${p.n.toLocaleString()} cells · ${metric.stat(lo, hi)}`;
 }
 
 // Click any plot (static histogram/extremes or a dynamically-added by-res
@@ -261,24 +299,36 @@ async function main() {
   initLightbox();
   initHist();
 
-  const cmapSel = $('#cmapSelect'), tfSel = $('#tfSelect');
+  const metricSel = $('#metricSelect'), cmapSel = $('#cmapSelect'), tfSel = $('#tfSelect');
   const onPick = () => {
     scale = { cmap: CMAPS.find((c) => c.key === cmapSel.value),
               tf: TFS.find((t) => t.key === tfSel.value) };
     applyScale();
   };
-  for (const [sel, opts] of [[cmapSel, CMAPS], [tfSel, TFS]]) {
+  // The metric changes the DOMAIN and the histograms, not just colors.
+  const onMetric = () => {
+    metric = METRICS.find((m) => m.key === metricSel.value);
+    computeDomainAndHists();
+    for (const p of PANELS) setMeta(p);
+    onPick();
+    drawHist(PANELS[0], null);
+  };
+  for (const [sel, opts, on] of [[metricSel, METRICS, onMetric],
+                                 [cmapSel, CMAPS, onPick], [tfSel, TFS, onPick]]) {
     opts.forEach((o, i) =>
       sel.add(new Option(i ? o.label : `${o.label} — the default`, o.key)));
-    sel.addEventListener('change', onPick);
+    sel.addEventListener('change', on);
   }
   // a fresh <select> starts on its first option, which IS the default
 
   DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
   DOMAIN.p99 = DOMAIN.max;
   for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
-  computeDomainAndHists();
-  onPick();                           // apply the selects' current state
-  drawHist(PANELS[0], null);          // seed the histogram before any hover
+  // A cached pre-area build has no area binaries: keep the option visible
+  // but unusable, rather than silently showing wrong data.
+  if (PANELS.some((p) => !p.vals.area)) {
+    metricSel.querySelector('option[value="area"]').disabled = true;
+  }
+  onMetric();   // seed domain/hists/legend/meta for the default metric
 }
 main();

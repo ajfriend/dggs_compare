@@ -80,16 +80,21 @@
     </section>
 
     <section>
-      <h2>Globes — cells colored by aspect ratio</h2>
+      <h2>Globes — cells colored by the selected metric</h2>
       <p class="caption">One globe per system at its coarsest full-coverage
-        resolution, colored on a <b>shared</b> AR scale so the systems compare
-        directly. Drag to rotate, scroll to zoom, hover for a cell's id and AR.
+        resolution, colored on a <b>shared</b> scale so the systems compare
+        directly. The <b>Metric</b> menu picks what is colored: aspect ratio,
+        or cell area relative to the resolution's exact mean (equal-area
+        systems read near-constant, with the 12 pentagons popping out at 5/6).
+        Drag to rotate, scroll to zoom, hover for a cell's id and value.
         The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu picks
-        where along the AR axis they are spent — hold one fixed and switch the
-        other (e.g. the stretched default vs. linear on the same colormap) to
-        see how the choice changes what's visible. Globes and legend update
-        together.</p>
+        where along the value axis they are spent — hold one fixed and switch
+        the other to see how the choice changes what's visible. Globes and
+        legend update together.</p>
       <div class="globe-controls">
+        <label class="scale-picker">Metric
+          <select id="metricSelect"></select>
+        </label>
         <label class="scale-picker">Colormap
           <select id="cmapSelect"></select>
         </label>
@@ -106,11 +111,11 @@
           <span class="leg-label" id="legHi">—</span>
         </div>
       </div>
-      <p class="leg-cap">The bars are the hovered globe's AR distribution (log
-        count); the white line marks the hovered cell. Its position lines up with
-        the color bar below — both <b>linear in AR</b> — so you can read where a
-        cell sits in the distribution and how the color scale places it. Grey =
-        did-not-certify.</p>
+      <p class="leg-cap">The bars are the hovered globe's distribution of the
+        selected metric (log count); the white line marks the hovered cell. Its
+        position lines up with the color bar below — both <b>linear in the
+        value</b> — so you can read where a cell sits in the distribution and
+        how the color scale places it. Grey = did-not-certify (AR only).</p>
       <div class="globe-grid" id="globeGrid"></div>
     </section>
   </main>
