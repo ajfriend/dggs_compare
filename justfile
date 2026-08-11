@@ -98,7 +98,8 @@ web-data:
 # disk. Reads the `ar` column; nothing is re-measured except the two
 # extreme cells the survey re-solves (csar) to draw their ellipses.
 site: survey web-data
-    cp out/histograms.png out/extremes.png out/by_res_*.png web/out/
+    cp out/histograms.png out/area_histograms.png out/area_ratio_by_res.png \
+       out/tradeoff.png out/extremes.png out/by_res_*.png web/out/
 
 # Serve the static site at http://localhost:8000 (builds it first).
 web: site

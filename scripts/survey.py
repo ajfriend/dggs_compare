@@ -2,9 +2,14 @@
 writes the comparison plots to out/ (the only csar calls re-solve each
 system's two extreme cells, to draw their certified ellipses):
 
-  histograms.png     cross-system AR distributions at the working resolutions
-  extremes.png       best/worst cell per system, drawn with its ellipse
-  by_res_<sys>.png   per-system AR distribution stacked by resolution
+  histograms.png        cross-system AR distributions at the working resolutions
+  area_histograms.png   cross-system cell-area distributions (area / (4π/N),
+                        regular cells; pentagon ratio as a labeled tick)
+  area_ratio_by_res.png worst-case area ratio (max/min, regular cells) vs
+                        resolution — the area twin of the AR curves
+  tradeoff.png          worst-case AR vs worst-case area ratio per system
+  extremes.png          best/worst cell per system, drawn with its ellipse
+  by_res_<sys>.png      per-system AR distribution stacked by resolution
 
 Aspect ratio (AR) = major/minor semi-axis ratio (a/b, a>=1) of each cell's
 enclosing-cone ellipse — the discrete, per-cell analogue of Tissot's
@@ -48,8 +53,14 @@ def sweep_system(name):
     target = RES[name]
     by_res = {}
     for res in cache.available_resolutions(name):
-        a = cache.load_columns(name, res, ['ar'])['ar']
-        by_res[res] = {'ars': a[~np.isnan(a)], 'dnc': int(np.isnan(a).sum())}
+        cols = cache.load_columns(name, res, ['ar', 'area', 'irregular'])
+        a = cols['ar']
+        # Normalize by the resolution's EXACT mean cell area: cells
+        # partition the sphere, so mean = 4*pi / N(res), closed form.
+        mean = 4.0 * np.pi / config.CELLS_PER_RES[name](res)
+        by_res[res] = {'ars': a[~np.isnan(a)], 'dnc': int(np.isnan(a).sum()),
+                       'area': cols['area'] / mean,
+                       'irr': cols['irregular'].astype(bool)}
 
     cols = cache.load_columns(name, target, ['cid', 'verts', 'ar'])
 
@@ -63,6 +74,18 @@ def sweep_system(name):
     return {'by_res': by_res,
             'best': record(int(np.nanargmin(cols['ar']))),
             'worst': record(int(np.nanargmax(cols['ar'])))}
+
+
+def area_ratio(d):
+    """max/min normalized area over REGULAR cells — the pentagon deficit
+    is a design constant (exactly 5/6 for the ISEA family), not
+    distortion, so it rides as an annotation instead. A resolution with
+    no regular cells (ISEA-family r0: all 12 cells ARE the pentagons)
+    uses every cell."""
+    a = d['area'][~d['irr']]
+    if not a.size:
+        a = d['area']
+    return float(a.max() / a.min())
 
 
 # ----- plotting ----------------------------------------------------------
@@ -97,6 +120,125 @@ def plot_histograms(results):
     fig.suptitle('DGGS aspect-ratio distributions (~H3 r9 cell size)', fontsize=12)
     fig.tight_layout()
     out = OUT_DIR / 'histograms.png'
+    fig.savefig(out, dpi=DPI)
+    plt.close(fig)
+    print(f'wrote {out}')
+
+
+def plot_area_histograms(results):
+    """Cross-system normalized-area distributions at the working
+    resolutions, regular cells only — a hex system's 12 pentagons are
+    invisible mass in a 1M-cell histogram, so each system's pentagon
+    ratio is drawn as a labeled tick instead."""
+    data = {}
+    print(f'{"sys":5} {"n":>8} {"min":>10} {"median":>10} {"max":>10} '
+          f'{"max/min":>9} {"(all)":>9}')
+    for s in SYSTEMS:
+        d = results[s]['by_res'][RES[s]]
+        reg = d['area'][~d['irr']]
+        if not reg.size:
+            reg = d['area']
+        # The pentagon tick: 12 cells among millions are ~never SAMPLED
+        # at the working resolution, so take them from the deepest
+        # resolution that has them (the ratio is resolution-stable —
+        # exactly 5/6 for the ISEA family at every level).
+        pent, pent_res = np.array([]), None
+        for res, dd in sorted(results[s]['by_res'].items(), reverse=True):
+            if dd['irr'].any() and (~dd['irr']).any():
+                pent, pent_res = dd['area'][dd['irr']], res
+                break
+        data[s] = (reg, pent, pent_res)
+        r_all = float(d['area'].max() / d['area'].min())
+        print(f'{s:5} {reg.size:>8} {reg.min():>10.6f} '
+              f'{np.median(reg):>10.6f} {reg.max():>10.6f} '
+              f'{area_ratio(d):>9.6f} {r_all:>9.6f}')
+
+    lo = min(min(reg.min() for reg, _, _ in data.values()),
+             min((p.min() for _, p, _ in data.values() if p.size), default=1.0))
+    hi = max(reg.max() for reg, _, _ in data.values())
+    lo, hi = min(lo, 0.98), max(hi, 1.02)     # never a zero-width axis
+    bins = np.linspace(lo, hi, N_BINS + 1)
+    fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
+    for ax, s in zip(axes, SYSTEMS):
+        reg, pent, pent_res = data[s]
+        ax.hist(reg, bins=bins, color=SYS_COLOR[s], edgecolor='white',
+                linewidth=0.3)
+        ax.set_yscale('log')
+        ax.set_ylabel('count (log)')
+        if pent.size:
+            p = float(pent.mean())
+            ax.axvline(p, color='0.25', ls='--', lw=1.2)
+            ax.text(p, 0.92, f' pentagons {p:.4f} (r{pent_res})',
+                    transform=ax.get_xaxis_transform(),
+                    fontsize=8, color='0.25', va='top')
+        ax.set_title(f'{SYS_LABEL[s]}  (median {np.median(reg):.4f}, '
+                     f'max/min {area_ratio(results[s]["by_res"][RES[s]]):.4f})',
+                     fontsize=10)
+        ax.grid(True, alpha=0.3)
+    axes[-1].set_xlabel('cell area / (4π/N) — exact-mean normalized; '
+                        'regular cells (shared bins)')
+    fig.suptitle('DGGS cell-area distributions (~H3 r9 cell size)', fontsize=12)
+    fig.tight_layout()
+    out = OUT_DIR / 'area_histograms.png'
+    fig.savefig(out, dpi=DPI)
+    plt.close(fig)
+    print(f'wrote {out}')
+
+
+def plot_area_ratio_by_res(results):
+    """One figure: worst-case area ratio vs resolution per system — the
+    area twin of the worst-case-AR-by-resolution story. Equal-area
+    systems hold 1.0 to float precision; sampled resolutions use sample
+    extremes (area is a smooth field, so 1M uniform samples reach close
+    to the true range)."""
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    for s in SYSTEMS:
+        rows = sorted(results[s]['by_res'].items())
+        ax.plot([r for r, _ in rows], [area_ratio(d) for _, d in rows],
+                '-o', ms=3.5, lw=1.4, color=SYS_COLOR[s], label=SYS_LABEL[s])
+    ax.axhline(1.0, color='0.8', lw=1, zorder=0)
+    ax.set_xlabel('resolution')
+    ax.set_ylabel('max/min cell area (regular cells, log)')
+    # Log y: the equal-area family hugs 1.0 while the finest levels of
+    # sub-attosteradian cells can spike on the f64 area floor — log keeps
+    # the 2x band readable either way.
+    ax.set_yscale('log')
+    ax.yaxis.set_major_formatter('{x:g}')
+    ax.set_yticks([1.0, 1.1, 1.25, 1.5, 2.0, 3.0, 4.0])
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+    ax.set_title('Worst-case area ratio by resolution\n'
+                 '(pentagons excluded — their 5/6 deficit is a design '
+                 'constant, not distortion)', fontsize=11)
+    fig.tight_layout()
+    out = OUT_DIR / 'area_ratio_by_res.png'
+    fig.savefig(out, dpi=DPI)
+    plt.close(fig)
+    print(f'wrote {out}')
+
+
+def plot_tradeoff(results):
+    """Pareto scatter at the working resolutions: worst-case AR (all
+    cells, matching the published AR stats) against worst-case area
+    ratio (regular cells). The ideal grid sits at (1, 1)."""
+    fig, ax = plt.subplots(figsize=(7.5, 6))
+    for s in SYSTEMS:
+        d = results[s]['by_res'][RES[s]]
+        x, y = float(d['ars'].max()), area_ratio(d)
+        ax.plot([x], [y], 'o', ms=9, color=SYS_COLOR[s])
+        ax.annotate(SYS_LABEL[s], (x, y), textcoords='offset points',
+                    xytext=(7, 4), fontsize=9)
+    ax.axhline(1.0, color='0.85', lw=1, zorder=0)
+    ax.axvline(1.0, color='0.85', lw=1, zorder=0)
+    ax.set_xlabel('worst-case aspect ratio (all cells)')
+    ax.set_ylabel('worst-case area ratio, max/min (regular cells)')
+    ax.grid(True, alpha=0.3)
+    ax.set_title('Shape vs area: worst case at the working resolutions\n'
+                 '(ideal = (1, 1); AR keeps pentagons, area excludes them)',
+                 fontsize=11)
+    fig.tight_layout()
+    out = OUT_DIR / 'tradeoff.png'
     fig.savefig(out, dpi=DPI)
     plt.close(fig)
     print(f'wrote {out}')
@@ -202,6 +344,9 @@ def main():
               f'in {time.perf_counter() - t0:.1f}s')
 
     plot_histograms(results)
+    plot_area_histograms(results)
+    plot_area_ratio_by_res(results)
+    plot_tradeoff(results)
     plot_extremes(results)
     for s in SYSTEMS:
         plot_by_resolution(s, results[s]['by_res'])

@@ -38,6 +38,36 @@
     </section>
 
     <section>
+      <h2>Cell-area distributions</h2>
+      <p class="caption">Cell area at the same working resolutions, normalized
+        by each resolution's exact mean 4π/N — 1.0 is a perfectly average cell.
+        Equal-area systems collapse to a spike at 1; a hexagonal system's 12
+        pentagons sit at the dashed tick (exactly 5/6 of a hexagon for the
+        ISEA family — a design constant, so the histograms show regular cells
+        only).</p>
+      <img class="plot" src="out/area_histograms.png"
+           alt="Cell-area distributions per system">
+    </section>
+
+    <section>
+      <h2>Shape vs area</h2>
+      <p class="caption">Worst-case aspect ratio against worst-case area ratio
+        (max/min over regular cells) at the working resolutions. The ideal
+        grid sits at (1,&nbsp;1); equal-area systems lie on the bottom edge.</p>
+      <img class="plot" src="out/tradeoff.png"
+           alt="Worst-case AR vs worst-case area ratio per system">
+    </section>
+
+    <section>
+      <h2>Area ratio by resolution</h2>
+      <p class="caption">Worst-case area ratio (max/min over regular cells) at
+        every resolution — the area twin of the AR-by-resolution story.
+        Equal-area systems hold 1.0 to float precision.</p>
+      <img class="plot" src="out/area_ratio_by_res.png"
+           alt="Worst-case area ratio by resolution">
+    </section>
+
+    <section>
       <h2>Best &amp; worst cells</h2>
       <p class="caption">The most-circular and most-squished cell of each
         system, drawn with its enclosing-cone ellipse.</p>
