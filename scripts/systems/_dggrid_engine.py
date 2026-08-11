@@ -279,7 +279,7 @@ class Adapter:
             return [False] * len(cells)
         if res not in self._pent_ids:
             q = (self._num_cells(res) - 2) // 10
-            ids = [1, 2] + [2 + k * q for k in range(1, 11)]
+            ids = [1] + [2 + k * q for k in range(11)]   # 2+10q == N
             nv = [len(r) for r in self._engine.boundaries(res, ids)]
             assert nv == [5] * 12, (res, ids, nv)
             self._pent_ids[res] = frozenset(ids)

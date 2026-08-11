@@ -146,6 +146,9 @@ def _write_res(impl, res, meta, n_cells, full):
     `select` includes the sampler's own rng/dedup — a thin numpy layer
     over the binding's point lookups."""
     t0 = time.perf_counter()
+    # The contract's optional declaration of exceptional cells
+    # (see interface.py); absent = every cell regular.
+    irregular = getattr(impl, 'irregular', None)
     cells, mode = _select_cells(impl, res, n_cells, full)
     t_select = time.perf_counter() - t0
     tc = time.perf_counter()
@@ -162,10 +165,8 @@ def _write_res(impl, res, meta, n_cells, full):
             cids, clist = zip(*chunk)
             tb = time.perf_counter()
             verts = impl.boundaries(res, clist)
-            # The contract's optional declaration of exceptional cells
-            # (see interface.py); absent = every cell regular.
-            flags = (impl.irregular(res, clist)
-                     if hasattr(impl, 'irregular') else [False] * len(clist))
+            flags = (irregular(res, clist) if irregular
+                     else [False] * len(clist))
             t_bounds += time.perf_counter() - tb
             # Rebind to the arrow array: the Python list is batch-sized
             # memory that must not outlive its conversion.

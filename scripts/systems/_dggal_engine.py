@@ -27,6 +27,7 @@ import glob
 import importlib.util
 import os
 
+import csar
 import numpy as np
 
 from dggs_compare.stats import authalic_lat, authalic_rings, orient_ccw
@@ -48,9 +49,7 @@ def _geodetic_lat(xi):
 def _unit_mean(ring):
     """Normalized mean of an open (lat, lng)-degree ring's unit vectors,
     as (lat, lng) degrees — for a ring symmetric about an axis, the axis."""
-    la, lo = np.radians(np.asarray(ring, float)).T
-    v = np.column_stack([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo),
-                         np.sin(la)]).mean(0)
+    v = csar.to_vec3(ring, geo='latlng_deg').mean(0)
     v /= np.linalg.norm(v)
     return (float(np.degrees(np.arcsin(v[2]))),
             float(np.degrees(np.arctan2(v[1], v[0]))))
@@ -201,15 +200,15 @@ class Adapter:
                     self._pent_centers.append((_geodetic_lat(lat), lng))
                 assert len(self._pent_centers) == 12, self._pent_centers
             zones = self.cells_at(res, self._pent_centers)
-            assert None not in zones, zones
             # Self-verifying declaration: all 12 must actually be
             # pentagons (guards vertex-lookup drift at depths where a
             # pentagon is centimeters wide, and future dggal versions).
             assert all(len(self.cell_boundary(z)) == 5 for z in zones), zones
             # int(zone) is the canonical id: listZones yields typed
             # (unhashable) zone objects while zone_at returns plain ints.
-            self._pent_zones[res] = frozenset(int(z) for z in zones)
-            assert len(self._pent_zones[res]) == 12, zones
+            pent = frozenset(int(z) for z in zones)
+            assert len(pent) == 12, zones     # 12 lookups, 12 DISTINCT hits
+            self._pent_zones[res] = pent
         pent = self._pent_zones[res]
         return [int(c) in pent for c in cells]
 

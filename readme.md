@@ -93,7 +93,10 @@ matrix is derived from it. A new implementation touches:
    works because running a script puts its own directory on `sys.path`.
 2. `config.py` — every dict in `PER_SYSTEM`: `CELLS_PER_RES`, `TARGET_RES`
    (`just calibrate` picks it from the closed-form counts — no tables
-   needed), `SYS_COLOR`, `PRIMARY_IMPL`.
+   needed), `SYS_COLOR`, `PRIMARY_IMPL`, and `EXPECTED_IRREGULAR` — decide
+   whether the implementation declares exceptional cells (the optional
+   `irregular` contract method; a hex grid's 12 pentagons) and record the
+   expected count, which `just dnc-check` asserts against the tables.
 
 A second implementation of an existing grid touches only step 1 — the
 grid's `PER_SYSTEM` entries already exist; the one decision is whether
