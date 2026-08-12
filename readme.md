@@ -6,6 +6,9 @@ ISEA3H, IVEA3H, ISEA4T, rHEALPix, hex9** — by per-cell statistics: shape
 solver) and area (via [sparea](https://pypi.org/project/sparea/)), at
 area-matched resolutions.
 
+**Live site: <https://ajfriend.com/dggs_compare/>** — interactive globes
+and every comparison plot, rebuilt from each data release.
+
 **The products of this repo are data artifacts and web pages.** The Parquet
 tables — one row per cell, with the computed `ar` and `area` bundled next to
 the geometry — are published as GitHub data releases; downstream consumers
@@ -15,9 +18,9 @@ with thin scripts on top; it is never published to PyPI.
 
 **Aspect ratio (AR)** throughout means the major/minor semi-axis ratio (a/b,
 a≥b) of a cell's enclosing-cone ellipse — the discrete per-cell analogue of
-Tissot's indicatrix. AR = 1 is isotropic; AR > 1 is anisotropic ("squished").
-Since these grids are ~equal-area, AR is where the unavoidable distortion
-surfaces.
+Tissot's indicatrix. AR = 1 is isotropic; AR > 1 is anisotropic (elongated).
+Tiling a sphere forces some elongation somewhere — AR measures each cell's
+share of it.
 
 Not listed separately: **IGEO7** is geometrically identical to ISEA7H (it is
 ISEA7H with Z7 cell indexing), so its shape/area statistics are already

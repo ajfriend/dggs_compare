@@ -37,6 +37,12 @@ globes, lower for coarser/lighter ones; changing it needs a full site rebuild.
 
 ## Viewer features (`globe.js`)
 
+- **Tabs** — the page is four hash-routed tabs (`#globes` default,
+  `#shape`, `#area`, `#tradeoff`): linkable, reload-stable, and plain
+  in-page anchors switch tabs. The globes build lazily and resumably on
+  showings of their tab (canvases size themselves from the DOM at
+  construction, so building only happens while the panel is visible);
+  a plots-tab visit costs no WebGL and no globe binaries.
 - **Globes** — one per system, cells colored by the selected metric on a
   shared domain so systems compare directly. Drag to rotate, scroll to zoom;
   **all globes are synced** (moving one moves all). Hover a cell for its
