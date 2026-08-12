@@ -35,18 +35,22 @@
     <div class="tab-panel" id="panel-globes">
       <section>
         <h2>Globes — cells colored by the selected metric</h2>
-        <p class="caption">One globe per system, at resolutions matched to a
-          common cell size (~H3&nbsp;r3), colored on a <b>shared</b> scale so
-          the systems compare directly. The <b>Metric</b> menu picks what is
-          colored: aspect ratio, or cell area relative to the resolution's
-          exact mean (an equal-area system reads near-constant; a hexagonal
-          system's 12 pentagons pop out well below the mean).
+        <p class="caption">One globe per system, every system at a resolution
+          matched to the common cell size set by the <b>Resolution</b> menu,
+          colored on a <b>shared</b> scale so the systems compare directly.
+          The <b>Metric</b> menu picks what is colored: aspect ratio, or cell
+          area relative to the resolution's exact mean (an equal-area system
+          reads near-constant; a hexagonal system's 12 pentagons pop out well
+          below the mean).
           Drag to rotate, scroll to zoom, hover for a cell's id and value.
           The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu
           picks how they are spread along the value range — hold one fixed and
           switch the other to see how the choice changes what's visible.
-          Globes and legend update together.</p>
+          Globes, legend, and histogram update together.</p>
         <div class="globe-controls">
+          <label class="scale-picker">Resolution
+            <select id="resSelect"></select>
+          </label>
           <label class="scale-picker">Metric
             <select id="metricSelect"></select>
           </label>
