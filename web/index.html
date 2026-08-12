@@ -17,10 +17,10 @@
     </p>
     <p class="lede">
       Every cell is measured as a spherical polygon — vertices on the unit
-      sphere, great-circle edges. Systems declared on an ellipsoid are
-      brought to the sphere by the area-preserving authalic latitude, so a
-      system that is exactly equal-area on its declared surface measures
-      exactly equal-area here.
+      sphere, edges great circles. Systems that define their cells on an
+      ellipsoid are mapped to the sphere by the area-preserving authalic
+      latitude, so a system that is exactly equal-area on its own surface
+      stays exactly equal-area here.
     </p>
   </header>
 
@@ -40,17 +40,17 @@
          aria-labelledby="tab-globes">
       <section>
         <h2>Globes — cells colored by the selected metric</h2>
-        <p class="caption">One globe per system at its coarsest full-coverage
-          resolution, colored on a <b>shared</b> scale so the systems compare
-          directly. The <b>Metric</b> menu picks what is colored: aspect ratio,
-          or cell area relative to the resolution's exact mean (equal-area
-          systems read near-constant, with the 12 pentagons popping out well
-          below the mean).
+        <p class="caption">One globe per system, at resolutions matched to a
+          common cell size (~H3&nbsp;r3), colored on a <b>shared</b> scale so
+          the systems compare directly. The <b>Metric</b> menu picks what is
+          colored: aspect ratio, or cell area relative to the resolution's
+          exact mean (an equal-area system reads near-constant; a hexagonal
+          system's 12 pentagons pop out well below the mean).
           Drag to rotate, scroll to zoom, hover for a cell's id and value.
-          The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu picks
-          where along the value axis they are spent — hold one fixed and switch
-          the other to see how the choice changes what's visible. Globes and
-          legend update together.</p>
+          The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu
+          picks how they are spread along the value range — hold one fixed and
+          switch the other to see how the choice changes what's visible.
+          Globes and legend update together.</p>
         <div class="globe-controls">
           <label class="scale-picker">Metric
             <select id="metricSelect"></select>
@@ -75,7 +75,8 @@
           selected metric (log count); the white line marks the hovered cell. Its
           position lines up with the color bar below — both <b>linear in the
           value</b> — so you can read where a cell sits in the distribution and
-          how the color scale places it. Grey = did-not-certify (AR only).</p>
+          how the color scale places it. Grey marks the rare cells whose aspect
+          ratio could not be certified.</p>
         <div class="globe-grid" id="globeGrid"></div>
       </section>
     </div>
@@ -117,23 +118,25 @@
     <div class="tab-panel" id="panel-area" role="tabpanel"
          aria-labelledby="tab-area">
       <p class="tab-intro">
-        <b>Area</b> is compared to each resolution's exact mean, 4π/N — a
-        perfectly equal-area grid reads 1.0 everywhere, so the spread is the
+        <b>Area</b> is shown relative to each resolution's exact mean cell
+        area — the sphere's area divided by the cell count, 4π/N — so a
+        perfectly equal-area grid reads 1.0 everywhere, and any spread is
         areal distortion.
       </p>
       <section>
         <h2>Cell-area distributions</h2>
         <p class="caption">Cell area of each system at its working
-          (~H3&nbsp;r9-sized) resolution. Regular cells only; a hexagonal
-          system's 12 pentagons appear as the dashed tick.</p>
+          (~H3&nbsp;r9-sized) resolution. A hexagonal system's 12 pentagons
+          are left out of the histogram and marked by the dashed tick.</p>
         <img class="plot" src="out/area_histograms.png"
              alt="Cell-area distributions per system">
       </section>
 
       <section>
         <h2>Area ratio by resolution</h2>
-        <p class="caption">The area twin of the AR-by-resolution story;
-          equal-area systems hold 1.0 to float precision.</p>
+        <p class="caption">Worst-case spread — the largest cell over the
+          smallest, pentagons excluded — at every resolution; equal-area
+          systems hold 1.0 to float precision.</p>
         <img class="plot" src="out/area_ratio_by_res.png"
              alt="Worst-case area ratio by resolution">
       </section>
@@ -158,7 +161,9 @@
       Parquet tables — code and data at
       <a href="https://github.com/ajfriend/dggs_compare">dggs_compare</a>.
       Aspect ratio via
-      <a href="https://github.com/ajfriend/csar_py">csar</a>; area via
+      <a href="https://github.com/ajfriend/csar_py">csar</a>, each solve
+      carrying a certificate of optimality (gap ≤
+      <span id="gap">—</span>); area via
       <a href="https://pypi.org/project/sparea/">sparea</a>; globes rendered
       with <a href="https://github.com/ajfriend/ajglobe">ajglobe</a>.</p>
   </footer>

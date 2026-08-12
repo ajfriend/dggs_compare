@@ -312,9 +312,9 @@ function initTabs(onShow) {
 async function main() {
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
-    `${M.systems.length} systems · shape via csar's enclosing-cone solver, area via sparea`
-    + ` · gap_tol ${M.gap_tol.toExponential()}`;
+    `${M.systems.length} systems · shape via csar's enclosing-cone solver, area via sparea`;
   if (M.tag) $('#tag').textContent = M.tag;
+  if (M.gap_tol) $('#gap').textContent = M.gap_tol.toExponential();
 
   byResGrid(M);
   initLightbox();
