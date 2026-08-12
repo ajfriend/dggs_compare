@@ -44,13 +44,14 @@ scripts/systems/      ONE PEP 723 SCRIPT PER (grid, implementation), named
                       lives here too, underscore-prefixed (_dggal_engine.py,
                       _dggrid_engine.py) — scripts import it directly
 scripts/              thin callers: metrics, survey, calibrate, dnc_check,
-                      convergence, web_*, explorations/
+                      convergence, web_*
 web/                  the static comparison site (survey plots + ajglobe
                       globes colored by a selectable metric: AR or relative
                       area); data from web/out/
 data/raw/             stage-1 geometry (gitignored, intermediate)
 data/cells/           the published tables (gitignored; data releases)
-notebooks/            interactive companions
+exploration-findings.md   archived conclusions from removed one-shot
+                      investigations (scripts live in git history)
 ```
 
 Each implementation script resolves its **own env** from its PEP 723

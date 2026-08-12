@@ -1,5 +1,5 @@
 """Shared DGGAL binding glue — the common code behind the DGGAL-backed
-scripts here (the `*-dggal.py` listing) and the live-engine explorations.
+scripts here (the `*-dggal.py` listing).
 
 System-specific code lives OUT of the library, next to the scripts that
 use it: `uv run scripts/systems/<key>.py` puts this directory on
@@ -117,9 +117,8 @@ def latlng_ring(points):
 # pentagons per level. Every ring an Adapter hands out is normalized
 # (stats.orient_ccw).
 class Adapter:
-    """Wrap one DGGAL DGGRS — both the GridImpl the DGGAL scripts hand
-    to `runner.generate` and the live-engine object the exploration
-    scripts drive.
+    """Wrap one DGGAL DGGRS as the GridImpl the DGGAL scripts hand to
+    `runner.generate`.
 
     `cls` is the DGGRS class name (e.g. 'ISEA7H'); the artifact key's
     grid half is its lowercase (override with `grid` if they ever
@@ -127,8 +126,8 @@ class Adapter:
     scripts pass `to_sphere` (a rings->rings function, e.g.
     `stats.authalic_rings`) — its presence in the script call is the
     record of how the system gets to the sphere. The contract methods
-    below return that frame; the per-cell singles after them return the
-    binding's raw geodetic frame (the exploration surface).
+    below return that frame; the per-cell singles after them (their
+    building blocks) return the binding's raw geodetic frame.
     """
 
     impl = 'dggal'
