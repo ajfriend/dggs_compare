@@ -6,6 +6,9 @@ ISEA3H, IVEA3H, ISEA4T, rHEALPix, hex9** — by per-cell statistics: shape
 solver) and area (via [sparea](https://pypi.org/project/sparea/)), at
 area-matched resolutions.
 
+**Live site: <https://ajfriend.com/dggs_compare/>** — interactive globes
+and every comparison plot, rebuilt from each data release.
+
 **The products of this repo are data artifacts and web pages.** The Parquet
 tables — one row per cell, with the computed `ar` and `area` bundled next to
 the geometry — are published as GitHub data releases; downstream consumers
