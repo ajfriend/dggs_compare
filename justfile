@@ -154,7 +154,6 @@ purge:
     just _rm .DS_Store
     just _rm __pycache__
     just _rm uv.lock
-    just _rm .ipynb_checkpoints
 
 _rm pattern:
     -@find . -name "{{pattern}}" -prune -exec rm -rf {} +

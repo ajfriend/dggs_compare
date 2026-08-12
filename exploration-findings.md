@@ -4,7 +4,9 @@ Conclusions from one-shot investigations whose scripts have been
 removed from the repo (they lived in `scripts/explorations/` and
 `notebooks/`; retrieve with `git log --diff-filter=D --name-only` if
 ever needed). Recorded here because the findings existed only in those
-files' docstrings.
+files' docstrings. Numbers were measured 2026-08 against the data-v10
+tables ("working resolution" = that release's TARGET_RES calibration);
+this file is an archive and is not re-verified against later releases.
 
 ## csar AR vs vertex-PCA AR (metric validity)
 
@@ -37,17 +39,16 @@ this cell were proposed to csar_py as standing validation material
 ## Projection distortion signatures (ISEA vs IVEA)
 
 Cell AR is resolution-independent for small cells, so per-cell AR maps
-picture each projection's distortion field. Globally: ISEA7H shows the
-20-fold icosahedral pattern (low face centroids, bright seams); IVEA7H
-is near-uniform with no bright seams. Zoomed on one face (gnomonic,
-r10): ISEA is a low core with a sharp 6-pointed seam star; IVEA a
-smooth, bounded radial pinwheel. Generator: `ar_heatmap.py` in git
-history (needs a live dggal engine env).
+picture each projection's distortion field. The global view is on the
+site's AR-colored globes; the archived part is the finer face zoom
+(gnomonic, r10): ISEA is a low core with a sharp 6-pointed seam star;
+IVEA a smooth, bounded radial pinwheel. Generator: `ar_heatmap.py` in
+git history (needs a live dggal engine env).
 
 ## Finest-resolution AR spot checks (from the retired notebook)
 
-At each system's finest resolution (5,000 sampled cells, not
-area-matched): H3 r15 median 1.0529 / max 1.2554; S2 L30 median
-1.2248 / max 1.7262; A5 r30 min 1.9873 / median 2.1341 / max 2.3154 —
-A5 tightly clustered around 2:1, its cells never circular. Consistent
-with the working-resolution survey (AR is ~resolution-stable).
+Sampled at each system's finest resolution (H3 r15, S2 L30, A5 r30),
+AR distributions match the working-resolution survey — AR is
+~resolution-stable — with A5 tightly clustered around 2:1: its cells
+are never circular. (Per-resolution detail is better served by the
+published tables and the site's by-resolution plots.)

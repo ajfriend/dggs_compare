@@ -50,9 +50,10 @@ web/                  the static comparison site (survey plots + ajglobe
                       area); data from web/out/
 data/raw/             stage-1 geometry (gitignored, intermediate)
 data/cells/           the published tables (gitignored; data releases)
-exploration-findings.md   archived conclusions from removed one-shot
-                      investigations (scripts live in git history)
 ```
+
+Conclusions from retired one-shot explorations are archived in
+`exploration-findings.md`; their scripts live in git history.
 
 Each implementation script resolves its **own env** from its PEP 723
 header — its binding plus the library, never co-resolved with any other
