@@ -18,8 +18,8 @@ with thin scripts on top; it is never published to PyPI.
 
 **Aspect ratio (AR)** throughout means the major/minor semi-axis ratio (a/b,
 a≥b) of a cell's enclosing-cone ellipse — the discrete per-cell analogue of
-Tissot's indicatrix. AR = 1 is isotropic; AR > 1 is anisotropic ("squished").
-Tiling a sphere forces some squishing somewhere — AR measures each cell's
+Tissot's indicatrix. AR = 1 is isotropic; AR > 1 is anisotropic (elongated).
+Tiling a sphere forces some elongation somewhere — AR measures each cell's
 share of it.
 
 Not listed separately: **IGEO7** is geometrically identical to ISEA7H (it is
