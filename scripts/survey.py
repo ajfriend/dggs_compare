@@ -265,14 +265,15 @@ def plot_tradeoff(results):
     for s in SYSTEMS:
         d = results[s]['by_res'][RES[s]]
         x, y = d['ars'].max(), d['ratio']
-        ax.plot(x, y, 'o', ms=9, color=SYS_COLOR[s])
-        ax.annotate(SYS_LABEL[s], (x, y), textcoords='offset points',
+        ax.plot(x, y, 'o', ms=9, color=SYS_COLOR[s], label=SYS_LABEL[s])
+        ax.annotate(s.upper(), (x, y), textcoords='offset points',
                     xytext=(7, 4), fontsize=9)
     ax.axhline(1.0, color='0.85', lw=1, zorder=0)
     ax.axvline(1.0, color='0.85', lw=1, zorder=0)
     ax.set_xlabel('worst-case aspect ratio (all cells)')
     ax.set_ylabel('worst-case area ratio, max/min (regular cells)')
     ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8, ncols=2, framealpha=0.9)   # system -> working res
     ax.set_title('Shape vs area: worst case at the working resolutions\n'
                  '(ideal = (1, 1); AR keeps pentagons, area excludes them)',
                  fontsize=11)
