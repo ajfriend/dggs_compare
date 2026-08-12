@@ -288,6 +288,26 @@ function initLightbox() {
   });
 }
 
+// Plot-group tabs. The active tab rides in the URL hash (#shape / #area /
+// #tradeoff) so tabs are linkable and survive reload; unknown or absent
+// hashes fall back to the first tab.
+function initTabs() {
+  const tabs = [...document.querySelectorAll('.tab')];
+  const show = (name) => {
+    if (!tabs.some((t) => t.dataset.tab === name)) name = tabs[0].dataset.tab;
+    for (const t of tabs) t.setAttribute('aria-selected', t.dataset.tab === name);
+    for (const p of document.querySelectorAll('.tab-panel'))
+      p.classList.toggle('active', p.id === `panel-${name}`);
+  };
+  for (const t of tabs)
+    t.addEventListener('click', () => {
+      history.replaceState(null, '', `#${t.dataset.tab}`);
+      show(t.dataset.tab);
+    });
+  window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+}
+
 async function main() {
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
@@ -295,6 +315,7 @@ async function main() {
     + ` · gap_tol ${M.gap_tol.toExponential()}`;
   if (M.tag) $('#tag').textContent = M.tag;
 
+  initTabs();
   byResGrid(M);
   initLightbox();
   initHist();

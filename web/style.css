@@ -64,6 +64,43 @@ section {
   border-top: 1px solid var(--line);
 }
 
+/* ---- plot-group tabs ---- */
+.tabs {
+  margin: 40px 0 0;
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 9px 16px 8px;
+  margin-bottom: -1px;             /* sit on the bar's border */
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  background: var(--panel);
+  border-color: var(--line);
+  border-bottom: 1px solid var(--bg);  /* mask the bar under the active tab */
+}
+.tab:focus-visible { outline: 1px solid var(--accent); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+/* the first section inside a panel sits right under the tab bar,
+   which already draws the separating line */
+.tab-panel > section:first-child { border-top: none; margin-top: 0; }
+
 h2 {
   margin: 0 0 4px;
   font-size: 20px;

@@ -31,54 +31,73 @@
   </header>
 
   <main>
-    <section>
-      <h2>Cross-system distributions</h2>
-      <p class="caption">AR distribution of each system at its working
-        (~H3&nbsp;r9-sized) resolution, on shared bins.</p>
-      <img class="plot" src="out/histograms.png"
-           alt="Aspect-ratio distributions per system">
-    </section>
+    <nav class="tabs" role="tablist" aria-label="Plot groups">
+      <button class="tab" role="tab" data-tab="shape"
+              id="tab-shape" aria-controls="panel-shape">Aspect ratio</button>
+      <button class="tab" role="tab" data-tab="area"
+              id="tab-area" aria-controls="panel-area">Area</button>
+      <button class="tab" role="tab" data-tab="tradeoff"
+              id="tab-tradeoff" aria-controls="panel-tradeoff">Shape vs area</button>
+    </nav>
 
-    <section>
-      <h2>Cell-area distributions</h2>
-      <p class="caption">Cell area at the same working resolutions, normalized
-        by the exact mean as above. Regular cells only; a hexagonal system's
-        12 pentagons appear as the dashed tick.</p>
-      <img class="plot" src="out/area_histograms.png"
-           alt="Cell-area distributions per system">
-    </section>
+    <div class="tab-panel" id="panel-shape" role="tabpanel"
+         aria-labelledby="tab-shape">
+      <section>
+        <h2>Cross-system distributions</h2>
+        <p class="caption">AR distribution of each system at its working
+          (~H3&nbsp;r9-sized) resolution, on shared bins.</p>
+        <img class="plot" src="out/histograms.png"
+             alt="Aspect-ratio distributions per system">
+      </section>
 
-    <section>
-      <h2>Shape vs area</h2>
-      <p class="caption">Worst-case aspect ratio against worst-case area ratio
-        at the working resolutions; equal-area systems lie on the bottom
-        edge.</p>
-      <img class="plot" src="out/tradeoff.png"
-           alt="Worst-case AR vs worst-case area ratio per system">
-    </section>
+      <section>
+        <h2>Best &amp; worst cells</h2>
+        <p class="caption">The most-circular and most-squished cell of each
+          system, drawn with its enclosing-cone ellipse.</p>
+        <img class="plot" src="out/extremes.png"
+             alt="Best and worst aspect-ratio cells per system">
+      </section>
 
-    <section>
-      <h2>Area ratio by resolution</h2>
-      <p class="caption">The area twin of the AR-by-resolution story;
-        equal-area systems hold 1.0 to float precision.</p>
-      <img class="plot" src="out/area_ratio_by_res.png"
-           alt="Worst-case area ratio by resolution">
-    </section>
+      <section>
+        <h2>Distribution by resolution</h2>
+        <p class="caption">Within each system, how the AR distribution shifts as
+          resolution refines (coarsest at top).</p>
+        <div class="byres-grid" id="byresGrid"></div>
+      </section>
+    </div>
 
-    <section>
-      <h2>Best &amp; worst cells</h2>
-      <p class="caption">The most-circular and most-squished cell of each
-        system, drawn with its enclosing-cone ellipse.</p>
-      <img class="plot" src="out/extremes.png"
-           alt="Best and worst aspect-ratio cells per system">
-    </section>
+    <div class="tab-panel" id="panel-area" role="tabpanel"
+         aria-labelledby="tab-area">
+      <section>
+        <h2>Cell-area distributions</h2>
+        <p class="caption">Cell area of each system at its working
+          (~H3&nbsp;r9-sized) resolution, normalized by the resolution's exact
+          mean, 4π/N. Regular cells only; a hexagonal system's 12 pentagons
+          appear as the dashed tick.</p>
+        <img class="plot" src="out/area_histograms.png"
+             alt="Cell-area distributions per system">
+      </section>
 
-    <section>
-      <h2>Distribution by resolution</h2>
-      <p class="caption">Within each system, how the AR distribution shifts as
-        resolution refines (coarsest at top).</p>
-      <div class="byres-grid" id="byresGrid"></div>
-    </section>
+      <section>
+        <h2>Area ratio by resolution</h2>
+        <p class="caption">The area twin of the AR-by-resolution story;
+          equal-area systems hold 1.0 to float precision.</p>
+        <img class="plot" src="out/area_ratio_by_res.png"
+             alt="Worst-case area ratio by resolution">
+      </section>
+    </div>
+
+    <div class="tab-panel" id="panel-tradeoff" role="tabpanel"
+         aria-labelledby="tab-tradeoff">
+      <section>
+        <h2>Shape vs area</h2>
+        <p class="caption">Worst-case aspect ratio against worst-case area ratio
+          at the working resolutions; equal-area systems lie on the bottom
+          edge. Down and to the left is better — no system wins both axes.</p>
+        <img class="plot" src="out/tradeoff.png"
+             alt="Worst-case AR vs worst-case area ratio per system">
+      </section>
+    </div>
 
     <section>
       <h2>Globes — cells colored by the selected metric</h2>
