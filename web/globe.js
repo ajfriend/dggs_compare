@@ -12,9 +12,8 @@ import { Orb } from './vendor/ajglobe.min.js';
 
 // ---- the three dropdown axes (colormap, transform, metric — METRICS sits
 // below the transforms it feeds). One entry per option, in menu order; the
-// FIRST entry of each list is the default (labeled so in the UI at build
-// time). Adding an option is one new object in its list — the dropdowns and
-// lookups all derive from these.
+// FIRST entry of each list is the default. Adding an option is one new
+// object in its list — the dropdowns and lookups all derive from these.
 // Colormap stops: RGB control points (0–255), linearly interpolated.
 const CMAPS = [
   { key: 'viridis', label: 'Viridis (perceptually uniform)',
@@ -336,8 +335,7 @@ async function main() {
   };
   for (const [sel, opts, on] of [[metricSel, METRICS, onMetric],
                                  [cmapSel, CMAPS, onPick], [tfSel, TFS, onPick]]) {
-    opts.forEach((o, i) =>
-      sel.add(new Option(i ? o.label : `${o.label} — the default`, o.key)));
+    opts.forEach((o) => sel.add(new Option(o.label, o.key)));
     sel.addEventListener('change', on);
   }
   // a fresh <select> starts on its first option, which IS the default
