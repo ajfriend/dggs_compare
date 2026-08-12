@@ -288,16 +288,18 @@ function initLightbox() {
   });
 }
 
-// Plot-group tabs. The active tab rides in the URL hash (#shape / #area /
-// #tradeoff) so tabs are linkable and survive reload; unknown or absent
-// hashes fall back to the first tab.
-function initTabs() {
+// Plot-group tabs. The active tab rides in the URL hash (#globes / #shape /
+// #area / #tradeoff) so tabs are linkable and survive reload; unknown or
+// absent hashes fall back to the first tab. `onShow` fires with the tab
+// name after every switch (including the initial one).
+function initTabs(onShow) {
   const tabs = [...document.querySelectorAll('.tab')];
   const show = (name) => {
     if (!tabs.some((t) => t.dataset.tab === name)) name = tabs[0].dataset.tab;
     for (const t of tabs) t.setAttribute('aria-selected', t.dataset.tab === name);
     for (const p of document.querySelectorAll('.tab-panel'))
       p.classList.toggle('active', p.id === `panel-${name}`);
+    onShow(name);
   };
   for (const t of tabs)
     t.addEventListener('click', () => {
@@ -315,10 +317,8 @@ async function main() {
     + ` · gap_tol ${M.gap_tol.toExponential()}`;
   if (M.tag) $('#tag').textContent = M.tag;
 
-  initTabs();
   byResGrid(M);
   initLightbox();
-  initHist();
 
   const metricSel = $('#metricSelect'), cmapSel = $('#cmapSelect'), tfSel = $('#tfSelect');
   const onPick = () => {
@@ -342,14 +342,25 @@ async function main() {
   }
   // a fresh <select> starts on its first option, which IS the default
 
-  DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
-  DOMAIN.p99 = DOMAIN.max;
-  for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
-  // A cached pre-area build has no area binaries: keep the option visible
-  // but unusable, rather than silently showing wrong data.
-  if (PANELS.some((p) => !p.vals.area)) {
-    metricSel.querySelector('option[value="area"]').disabled = true;
-  }
-  onMetric();   // seed domain/hists/legend/meta for the default metric
+  // The globes build lazily, on the first showing of their tab: canvases
+  // (the histogram's and each Orb's) size themselves from the DOM at
+  // construction, which only works while their panel is displayed.
+  let globesStarted = false;
+  const ensureGlobes = async () => {
+    if (globesStarted) return;
+    globesStarted = true;
+    initHist();
+    DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
+    DOMAIN.p99 = DOMAIN.max;
+    for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
+    // A cached pre-area build has no area binaries: keep the option visible
+    // but unusable, rather than silently showing wrong data.
+    if (PANELS.some((p) => !p.vals.area)) {
+      metricSel.querySelector('option[value="area"]').disabled = true;
+    }
+    onMetric();   // seed domain/hists/legend/meta for the default metric
+  };
+
+  initTabs((name) => { if (name === 'globes') ensureGlobes(); });
 }
 main();

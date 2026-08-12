@@ -32,6 +32,8 @@
 
   <main>
     <nav class="tabs" role="tablist" aria-label="Plot groups">
+      <button class="tab" role="tab" data-tab="globes"
+              id="tab-globes" aria-controls="panel-globes">Globes</button>
       <button class="tab" role="tab" data-tab="shape"
               id="tab-shape" aria-controls="panel-shape">Aspect ratio</button>
       <button class="tab" role="tab" data-tab="area"
@@ -39,6 +41,50 @@
       <button class="tab" role="tab" data-tab="tradeoff"
               id="tab-tradeoff" aria-controls="panel-tradeoff">Shape vs area</button>
     </nav>
+
+    <div class="tab-panel" id="panel-globes" role="tabpanel"
+         aria-labelledby="tab-globes">
+      <section>
+        <h2>Globes — cells colored by the selected metric</h2>
+        <p class="caption">One globe per system at its coarsest full-coverage
+          resolution, colored on a <b>shared</b> scale so the systems compare
+          directly. The <b>Metric</b> menu picks what is colored: aspect ratio,
+          or cell area relative to the resolution's exact mean (equal-area
+          systems read near-constant, with the 12 pentagons popping out well
+          below the mean).
+          Drag to rotate, scroll to zoom, hover for a cell's id and value.
+          The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu picks
+          where along the value axis they are spent — hold one fixed and switch
+          the other to see how the choice changes what's visible. Globes and
+          legend update together.</p>
+        <div class="globe-controls">
+          <label class="scale-picker">Metric
+            <select id="metricSelect"></select>
+          </label>
+          <label class="scale-picker">Colormap
+            <select id="cmapSelect"></select>
+          </label>
+          <label class="scale-picker">Scaling
+            <select id="tfSelect"></select>
+          </label>
+        </div>
+        <div class="scale-viz">
+          <div class="hist-head"><span id="histLabel">hover a globe to see its distribution</span></div>
+          <canvas id="histCanvas"></canvas>
+          <div class="leg-bar" id="legendGrad"></div>
+          <div class="leg-scale">
+            <span class="leg-label" id="legLo">1.0</span>
+            <span class="leg-label" id="legHi">—</span>
+          </div>
+        </div>
+        <p class="leg-cap">The bars are the hovered globe's distribution of the
+          selected metric (log count); the white line marks the hovered cell. Its
+          position lines up with the color bar below — both <b>linear in the
+          value</b> — so you can read where a cell sits in the distribution and
+          how the color scale places it. Grey = did-not-certify (AR only).</p>
+        <div class="globe-grid" id="globeGrid"></div>
+      </section>
+    </div>
 
     <div class="tab-panel" id="panel-shape" role="tabpanel"
          aria-labelledby="tab-shape">
@@ -99,46 +145,6 @@
       </section>
     </div>
 
-    <section>
-      <h2>Globes — cells colored by the selected metric</h2>
-      <p class="caption">One globe per system at its coarsest full-coverage
-        resolution, colored on a <b>shared</b> scale so the systems compare
-        directly. The <b>Metric</b> menu picks what is colored: aspect ratio,
-        or cell area relative to the resolution's exact mean (equal-area
-        systems read near-constant, with the 12 pentagons popping out well
-        below the mean).
-        Drag to rotate, scroll to zoom, hover for a cell's id and value.
-        The <b>Colormap</b> menu picks the colors; the <b>Scaling</b> menu picks
-        where along the value axis they are spent — hold one fixed and switch
-        the other to see how the choice changes what's visible. Globes and
-        legend update together.</p>
-      <div class="globe-controls">
-        <label class="scale-picker">Metric
-          <select id="metricSelect"></select>
-        </label>
-        <label class="scale-picker">Colormap
-          <select id="cmapSelect"></select>
-        </label>
-        <label class="scale-picker">Scaling
-          <select id="tfSelect"></select>
-        </label>
-      </div>
-      <div class="scale-viz">
-        <div class="hist-head"><span id="histLabel">hover a globe to see its distribution</span></div>
-        <canvas id="histCanvas"></canvas>
-        <div class="leg-bar" id="legendGrad"></div>
-        <div class="leg-scale">
-          <span class="leg-label" id="legLo">1.0</span>
-          <span class="leg-label" id="legHi">—</span>
-        </div>
-      </div>
-      <p class="leg-cap">The bars are the hovered globe's distribution of the
-        selected metric (log count); the white line marks the hovered cell. Its
-        position lines up with the color bar below — both <b>linear in the
-        value</b> — so you can read where a cell sits in the distribution and
-        how the color scale places it. Grey = did-not-certify (AR only).</p>
-      <div class="globe-grid" id="globeGrid"></div>
-    </section>
   </main>
 
   <footer>
