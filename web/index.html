@@ -13,12 +13,7 @@
     <p class="lede">
       Discrete global grid systems — <b>H3, S2, A5, ISEA7H, IVEA7H, ISEA3H,
       IVEA3H, ISEA4T, rHEALPix, hex9</b> — compared by per-cell shape and
-      area. <b>Aspect ratio (AR)</b> is the major/minor axis ratio of a
-      cell's tightest enclosing-cone ellipse (the per-cell analogue of
-      Tissot's indicatrix): AR&nbsp;=&nbsp;1 is isotropic,
-      AR&nbsp;&gt;&nbsp;1 is squished. <b>Area</b> is compared to each
-      resolution's exact mean, 4π/N — a perfectly equal-area grid reads
-      1.0 everywhere, so the spread is the areal distortion.
+      area.
     </p>
     <p class="lede">
       Every cell is measured as a spherical polygon — vertices on the unit
@@ -88,6 +83,13 @@
 
     <div class="tab-panel" id="panel-shape" role="tabpanel"
          aria-labelledby="tab-shape">
+      <p class="tab-intro">
+        <b>Aspect ratio (AR)</b> is the major/minor axis ratio of a cell's
+        tightest enclosing-cone ellipse (the per-cell analogue of Tissot's
+        indicatrix): AR&nbsp;=&nbsp;1 is isotropic, AR&nbsp;&gt;&nbsp;1 is
+        squished. Since these grids are all ~equal-area, AR is where the
+        unavoidable distortion surfaces.
+      </p>
       <section>
         <h2>Cross-system distributions</h2>
         <p class="caption">AR distribution of each system at its working
@@ -114,12 +116,16 @@
 
     <div class="tab-panel" id="panel-area" role="tabpanel"
          aria-labelledby="tab-area">
+      <p class="tab-intro">
+        <b>Area</b> is compared to each resolution's exact mean, 4π/N — a
+        perfectly equal-area grid reads 1.0 everywhere, so the spread is the
+        areal distortion.
+      </p>
       <section>
         <h2>Cell-area distributions</h2>
         <p class="caption">Cell area of each system at its working
-          (~H3&nbsp;r9-sized) resolution, normalized by the resolution's exact
-          mean, 4π/N. Regular cells only; a hexagonal system's 12 pentagons
-          appear as the dashed tick.</p>
+          (~H3&nbsp;r9-sized) resolution. Regular cells only; a hexagonal
+          system's 12 pentagons appear as the dashed tick.</p>
         <img class="plot" src="out/area_histograms.png"
              alt="Cell-area distributions per system">
       </section>

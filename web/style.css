@@ -90,6 +90,15 @@ section {
    which already draws the separating line */
 .tab-panel > section:first-child { border-top: none; margin-top: 0; }
 
+/* a tab's optional lead-in paragraph (metric definition), between the
+   bar and its first section (which keeps its rule as the separator) */
+.tab-intro {
+  margin: 24px 0 0;
+  max-width: 760px;
+  color: var(--muted);
+}
+.tab-intro b { color: var(--ink); font-weight: 600; }
+
 h2 {
   margin: 0 0 4px;
   font-size: 20px;
