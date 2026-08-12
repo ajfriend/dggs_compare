@@ -24,8 +24,5 @@ dependencies = [
     "sparea>=0.4",
 ]
 
-[dependency-groups]
-lab = ["jupyterlab>=4"]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/dggs_compare"]

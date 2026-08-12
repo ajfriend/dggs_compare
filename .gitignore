@@ -3,7 +3,6 @@
 __pycache__/
 *.pyc
 .DS_Store
-.ipynb_checkpoints/
 
 # uv lockfile — opt in if you want it tracked
 uv.lock

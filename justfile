@@ -149,16 +149,11 @@ fetch-data tag:
     mkdir -p data/cells
     gh release download {{tag}} -p '*.parquet' -D data/cells --clobber
 
-# Open JupyterLab (notebooks/).
-lab:
-    uv run --group lab jupyter lab
-
 purge:
     just _rm .venv
     just _rm .DS_Store
     just _rm __pycache__
     just _rm uv.lock
-    just _rm .ipynb_checkpoints
 
 _rm pattern:
     -@find . -name "{{pattern}}" -prune -exec rm -rf {} +
