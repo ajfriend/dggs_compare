@@ -19,8 +19,8 @@ with thin scripts on top; it is never published to PyPI.
 **Aspect ratio (AR)** throughout means the major/minor semi-axis ratio (a/b,
 a≥b) of a cell's enclosing-cone ellipse — the discrete per-cell analogue of
 Tissot's indicatrix. AR = 1 is isotropic; AR > 1 is anisotropic ("squished").
-Since these grids are ~equal-area, AR is where the unavoidable distortion
-surfaces.
+No grid can keep every cell circular, so shape distortion is unavoidable —
+AR measures each cell's share of it.
 
 Not listed separately: **IGEO7** is geometrically identical to ISEA7H (it is
 ISEA7H with Z7 cell indexing), so its shape/area statistics are already
