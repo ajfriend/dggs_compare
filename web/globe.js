@@ -295,7 +295,7 @@ function initTabs(onShow) {
   const tabs = [...document.querySelectorAll('.tab')];
   const show = (name) => {
     if (!tabs.some((t) => t.dataset.tab === name)) name = tabs[0].dataset.tab;
-    for (const t of tabs) t.setAttribute('aria-selected', t.dataset.tab === name);
+    for (const t of tabs) t.classList.toggle('active', t.dataset.tab === name);
     for (const p of document.querySelectorAll('.tab-panel'))
       p.classList.toggle('active', p.id === `panel-${name}`);
     onShow(name);
@@ -319,44 +319,57 @@ async function main() {
   byResGrid(M);
   initLightbox();
 
-  const metricSel = $('#metricSelect'), cmapSel = $('#cmapSelect'), tfSel = $('#tfSelect');
-  const onPick = () => {
-    scale = { cmap: CMAPS.find((c) => c.key === cmapSel.value),
-              tf: TFS.find((t) => t.key === tfSel.value) };
-    applyScale();
-  };
-  // The metric changes the DOMAIN and the histograms, not just colors.
-  const onMetric = () => {
-    metric = METRICS.find((m) => m.key === metricSel.value);
-    computeDomainAndHists();
-    for (const p of PANELS) setMeta(p);
-    onPick();
-    drawHist(PANELS[0], null);
-  };
-  for (const [sel, opts, on] of [[metricSel, METRICS, onMetric],
-                                 [cmapSel, CMAPS, onPick], [tfSel, TFS, onPick]]) {
-    opts.forEach((o) => sel.add(new Option(o.label, o.key)));
-    sel.addEventListener('change', on);
-  }
-  // a fresh <select> starts on its first option, which IS the default
-
-  // The globes build lazily, on the first showing of their tab: canvases
-  // (the histogram's and each Orb's) size themselves from the DOM at
-  // construction, which only works while their panel is displayed.
-  let globesStarted = false;
+  // Everything globe-panel runs lazily and RESUMABLY, driven by showings
+  // of the globes tab: canvases (the histogram's and each Orb's) size
+  // themselves from the DOM at construction, which only works while
+  // their panel is displayed. So the one-time setup happens on the
+  // first showing, and the build loop checks visibility before each
+  // globe — switching away mid-build pauses it, switching back resumes.
+  const panelShown = () => $('#panel-globes').classList.contains('active');
+  let onMetric, wired = false, building = false, finalized = false, next = 0;
   const ensureGlobes = async () => {
-    if (globesStarted) return;
-    globesStarted = true;
-    initHist();
-    DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
-    DOMAIN.p99 = DOMAIN.max;
-    for (const sys of M.systems) await buildGlobe(M, sys);   // one at a time; 6 WebGL panels
-    // A cached pre-area build has no area binaries: keep the option visible
-    // but unusable, rather than silently showing wrong data.
-    if (PANELS.some((p) => !p.vals.area)) {
-      metricSel.querySelector('option[value="area"]').disabled = true;
+    if (!wired) {
+      wired = true;
+      const metricSel = $('#metricSelect'), cmapSel = $('#cmapSelect'), tfSel = $('#tfSelect');
+      const onPick = () => {
+        scale = { cmap: CMAPS.find((c) => c.key === cmapSel.value),
+                  tf: TFS.find((t) => t.key === tfSel.value) };
+        applyScale();
+      };
+      // The metric changes the DOMAIN and the histograms, not just colors.
+      onMetric = () => {
+        metric = METRICS.find((m) => m.key === metricSel.value);
+        computeDomainAndHists();
+        for (const p of PANELS) setMeta(p);
+        onPick();
+        drawHist(PANELS[0], null);
+      };
+      for (const [sel, opts, on] of [[metricSel, METRICS, onMetric],
+                                     [cmapSel, CMAPS, onPick], [tfSel, TFS, onPick]]) {
+        opts.forEach((o) => sel.add(new Option(o.label, o.key)));
+        sel.addEventListener('change', on);
+      }
+      // a fresh <select> starts on its first option, which IS the default
+      initHist();
+      DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
+      DOMAIN.p99 = DOMAIN.max;
     }
-    onMetric();   // seed domain/hists/legend/meta for the default metric
+    if (building) return;
+    building = true;
+    while (next < M.systems.length && panelShown()) {   // serial builds; pause point
+      await buildGlobe(M, M.systems[next]);
+      next++;
+    }
+    building = false;
+    if (next === M.systems.length && !finalized) {
+      finalized = true;
+      // A cached pre-area build has no area binaries: keep the option
+      // visible but unusable, rather than silently showing wrong data.
+      if (PANELS.some((p) => !p.vals.area)) {
+        $('#metricSelect').querySelector('option[value="area"]').disabled = true;
+      }
+      onMetric();   // seed domain/hists/legend/meta for the default metric
+    }
   };
 
   initTabs((name) => { if (name === 'globes') ensureGlobes(); });

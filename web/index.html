@@ -25,19 +25,14 @@
   </header>
 
   <main>
-    <nav class="tabs" role="tablist" aria-label="Plot groups">
-      <button class="tab" role="tab" data-tab="globes"
-              id="tab-globes" aria-controls="panel-globes">Globes</button>
-      <button class="tab" role="tab" data-tab="shape"
-              id="tab-shape" aria-controls="panel-shape">Aspect ratio</button>
-      <button class="tab" role="tab" data-tab="area"
-              id="tab-area" aria-controls="panel-area">Area</button>
-      <button class="tab" role="tab" data-tab="tradeoff"
-              id="tab-tradeoff" aria-controls="panel-tradeoff">Shape vs area</button>
+    <nav class="tabs" aria-label="Plot groups">
+      <button class="tab" data-tab="globes">Globes</button>
+      <button class="tab" data-tab="shape">Aspect ratio</button>
+      <button class="tab" data-tab="area">Area</button>
+      <button class="tab" data-tab="tradeoff">Shape vs area</button>
     </nav>
 
-    <div class="tab-panel" id="panel-globes" role="tabpanel"
-         aria-labelledby="tab-globes">
+    <div class="tab-panel" id="panel-globes">
       <section>
         <h2>Globes — cells colored by the selected metric</h2>
         <p class="caption">One globe per system, at resolutions matched to a
@@ -81,9 +76,8 @@
       </section>
     </div>
 
-    <div class="tab-panel" id="panel-shape" role="tabpanel"
-         aria-labelledby="tab-shape">
-      <p class="tab-intro">
+    <div class="tab-panel" id="panel-shape">
+      <p class="lede tab-intro">
         <b>Aspect ratio (AR)</b> is the major/minor axis ratio of a cell's
         tightest enclosing-cone ellipse (the per-cell analogue of Tissot's
         indicatrix): AR&nbsp;=&nbsp;1 is isotropic, AR&nbsp;&gt;&nbsp;1 is
@@ -95,7 +89,7 @@
         <h2>Cross-system distributions</h2>
         <p class="caption">AR distribution of each system at its working
           (~H3&nbsp;r9-sized) resolution, on shared bins.</p>
-        <img class="plot" src="out/histograms.png"
+        <img class="plot" loading="lazy" src="out/histograms.png"
              alt="Aspect-ratio distributions per system">
       </section>
 
@@ -103,7 +97,7 @@
         <h2>Best &amp; worst cells</h2>
         <p class="caption">The most-isotropic and most-elongated cell of each
           system, drawn with its enclosing-cone ellipse.</p>
-        <img class="plot" src="out/extremes.png"
+        <img class="plot" loading="lazy" src="out/extremes.png"
              alt="Best and worst aspect-ratio cells per system">
       </section>
 
@@ -115,9 +109,8 @@
       </section>
     </div>
 
-    <div class="tab-panel" id="panel-area" role="tabpanel"
-         aria-labelledby="tab-area">
-      <p class="tab-intro">
+    <div class="tab-panel" id="panel-area">
+      <p class="lede tab-intro">
         <b>Area</b> is shown relative to each resolution's exact mean cell
         area — the sphere's area divided by the cell count, 4π/N — so a
         perfectly equal-area grid reads 1.0 everywhere, and any spread is
@@ -128,7 +121,7 @@
         <p class="caption">Cell area of each system at its working
           (~H3&nbsp;r9-sized) resolution. A hexagonal system's 12 pentagons
           are left out of the histogram and marked by the dashed tick.</p>
-        <img class="plot" src="out/area_histograms.png"
+        <img class="plot" loading="lazy" src="out/area_histograms.png"
              alt="Cell-area distributions per system">
       </section>
 
@@ -137,19 +130,18 @@
         <p class="caption">Worst-case spread — the largest cell over the
           smallest, pentagons excluded — at every resolution; equal-area
           systems hold 1.0 to float precision.</p>
-        <img class="plot" src="out/area_ratio_by_res.png"
+        <img class="plot" loading="lazy" src="out/area_ratio_by_res.png"
              alt="Worst-case area ratio by resolution">
       </section>
     </div>
 
-    <div class="tab-panel" id="panel-tradeoff" role="tabpanel"
-         aria-labelledby="tab-tradeoff">
+    <div class="tab-panel" id="panel-tradeoff">
       <section>
         <h2>Shape vs area</h2>
         <p class="caption">Worst-case aspect ratio against worst-case area ratio
           at the working resolutions; equal-area systems lie on the bottom
           edge. Down and to the left is better — no system wins both axes.</p>
-        <img class="plot" src="out/tradeoff.png"
+        <img class="plot" loading="lazy" src="out/tradeoff.png"
              alt="Worst-case AR vs worst-case area ratio per system">
       </section>
     </div>

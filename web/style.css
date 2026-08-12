@@ -76,7 +76,7 @@ section {
   cursor: pointer;
 }
 .tab:hover { color: var(--ink); }
-.tab[aria-selected="true"] {
+.tab.active {
   color: var(--ink);
   background: var(--panel);
   border-color: var(--line);
@@ -90,14 +90,10 @@ section {
    which already draws the separating line */
 .tab-panel > section:first-child { border-top: none; margin-top: 0; }
 
-/* a tab's optional lead-in paragraph (metric definition), between the
-   bar and its first section (which keeps its rule as the separator) */
-.tab-intro {
-  margin: 24px 0 0;
-  max-width: 760px;
-  color: var(--muted);
-}
-.tab-intro b { color: var(--ink); font-weight: 600; }
+/* a tab's optional lead-in paragraph (metric definition) is a .lede
+   with extra clearance under the bar; the first section below it
+   keeps its rule as the separator */
+.tab-intro { margin-top: 24px; }
 
 h2 {
   margin: 0 0 4px;
