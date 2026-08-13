@@ -22,8 +22,6 @@ dependencies = [
     "matplotlib>=3",
     "csar>=0.1.1",
     "sparea>=0.4",
-    "great-tables>=0.16",
-    "pandas>=2",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -109,9 +109,7 @@ h2 {
 }
 .caption b { color: var(--ink); font-weight: 600; }
 
-/* ---- summary stats table (version A; version B — great_tables —
-   carries its own scoped styling) ---- */
-h3 { margin: 26px 0 10px; font-size: 14px; font-weight: 620; color: var(--muted); }
+/* ---- summary stats table (fragment written by survey.py) ---- */
 .stats-wrap { overflow-x: auto; }
 table.stats {
   border-collapse: collapse;

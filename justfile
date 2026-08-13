@@ -102,7 +102,7 @@ web-data:
 site: survey web-data
     cp out/histograms.png out/area_histograms.png \
        out/tradeoff.png out/extremes.png out/by_res_*.png \
-       out/summary_table.html out/summary_table_gt.html web/out/
+       out/summary_table.html web/out/
 
 # Serve the static site at http://localhost:8000 (builds it first).
 web: site

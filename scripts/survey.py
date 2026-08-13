@@ -9,9 +9,8 @@ certified ellipses):
   tradeoff.png          shape-vs-area scatter, all-cells and central-99.9% panels
   extremes.png          best/worst cell per system, drawn with its ellipse
   by_res_<sys>.png      per-system AR distribution stacked by resolution
-  summary_table.html    the working-resolution stat lines as one table,
-  summary_table_gt.html rendered two ways (hand-rolled / great_tables)
-                        for comparison; injected into the page by globe.js
+  summary_table.html    the working-resolution stat lines as one table
+                        (an HTML fragment; injected into the page by globe.js)
 
 Aspect ratio (AR) = major/minor semi-axis ratio (a/b, a>=1) of each cell's
 enclosing-cone ellipse — the discrete, per-cell analogue of Tissot's
@@ -270,8 +269,8 @@ def summary_stats(results):
     """The working-resolution stats, one row per system: for each metric
     the all-cells extreme and its central-99.9% counterpart (#83), plus
     median AR and the DNC count. The single computation of these numbers —
-    the tradeoff panels and both table renderings consume the rows, so
-    they agree by construction. (AR's floor is 1, so its central-99.9%
+    the tradeoff panels and the summary table consume the rows, so they
+    agree by construction. (AR's floor is 1, so its central-99.9%
     counterpart is just the upper edge p99.95.)"""
     rows = []
     for s in SYSTEMS:
@@ -293,17 +292,21 @@ def summary_stats(results):
 
 
 def write_summary_table(rows):
-    """Version A of the table comparison: a hand-rolled HTML fragment,
-    styled by the site's own CSS (table.stats in web/style.css)."""
+    """The summary stats as an HTML fragment, styled by the site's own
+    CSS (table.stats in web/style.css)."""
     def num(v):
         return f'<td class="num">{v:.4f}</td>'
+
+    def sci(n):   # 1000000 -> '1.0e6'
+        m, e = f'{n:.1e}'.split('e')
+        return f'{m}e{int(e)}'
 
     body = []
     for r in rows:
         body.append(
             '<tr><td class="sys"><span class="swatch" '
             f'style="background:{r["color"]}"></span>{r["label"]}</td>'
-            f'<td class="num">{r["n"]:,}</td>'
+            f'<td class="num">{sci(r["n"])}</td>'
             + num(r['ar_median']) + num(r['ar_p9995']) + num(r['ar_max'])
             + f'<td class="num">{r["dnc"]}</td>'
             + num(r['area_trim']) + num(r['area_all']) + '</tr>')
@@ -319,44 +322,6 @@ def write_summary_table(rows):
         '</thead>\n<tbody>\n' + '\n'.join(body) + '\n</tbody>\n</table>\n')
     out = OUT_DIR / 'summary_table.html'
     out.write_text(html)
-    print(f'wrote {out}')
-
-
-def write_summary_table_gt(rows):
-    """Version B of the table comparison: the same stats through
-    great_tables (imports kept local so dropping the loser of the
-    comparison drops the dependency with it)."""
-    import pandas as pd
-    from great_tables import GT
-
-    cols = ['label', 'n', 'ar_median', 'ar_p9995', 'ar_max', 'dnc',
-            'area_trim', 'area_all']
-    df = pd.DataFrame(rows)[cols]
-    gt = (
-        GT(df)
-        .tab_spanner('aspect ratio', ['ar_median', 'ar_p9995', 'ar_max', 'dnc'])
-        .tab_spanner('area ratio', ['area_trim', 'area_all'])
-        .cols_label(label='system', n='cells', ar_median='median',
-                    ar_p9995='p99.95', ar_max='max', dnc='DNC',
-                    area_trim='central-99.9%', area_all='max/min')
-        .fmt_number(['ar_median', 'ar_p9995', 'ar_max', 'area_trim', 'area_all'],
-                    decimals=4)
-        .fmt_integer(['n', 'dnc'])
-        # great_tables validates colors, so the site palette can't be
-        # referenced as CSS variables — these literals restate
-        # style.css's --panel / --ink / --line and drift if it changes.
-        .tab_options(table_margin_left='0',   # sit flush left like version A
-                     table_background_color='#11151c',
-                     table_font_color='#e7edf4',
-                     table_font_size='13.5px',
-                     table_border_top_color='#222a35',
-                     table_border_bottom_color='#222a35',
-                     column_labels_border_top_color='#222a35',
-                     column_labels_border_bottom_color='#222a35',
-                     table_body_hlines_color='#222a35')
-    )
-    out = OUT_DIR / 'summary_table_gt.html'
-    out.write_text(gt.as_raw_html())
     print(f'wrote {out}')
 
 
@@ -458,7 +423,6 @@ def main():
     rows = summary_stats(results)
     plot_tradeoff(rows)
     write_summary_table(rows)
-    write_summary_table_gt(rows)
     plot_extremes(results)
     for s in SYSTEMS:
         plot_by_resolution(s, results[s]['by_res'])

@@ -218,16 +218,13 @@ function byResGrid(M) {
   }
 }
 
-function summaryTables() {
-  // The two renderings of the working-resolution summary stats (fragments
-  // written by survey.py); a missing file (an older cached build) just
-  // leaves its block empty.
-  for (const [id, file] of [['#statsTable', 'summary_table.html'],
-                            ['#statsTableGT', 'summary_table_gt.html']]) {
-    fetch(`out/${file}`)
-      .then((r) => (r.ok ? r.text() : ''))
-      .then((html) => { $(id).innerHTML = html; });
-  }
+function summaryTable() {
+  // The working-resolution summary stats (a fragment written by
+  // survey.py); a missing file (an older cached build) just leaves the
+  // section empty.
+  fetch('out/summary_table.html')
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((html) => { $('#statsTable').innerHTML = html; });
 }
 
 function buildGlobe(M, sys) {   // card + Orb + hover wiring; data comes via loadAnchor
@@ -348,7 +345,7 @@ function initTabs(onShow) {
 }
 
 async function main() {
-  summaryTables();   // independent of the manifest — don't wait on it
+  summaryTable();   // independent of the manifest — don't wait on it
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
     `${M.systems.length} systems · shape via csar's enclosing-cone solver, area via sparea`;
