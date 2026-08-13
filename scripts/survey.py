@@ -54,6 +54,7 @@ SYS_COLOR = config.SYS_COLOR
 OUT_DIR = Path(__file__).resolve().parent.parent / 'out'
 N_BINS = 60
 DPI = 200
+P_LO, P_HI = 0.0005, 0.9995   # the central-99.9% trim (#83)
 # -------------------------------------------------------------------------
 
 
@@ -62,11 +63,12 @@ def sweep_system(name):
     the best/worst cell at the target resolution
     (re-solved — two cells — so the extremes plot can draw the certified
     ellipse). Full per-cell area arrays are kept ONLY at the target
-    resolution (the histogram input): retained everywhere they'd cost
-    ~2.5 GB at the full budget for values only ever reduced to scalars.
-    Weights are the exception — the by-resolution histograms consume them
-    at every sampled resolution — kept lean as float32 and None where
-    uniform (~0.6 GB at the full budget)."""
+    resolution (the area-histogram and tradeoff input): retained
+    everywhere they'd cost ~2.5 GB at the full budget when their only
+    remaining job is deriving the sampling weights. Weights are the
+    exception — the by-resolution histograms consume them at every
+    sampled resolution — kept lean as float32 and None where uniform
+    (~0.6 GB at the full budget)."""
     target = RES[name]
     impl = config.PRIMARY_IMPL[name]
     by_res = {}
@@ -105,17 +107,22 @@ def sweep_system(name):
             'worst': record(int(np.nanargmax(cols['ar'])))}
 
 
+def _wq(vals, q, w):
+    """Weighted quantile(s), per-cell uniform (inverted_cdf is the only
+    method numpy allows with weights; w=None on full enumerations)."""
+    return np.quantile(vals, q, weights=w, method='inverted_cdf')
+
+
 def p_hi(vals, w):
-    """p_9995 — the central-99.9% upper edge (#83): one uniform trim, no
-    declared cell classes, stable where a sample extreme is not."""
-    return float(np.quantile(vals, 0.9995, weights=w,
-                             method='inverted_cdf'))
+    """The central-99.9% upper edge (#83): one uniform trim, no declared
+    cell classes, stable where a sample extreme is not. AR's floor is 1
+    by construction, so for AR only the upper edge is informative."""
+    return float(_wq(vals, P_HI, w))
 
 
 def trimmed_ratio(vals, w):
-    """p_9995/p_0005 — the central-99.9% ratio (#83)."""
-    lo, hi = np.quantile(vals, [0.0005, 0.9995], weights=w,
-                         method='inverted_cdf')
+    """The central-99.9% ratio (#83)."""
+    lo, hi = _wq(vals, [P_LO, P_HI], w)
     return float(hi / lo)
 
 
@@ -134,8 +141,7 @@ def plot_histograms(results):
     dnc = {s: results[s]['by_res'][RES[s]]['dnc'] for s in SYSTEMS}
 
     def stat(a, w):
-        med, p9995 = np.quantile(a, [0.5, 0.9995], weights=w,
-                                 method='inverted_cdf')
+        med, p9995 = _wq(a, [0.5, P_HI], w)
         return dict(n=a.size, min=float(a.min()), median=float(med),
                     p9995=float(p9995), max=float(a.max()))
 
@@ -173,14 +179,13 @@ def plot_area_histograms(results):
     for s in SYSTEMS:
         d = results[s]['by_res'][RES[s]]
         area, w = d['area'], d['w']
-        data[s] = {'area': area, 'w': w,
-                   'med': float(np.quantile(area, 0.5, weights=w,
-                                            method='inverted_cdf')),
+        lo, med, hi = _wq(area, [P_LO, 0.5, P_HI], w)
+        data[s] = {'area': area, 'w': w, 'med': float(med),
                    'all_ratio': float(area.max() / area.min()),
-                   'trim_ratio': trimmed_ratio(area, w)}
+                   'trim_ratio': float(hi / lo)}
 
     print(f'{"sys":5} {"n":>8} {"min":>10} {"median":>10} {"max":>10} '
-          f'{"max/min":>9} {"p-ratio":>9}')
+          f'{"max/min":>9} {"central":>9}')
     for s in SYSTEMS:
         v = data[s]
         print(f'{s:5} {v["area"].size:>8} {v["area"].min():>10.6f} '
@@ -208,7 +213,6 @@ def plot_area_histograms(results):
     fig.suptitle('DGGS cell-area distributions (~H3 r9 cell size)', fontsize=12)
     fig.tight_layout()
     _save(fig, 'area_histograms.png')
-
 
 
 def _scatter_panel(ax, pts):
