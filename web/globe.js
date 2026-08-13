@@ -1,8 +1,9 @@
 // Static DGGS comparison site: a grid of ajglobe globes, one per system,
 // cells colored by the selected METRIC (aspect ratio, or area relative to
 // the resolution's exact mean) on a SHARED scale so systems compare directly.
-// - three dropdowns pick the metric, the colormap, and the value transform
-//   independently; globes + legend + histogram recolor together.
+// - four dropdowns pick the shared cell size (the RESOLUTION anchor, each
+//   system count-matched to it), the metric, the colormap, and the value
+//   transform; globes + legend + histogram update together.
 // - hovering a globe shows THAT globe's distribution of the active metric as
 //   a histogram above the legend, with a line marking the hovered cell
 //   (aligned to the color bar, so you see where the cell sits in both the
@@ -10,7 +11,7 @@
 // - all globes rotate/zoom together.
 import { Orb } from './vendor/ajglobe.min.js';
 
-// ---- the three dropdown axes (colormap, transform, metric — METRICS sits
+// ---- the dropdown axes (colormap, transform, metric — METRICS sits
 // below the transforms it feeds). One entry per option, in menu order; the
 // FIRST entry of each list is the default. Adding an option is one new
 // object in its list — the dropdowns and lookups all derive from these.
@@ -87,9 +88,11 @@ async function fetchBin(path, Ctor) {
 }
 
 const DOMAIN = { lo: 1, max: 1, p99: 1 };  // shared domain of the ACTIVE metric
-const PANELS = [];   // { sys, label, color, orb, layer, vals, hist, meta, n }
+const PANELS = [];   // { sys, label, color, orb, layer, vals, ids, hist, meta, resEl, byAnchor }
 let scale = { cmap: CMAPS[0], tf: TFS[0] };   // the current pick (defaults)
 let metric = METRICS[0];
+let anchorIdx = 0;   // active Resolution-menu index into globe_res lists
+let nSystems = 0;    // panels expected once fully built (set from the manifest)
 
 const vals = (p) => p.vals[metric.key];
 
@@ -116,25 +119,30 @@ function drawLegend(sc) {
 
 function applyScale() {
   drawLegend(scale);
-  for (const p of PANELS) p.layer.update({ fill: makeFill(vals(p), scale) });
+  for (const p of PANELS)
+    if (p.layer) p.layer.update({ fill: makeFill(vals(p), scale) });
 }
 
 // ---- shared metric domain + per-globe histograms (scale-independent).
-// Memoized per metric: the data is static, so a metric switch after the
-// first is a lookup, not a ~400k-value re-sort.
-const DOMAINS = {};   // metric key -> { lo, max, p99, hists: Map(panel -> hist) }
+// Memoized per (metric, anchor): the data is static, so revisiting a
+// combination is a lookup, not a ~400k-value re-sort. The domain
+// recomputes per anchor deliberately — each resolution view is
+// self-consistent rather than color-comparable across resolutions.
+const DOMAINS = {};   // `${metric}@${anchor}` -> { lo, max, p99, hists: Map }
 function computeDomainAndHists() {
-  let c = DOMAINS[metric.key];
+  const key = `${metric.key}@${anchorIdx}`;
+  let c = DOMAINS[key];
   if (!c) {
+    const ready = PANELS.filter((p) => p.vals);   // mid-build: some pending
     const all = [];
-    for (const p of PANELS) for (const a of vals(p)) if (Number.isFinite(a)) all.push(a);
+    for (const p of ready) for (const a of vals(p)) if (Number.isFinite(a)) all.push(a);
     const s = Float32Array.from(all).sort();   // typed: numeric, no comparator
     const lo = metric.fixedLo ?? (s.length ? s[0] : 0);
     const max = s.length ? s[s.length - 1] : lo + 1;
     const p99 = s.length ? s[Math.floor(0.99 * (s.length - 1))] : max;
     const span = max - lo || 1;
     const hists = new Map();
-    for (const p of PANELS) {
+    for (const p of ready) {
       const counts = new Array(HBINS).fill(0);
       for (const a of vals(p)) {
         if (!Number.isFinite(a)) continue;
@@ -142,7 +150,10 @@ function computeDomainAndHists() {
       }
       hists.set(p, { counts, cmax: Math.max(1, ...counts) });
     }
-    c = DOMAINS[metric.key] = { lo, max, p99, hists };
+    c = { lo, max, p99, hists };
+    // memoize only complete views — a partial domain must not masquerade
+    // as this (metric, anchor) combination's answer on later visits
+    if (ready.length === nSystems) DOMAINS[key] = c;
   }
   Object.assign(DOMAIN, { lo: c.lo, max: c.max, p99: c.p99 });
   for (const p of PANELS) p.hist = c.hists.get(p);
@@ -164,7 +175,7 @@ function drawHist(panel, hl) {
     ? `<span class="swatch" style="background:${panel.color}"></span>${panel.label} — ${vals(panel).length.toLocaleString()} cells`
     : 'hover a globe to see its distribution';
   hctx.clearRect(0, 0, hcw, hch);
-  if (!panel) return;
+  if (!panel?.hist) return;
   const { counts, cmax } = panel.hist, bw = hcw / HBINS, logmax = Math.log(cmax + 1);
   hctx.fillStyle = panel.color;
   for (let i = 0; i < HBINS; i++) {
@@ -207,16 +218,12 @@ function byResGrid(M) {
   }
 }
 
-async function buildGlobe(M, sys) {
-  // globe_res is now the single area-matched resolution per system; tolerate
-  // the older list form (a cached manifest from a previous build).
-  const gr = M.globe_res[sys];
-  const res = Array.isArray(gr) ? gr.at(-1) : gr;
+function buildGlobe(M, sys) {   // card + Orb + hover wiring; data comes via loadAnchor
   const card = document.createElement('div');
   card.className = 'globe-card';
   card.innerHTML =
     `<div class="globe-label"><span class="swatch" style="background:${M.colors[sys]}"></span>`
-    + `${M.labels[sys]} <span class="res">${M.res_prefix[sys]}${res}</span></div>`
+    + `${M.labels[sys]} <span class="res"></span></div>`
     + `<div class="globe-holder"><canvas></canvas></div><div class="globe-meta"></div>`;
   $('#globeGrid').appendChild(card);
 
@@ -225,45 +232,64 @@ async function buildGlobe(M, sys) {
   orb.lookAt(0, 20);
   orb.borders({ color: '#2a3340', width: 1 });
 
-  const key = `${sys}_r${res}`;
-  const [pos, starts, ar, area, ids] = await Promise.all([
-    fetchBin(`out/globe/${key}_pos.f32`, Float32Array),
-    fetchBin(`out/globe/${key}_idx.u32`, Uint32Array),
-    fetchBin(`out/globe/${key}_ar.f32`, Float32Array),
-    // Tolerate a cached pre-area build (see the guard in main()).
-    fetchBin(`out/globe/${key}_area.f32`, Float32Array).catch(() => null),
-    fetch(`out/globe/${key}_ids.json`).then((r) => r.json()),
-  ]);
-
-  const layer = orb.polygons({ lnglat: pos, starts, fill: makeFill(ar, scale) });
-  const panel = { sys, label: `${M.labels[sys]} ${M.res_prefix[sys]}${res}`,
-                  color: M.colors[sys], orb, layer, vals: { ar, area },
-                  meta: card.querySelector('.globe-meta'), n: ids.length };
+  // Data (and the polygon layer) attach per anchor via loadAnchor; the
+  // hover handlers read the panel's ACTIVE fields, so they bind once.
+  const panel = { sys, label: '', color: M.colors[sys], orb,
+                  layer: null, vals: null, ids: null, byAnchor: {},
+                  meta: card.querySelector('.globe-meta'),
+                  resEl: card.querySelector('.res') };
   PANELS.push(panel);
-  setMeta(panel);
 
   orb.on('viewchange', () => syncFrom(orb));
 
   const tip = $('#tooltip');
   orb.on('hover', (e) => {
-    orb.highlight(e.index ?? -1, layer);
+    orb.highlight(e.index ?? -1, panel.layer);
     const a = e.index == null ? null : vals(panel)[e.index];
     drawHist(panel, Number.isFinite(a) ? a : null);   // this globe's distribution + line
     if (e.index == null) { tip.style.opacity = 0; return; }
-    tip.innerHTML = `${ids[e.index]}<br>${metric.name} ${Number.isFinite(a) ? fmt(a, 4) : 'DNC'}`;
+    tip.innerHTML = `${panel.ids[e.index]}<br>${metric.name} ${Number.isFinite(a) ? fmt(a, 4) : 'DNC'}`;
     const r = canvas.getBoundingClientRect();
     tip.style.left = `${r.left + e.x + 14}px`;
     tip.style.top = `${r.top + e.y + 14}px`;
     tip.style.opacity = 1;
   });
   canvas.addEventListener('pointerleave', () => { tip.style.opacity = 0; drawHist(panel, null); });
+  return panel;
+}
+
+// Fetch (once, cached per panel) and activate the CURRENT anchor's data
+// on `p`: swap the polygon layer and point the panel's active fields at it.
+async function loadAnchor(M, p) {
+  let d = p.byAnchor[anchorIdx];
+  if (!d) {
+    const res = M.globe_res[p.sys][anchorIdx];
+    const key = `${p.sys}_r${res}`;
+    const [pos, starts, ar, area, ids] = await Promise.all([
+      fetchBin(`out/globe/${key}_pos.f32`, Float32Array),
+      fetchBin(`out/globe/${key}_idx.u32`, Uint32Array),
+      fetchBin(`out/globe/${key}_ar.f32`, Float32Array),
+      // Tolerate a cached pre-area build (see the guard in main()).
+      fetchBin(`out/globe/${key}_area.f32`, Float32Array).catch(() => null),
+      fetch(`out/globe/${key}_ids.json`).then((r) => r.json()),
+    ]);
+    d = p.byAnchor[anchorIdx] = { res, pos, starts, vals: { ar, area }, ids };
+  }
+  p.layer?.remove();
+  Object.assign(p, { vals: d.vals, ids: d.ids });
+  p.layer = p.orb.polygons({ lnglat: d.pos, starts: d.starts,
+                             fill: makeFill(vals(p) ?? d.vals.ar, scale) });
+  const rlabel = `${M.res_prefix[p.sys]}${d.res}`;
+  p.resEl.textContent = rlabel;
+  p.label = `${M.labels[p.sys]} ${rlabel}`;
 }
 
 // Per-globe stat line under each canvas, restated for the active metric.
 function setMeta(p) {
+  if (!p.vals) return;   // mid-build: not loaded yet
   let lo = Infinity, hi = -Infinity;
   for (const a of vals(p)) if (Number.isFinite(a)) { if (a < lo) lo = a; if (a > hi) hi = a; }
-  p.meta.textContent = `${p.n.toLocaleString()} cells · ${metric.stat(lo, hi)}`;
+  p.meta.textContent = `${p.ids.length.toLocaleString()} cells · ${metric.stat(lo, hi)}`;
 }
 
 // Click any plot (static histogram/extremes or a dynamically-added by-res
@@ -325,8 +351,17 @@ async function main() {
   // their panel is displayed. So the one-time setup happens on the
   // first showing, and the build loop checks visibility before each
   // globe — switching away mid-build pauses it, switching back resumes.
+  // Normalize an older cached manifest (one resolution per system, no
+  // anchor labels) into the per-anchor list form.
+  if (!Array.isArray(M.globe_res[M.systems[0]])) {
+    for (const s of M.systems) M.globe_res[s] = [M.globe_res[s]];
+  }
+  M.globe_anchor_labels ??= [''];
+  anchorIdx = M.globe_res[M.systems[0]].length - 1;   // default: the finest
+  nSystems = M.systems.length;
+
   const panelShown = () => $('#panel-globes').classList.contains('active');
-  let onMetric, wired = false, building = false, finalized = false, next = 0;
+  let onMetric, resSel, wired = false, building = false, finalized = false, next = 0;
   const ensureGlobes = async () => {
     if (!wired) {
       wired = true;
@@ -350,6 +385,25 @@ async function main() {
         sel.addEventListener('change', on);
       }
       // a fresh <select> starts on its first option, which IS the default
+      // The anchor changes every panel's DATA: all four menus disable for
+      // the swap's duration (and until the initial build finishes) so no
+      // recolor or domain computation can run over mixed-anchor panels.
+      resSel = $('#resSelect');
+      M.globe_anchor_labels.forEach((l) => resSel.add(new Option(l)));
+      resSel.selectedIndex = anchorIdx;
+      resSel.disabled = true;
+      if (resSel.options.length < 2) resSel.closest('label').hidden = true;
+      const allSels = [resSel, metricSel, cmapSel, tfSel];
+      resSel.addEventListener('change', async () => {
+        for (const x of allSels) x.disabled = true;
+        anchorIdx = resSel.selectedIndex;
+        try {
+          await Promise.all(PANELS.map((p) => loadAnchor(M, p)));
+          onMetric();   // per-anchor domain/hists/legend/meta
+        } finally {
+          for (const x of allSels) x.disabled = false;
+        }
+      });
       initHist();
       DOMAIN.max = M.globe_ar_max || 1;   // provisional, so the first fill is sane
       DOMAIN.p99 = DOMAIN.max;
@@ -357,7 +411,9 @@ async function main() {
     if (building) return;
     building = true;
     while (next < M.systems.length && panelShown()) {   // serial builds; pause point
-      await buildGlobe(M, M.systems[next]);
+      const p = buildGlobe(M, M.systems[next]);
+      await loadAnchor(M, p);
+      setMeta(p);
       next++;
     }
     building = false;
@@ -369,6 +425,7 @@ async function main() {
         $('#metricSelect').querySelector('option[value="area"]').disabled = true;
       }
       onMetric();   // seed domain/hists/legend/meta for the default metric
+      resSel.disabled = false;
     }
   };
 
