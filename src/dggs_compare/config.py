@@ -34,9 +34,8 @@ PER_RES_SEED = True
 N_CELLS = 1_000_000
 SUBSAMPLE_MAX_RATIO = 4
 # Resolutions enumerated EXHAUSTIVELY regardless of the budgets — complete
-# coverage for the full-globe viewer page (web/globe_full.html renders every
-# cell; r6 is the 1.18M-cell torture test). webdata emits that page's
-# binaries for exactly these entries, straight from the tables.
+# coverage in the published tables for these entries (r6 is the 1.18M-cell
+# torture test); the runner is the consumer.
 FULL_RES = {'ivea7h': (1, 2, 3, 5, 6)}
 
 # ----- per-grid registry metadata ------------------------------------------
@@ -132,10 +131,11 @@ def sampling_regime(sys, res, n_cells=None):
 PER_SYSTEM = {'TARGET_RES': TARGET_RES, 'SYS_COLOR': SYS_COLOR,
               'CELLS_PER_RES': CELLS_PER_RES, 'PRIMARY_IMPL': PRIMARY_IMPL,
               'EXPECTED_IRREGULAR': EXPECTED_IRREGULAR}
-# The globe view draws one globe per system, all at a common cell size: this H3
-# resolution sets it (r3 ~ 41,162 cells ~ 12,600 km^2/cell), and every other
-# system uses the resolution whose cell count is closest to H3's here. Raise for
-# finer/heavier globes, lower for coarser/lighter ones.
+# The globe view offers a Resolution menu of H3 anchor levels 0..this, every
+# system drawing at the resolution whose cell count is closest to the selected
+# anchor's. This sets the FINEST anchor, which is also the menu default
+# (r3 ~ 41,162 cells ~ 12,600 km^2/cell). Raising it adds finer menu entries
+# whose payloads grow geometrically; the coarser levels are nearly free.
 GLOBE_H3_RES = 3
 
 # ----- csar settings (recorded in the tables' metadata) -------------------

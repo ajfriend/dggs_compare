@@ -68,27 +68,29 @@ def _emit_globe(s, res):
     return float(finite.max()) if finite.size else 1.0
 
 
+def _anchor_label(a):
+    """Menu label for anchor `a`: mean cell area in km², 3 significant
+    figures (grouping only above the point where it reads well)."""
+    km2 = float(f'{config.mean_cell_area("h3", a) * config.SR2KM2:.3g}')
+    km2_s = f'{km2:,.0f}' if km2 >= 100 else f'{km2:g}'
+    return f'~{km2_s} km²/cell (≈H3 r{a})'
+
+
 def build_globe():
     """Write flat binaries for each system at every anchor level (H3
     r0..GLOBE_H3_RES, coarse to fine). Returns ({system: [res per
     anchor]}, [anchor label per anchor], shared AR max over all cells)."""
     GLOBE_DIR.mkdir(parents=True, exist_ok=True)
     anchors = range(config.GLOBE_H3_RES + 1)
-    chosen = {s: [] for s in systems()}
-    labels, globe_max, written = [], 1.0, set()
-    for a in anchors:
-        anchor_n = config.CELLS_PER_RES['h3'](a)
-        km2 = config.mean_cell_area('h3', a) * config.SR2KM2
-        labels.append(f'~{float(f"{km2:.3g}"):,.0f} km²/cell (≈H3 r{a})')
-        for s in systems():
-            res = globe_res_for(s, anchor_n)
-            chosen[s].append(res)
-            # neighboring anchors can pick the same resolution for a
-            # slow-growing grid; the files are keyed by res, so emit once
-            if (s, res) not in written:
-                written.add((s, res))
-                globe_max = max(globe_max, _emit_globe(s, res))
-    return chosen, labels, globe_max
+    anchor_ns = [config.CELLS_PER_RES['h3'](a) for a in anchors]
+    chosen, globe_max = {}, 1.0
+    for s in systems():
+        chosen[s] = [globe_res_for(s, n) for n in anchor_ns]
+        # neighboring anchors can pick the same resolution for a
+        # slow-growing grid; emit each distinct resolution once
+        for res in dict.fromkeys(chosen[s]):
+            globe_max = max(globe_max, _emit_globe(s, res))
+    return chosen, [_anchor_label(a) for a in anchors], globe_max
 
 
 def build_all():

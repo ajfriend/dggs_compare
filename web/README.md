@@ -26,14 +26,19 @@ hand-authored or pre-baked into git. `just site` runs two steps into `web/out/`
   plots (matplotlib).
 - **`scripts/web_data.py`** (via `dggs_compare.webdata`) → `manifest.json` and
   `globe/{sys}_r{res}_{pos.f32,idx.u32,ar.f32,area.f32,ids.json}` — ajglobe's
-  flat-binary polygons plus one f32 per cell per metric, one globe per system.
+  flat-binary polygons plus one f32 per cell per metric, one globe per
+  (system, anchor resolution).
 
-**Globe resolution is area-matched.** Each system's globe uses the resolution
-whose cell count is closest (in log-ratio) to H3's at `config.GLOBE_H3_RES`
-(default r3). These are ~equal-area grids, so `avg cell area = 4πR²/N(res)` —
+**Globe resolutions are area-matched to anchors.** The Resolution menu offers
+every H3 level 0..`config.GLOBE_H3_RES` as a common cell size; each system
+serves the resolution whose cell count is closest (in log-ratio) to the
+anchor's. These are ~equal-area grids, so `avg cell area = 4πR²/N(res)` —
 matching cell counts matches cell size, computed from the closed-form counts in
-`config.CELLS_PER_RES` (no table reads). Raise `GLOBE_H3_RES` for finer/heavier
-globes, lower for coarser/lighter ones; changing it needs a full site rebuild.
+`config.CELLS_PER_RES` (no table reads). The manifest's `globe_res` is
+`{system: [res per anchor]}`, coarse to fine; the finest anchor is the default
+view. Payloads shrink geometrically toward r0, so the coarser levels together
+cost ~1/6 of the finest. Raising `GLOBE_H3_RES` adds finer, geometrically
+heavier menu entries; changing it needs a full site rebuild.
 
 ## Viewer features (`globe.js`)
 
@@ -43,6 +48,10 @@ globes, lower for coarser/lighter ones; changing it needs a full site rebuild.
   showings of their tab (canvases size themselves from the DOM at
   construction, so building only happens while the panel is visible);
   a plots-tab visit costs no WebGL and no globe binaries.
+- **Resolution menu** — the shared cell size, one entry per H3 anchor
+  (labeled ~km²/cell). Each anchor's binaries fetch on first use and are
+  cached per globe; the color domain recomputes per (metric, anchor), so
+  each resolution view is self-consistent.
 - **Globes** — one per system, cells colored by the selected metric on a
   shared domain so systems compare directly. Drag to rotate, scroll to zoom;
   **all globes are synced** (moving one moves all). Hover a cell for its
