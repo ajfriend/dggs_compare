@@ -116,13 +116,6 @@ def _wq(vals, q, w):
     return np.quantile(vals, q, weights=w, method='inverted_cdf')
 
 
-def p_hi(vals, w):
-    """The central-99.9% upper edge (#83): one uniform trim, no declared
-    cell classes, stable where a sample extreme is not. AR's floor is 1
-    by construction, so for AR only the upper edge is informative."""
-    return float(_wq(vals, P_HI, w))
-
-
 def trimmed_ratio(vals, w):
     """The central-99.9% ratio (#83)."""
     lo, hi = _wq(vals, [P_LO, P_HI], w)
@@ -249,24 +242,20 @@ def _scatter_panel(ax, pts):
     ax.grid(True, alpha=0.3)
 
 
-def plot_tradeoff(results):
+def plot_tradeoff(rows):
     """Pareto scatter at the working resolutions, shown both ways side
     by side (#83): all-cells extremes and the central-99.9% quantile
     statistics — the same construction in each panel, neither favored.
-    The ideal grid sits at (1, 1), starred."""
-    stats = {}
-    for s in SYSTEMS:
-        d = results[s]['by_res'][RES[s]]
-        stats[s] = {'all': (float(d['ars'].max()),
-                            float(d['area'].max() / d['area'].min())),
-                    'trim': (p_hi(d['ars'], d['w_ars']),
-                             trimmed_ratio(d['area'], d['w']))}
+    Consumes the summary_stats rows. The ideal grid sits at (1, 1),
+    starred."""
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.8),
                              sharex=True, sharey=True)
-    for ax, key, sub in zip(axes, ('all', 'trim'),
-                            ('all cells:  max(AR)  vs  max/min(area)',
-                             'central 99.9%:  p99.95(AR)  vs  p99.95/p0.05(area)')):
-        _scatter_panel(ax, [(s, *stats[s][key]) for s in SYSTEMS])
+    for ax, (kx, ky), sub in zip(axes,
+                                 (('ar_max', 'area_all'),
+                                  ('ar_p9995', 'area_trim')),
+                                 ('all cells:  max(AR)  vs  max/min(area)',
+                                  'central 99.9%:  p99.95(AR)  vs  p99.95/p0.05(area)')):
+        _scatter_panel(ax, [(r['sys'], r[kx], r[ky]) for r in rows])
         ax.set_title(sub, fontsize=10)
         ax.set_xlabel('aspect ratio')
     axes[0].set_ylabel('cell-area ratio')
@@ -278,21 +267,24 @@ def plot_tradeoff(results):
 
 
 def summary_stats(results):
-    """The working-resolution numbers behind the histogram stat lines and
-    the tradeoff panels, one row per system: for each metric the all-cells
-    extreme and its central-99.9% counterpart (#83), plus median AR and
-    the DNC count."""
+    """The working-resolution stats, one row per system: for each metric
+    the all-cells extreme and its central-99.9% counterpart (#83), plus
+    median AR and the DNC count. The single computation of these numbers —
+    the tradeoff panels and both table renderings consume the rows, so
+    they agree by construction. (AR's floor is 1, so its central-99.9%
+    counterpart is just the upper edge p99.95.)"""
     rows = []
     for s in SYSTEMS:
         d = results[s]['by_res'][RES[s]]
         a, w = d['ars'], d['w_ars']
         area, wa = d['area'], d['w']
+        med, hi = _wq(a, [0.5, P_HI], w)
         rows.append({
-            'label': SYS_LABEL[s],
+            'sys': s, 'label': SYS_LABEL[s],
             'color': matplotlib.colors.to_hex(SYS_COLOR[s]),   # 'C0' -> web hex
-            'n': int(area.size), 'dnc': d['dnc'],
-            'ar_median': float(_wq(a, 0.5, w)),
-            'ar_p9995': p_hi(a, w),
+            'n': area.size, 'dnc': d['dnc'],
+            'ar_median': float(med),
+            'ar_p9995': float(hi),
             'ar_max': float(a.max()),
             'area_trim': trimmed_ratio(area, wa),
             'area_all': float(area.max() / area.min()),
@@ -337,10 +329,9 @@ def write_summary_table_gt(rows):
     import pandas as pd
     from great_tables import GT
 
-    cols = ('label', 'n', 'ar_median', 'ar_p9995', 'ar_max', 'dnc',
-            'area_trim', 'area_all')
-    df = pd.DataFrame([{k: r[k] for k in cols} for r in rows])
-    line = '#222a35'   # the site's --line color
+    cols = ['label', 'n', 'ar_median', 'ar_p9995', 'ar_max', 'dnc',
+            'area_trim', 'area_all']
+    df = pd.DataFrame(rows)[cols]
     gt = (
         GT(df)
         .tab_spanner('aspect ratio', ['ar_median', 'ar_p9995', 'ar_max', 'dnc'])
@@ -351,15 +342,18 @@ def write_summary_table_gt(rows):
         .fmt_number(['ar_median', 'ar_p9995', 'ar_max', 'area_trim', 'area_all'],
                     decimals=4)
         .fmt_integer(['n', 'dnc'])
+        # great_tables validates colors, so the site palette can't be
+        # referenced as CSS variables — these literals restate
+        # style.css's --panel / --ink / --line and drift if it changes.
         .tab_options(table_margin_left='0',   # sit flush left like version A
                      table_background_color='#11151c',
                      table_font_color='#e7edf4',
                      table_font_size='13.5px',
-                     table_border_top_color=line,
-                     table_border_bottom_color=line,
-                     column_labels_border_top_color=line,
-                     column_labels_border_bottom_color=line,
-                     table_body_hlines_color=line)
+                     table_border_top_color='#222a35',
+                     table_border_bottom_color='#222a35',
+                     column_labels_border_top_color='#222a35',
+                     column_labels_border_bottom_color='#222a35',
+                     table_body_hlines_color='#222a35')
     )
     out = OUT_DIR / 'summary_table_gt.html'
     out.write_text(gt.as_raw_html())
@@ -461,8 +455,8 @@ def main():
 
     plot_histograms(results)
     plot_area_histograms(results)
-    plot_tradeoff(results)
     rows = summary_stats(results)
+    plot_tradeoff(rows)
     write_summary_table(rows)
     write_summary_table_gt(rows)
     plot_extremes(results)

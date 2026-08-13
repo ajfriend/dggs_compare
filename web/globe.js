@@ -348,6 +348,7 @@ function initTabs(onShow) {
 }
 
 async function main() {
+  summaryTables();   // independent of the manifest — don't wait on it
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
     `${M.systems.length} systems · shape via csar's enclosing-cone solver, area via sparea`;
@@ -355,7 +356,6 @@ async function main() {
   if (M.gap_tol) $('#gap').textContent = M.gap_tol.toExponential();
 
   byResGrid(M);
-  summaryTables();
   initLightbox();
 
   // Everything globe-panel runs lazily and RESUMABLY, driven by showings
