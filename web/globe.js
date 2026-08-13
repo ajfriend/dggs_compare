@@ -218,6 +218,18 @@ function byResGrid(M) {
   }
 }
 
+function summaryTables() {
+  // The two renderings of the working-resolution summary stats (fragments
+  // written by survey.py); a missing file (an older cached build) just
+  // leaves its block empty.
+  for (const [id, file] of [['#statsTable', 'summary_table.html'],
+                            ['#statsTableGT', 'summary_table_gt.html']]) {
+    fetch(`out/${file}`)
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((html) => { $(id).innerHTML = html; });
+  }
+}
+
 function buildGlobe(M, sys) {   // card + Orb + hover wiring; data comes via loadAnchor
   const card = document.createElement('div');
   card.className = 'globe-card';
@@ -343,6 +355,7 @@ async function main() {
   if (M.gap_tol) $('#gap').textContent = M.gap_tol.toExponential();
 
   byResGrid(M);
+  summaryTables();
   initLightbox();
 
   // Everything globe-panel runs lazily and RESUMABLY, driven by showings

@@ -9,6 +9,9 @@ certified ellipses):
   tradeoff.png          shape-vs-area scatter, all-cells and central-99.9% panels
   extremes.png          best/worst cell per system, drawn with its ellipse
   by_res_<sys>.png      per-system AR distribution stacked by resolution
+  summary_table.html    the working-resolution stat lines as one table,
+  summary_table_gt.html rendered two ways (hand-rolled / great_tables)
+                        for comparison; injected into the page by globe.js
 
 Aspect ratio (AR) = major/minor semi-axis ratio (a/b, a>=1) of each cell's
 enclosing-cone ellipse — the discrete, per-cell analogue of Tissot's
@@ -274,6 +277,95 @@ def plot_tradeoff(results):
     _save(fig, 'tradeoff.png')
 
 
+def summary_stats(results):
+    """The working-resolution numbers behind the histogram stat lines and
+    the tradeoff panels, one row per system: for each metric the all-cells
+    extreme and its central-99.9% counterpart (#83), plus median AR and
+    the DNC count."""
+    rows = []
+    for s in SYSTEMS:
+        d = results[s]['by_res'][RES[s]]
+        a, w = d['ars'], d['w_ars']
+        area, wa = d['area'], d['w']
+        rows.append({
+            'label': SYS_LABEL[s],
+            'color': matplotlib.colors.to_hex(SYS_COLOR[s]),   # 'C0' -> web hex
+            'n': int(area.size), 'dnc': d['dnc'],
+            'ar_median': float(_wq(a, 0.5, w)),
+            'ar_p9995': p_hi(a, w),
+            'ar_max': float(a.max()),
+            'area_trim': trimmed_ratio(area, wa),
+            'area_all': float(area.max() / area.min()),
+        })
+    return rows
+
+
+def write_summary_table(rows):
+    """Version A of the table comparison: a hand-rolled HTML fragment,
+    styled by the site's own CSS (table.stats in web/style.css)."""
+    def num(v):
+        return f'<td class="num">{v:.4f}</td>'
+
+    body = []
+    for r in rows:
+        body.append(
+            '<tr><td class="sys"><span class="swatch" '
+            f'style="background:{r["color"]}"></span>{r["label"]}</td>'
+            f'<td class="num">{r["n"]:,}</td>'
+            + num(r['ar_median']) + num(r['ar_p9995']) + num(r['ar_max'])
+            + f'<td class="num">{r["dnc"]}</td>'
+            + num(r['area_trim']) + num(r['area_all']) + '</tr>')
+    html = (
+        '<table class="stats">\n<thead>\n'
+        '<tr><th rowspan="2" class="sys">system</th>'
+        '<th rowspan="2" class="num">cells</th>'
+        '<th colspan="4" class="grp">aspect ratio</th>'
+        '<th colspan="2" class="grp">area ratio</th></tr>\n'
+        '<tr><th class="num">median</th><th class="num">p99.95</th>'
+        '<th class="num">max</th><th class="num">DNC</th>'
+        '<th class="num">central&#8209;99.9%</th><th class="num">max/min</th></tr>\n'
+        '</thead>\n<tbody>\n' + '\n'.join(body) + '\n</tbody>\n</table>\n')
+    out = OUT_DIR / 'summary_table.html'
+    out.write_text(html)
+    print(f'wrote {out}')
+
+
+def write_summary_table_gt(rows):
+    """Version B of the table comparison: the same stats through
+    great_tables (imports kept local so dropping the loser of the
+    comparison drops the dependency with it)."""
+    import pandas as pd
+    from great_tables import GT
+
+    cols = ('label', 'n', 'ar_median', 'ar_p9995', 'ar_max', 'dnc',
+            'area_trim', 'area_all')
+    df = pd.DataFrame([{k: r[k] for k in cols} for r in rows])
+    line = '#222a35'   # the site's --line color
+    gt = (
+        GT(df)
+        .tab_spanner('aspect ratio', ['ar_median', 'ar_p9995', 'ar_max', 'dnc'])
+        .tab_spanner('area ratio', ['area_trim', 'area_all'])
+        .cols_label(label='system', n='cells', ar_median='median',
+                    ar_p9995='p99.95', ar_max='max', dnc='DNC',
+                    area_trim='central-99.9%', area_all='max/min')
+        .fmt_number(['ar_median', 'ar_p9995', 'ar_max', 'area_trim', 'area_all'],
+                    decimals=4)
+        .fmt_integer(['n', 'dnc'])
+        .tab_options(table_margin_left='0',   # sit flush left like version A
+                     table_background_color='#11151c',
+                     table_font_color='#e7edf4',
+                     table_font_size='13.5px',
+                     table_border_top_color=line,
+                     table_border_bottom_color=line,
+                     column_labels_border_top_color=line,
+                     column_labels_border_bottom_color=line,
+                     table_body_hlines_color=line)
+    )
+    out = OUT_DIR / 'summary_table_gt.html'
+    out.write_text(gt.as_raw_html())
+    print(f'wrote {out}')
+
+
 def draw_cell(ax, rec, color):
     """Draw a cell's boundary + enclosing ellipse, major axis horizontal."""
     xy, semi = csar.project_to_cone(rec['result'], rec['verts'], up=None)
@@ -370,6 +462,9 @@ def main():
     plot_histograms(results)
     plot_area_histograms(results)
     plot_tradeoff(results)
+    rows = summary_stats(results)
+    write_summary_table(rows)
+    write_summary_table_gt(rows)
     plot_extremes(results)
     for s in SYSTEMS:
         plot_by_resolution(s, results[s]['by_res'])
