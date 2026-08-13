@@ -262,12 +262,33 @@ def plot_tradeoff(results):
     cells, matching the published AR stats) against worst-case area
     ratio (regular cells). The ideal grid sits at (1, 1)."""
     fig, ax = plt.subplots(figsize=(7.5, 6))
+    pts = []
     for s in SYSTEMS:
         d = results[s]['by_res'][RES[s]]
         x, y = d['ars'].max(), d['ratio']
+        pts.append((s, x, y))
         ax.plot(x, y, 'o', ms=9, color=SYS_COLOR[s], label=SYS_LABEL[s])
-        ax.annotate(s.upper(), (x, y), textcoords='offset points',
-                    xytext=(7, 4), fontsize=9)
+    # Near-coincident points (the equal-area systems collide at y=1, and
+    # the ISEA/IVEA n-hedge pairs coincide in both axes) get their labels
+    # STACKED instead of overprinted: points within 3% of the axis range
+    # of a cluster's first point join it, and the whole stack anchors on
+    # that first point so near-misses can't smear the stack apart.
+    xs, ys = [p[1] for p in pts], [p[2] for p in pts]
+    ex = 0.03 * ((max(xs) - min(xs)) or 1)
+    ey = 0.03 * ((max(ys) - min(ys)) or 1)
+    clusters = []
+    for pt in pts:
+        for c in clusters:
+            if abs(pt[1] - c[0][1]) < ex and abs(pt[2] - c[0][2]) < ey:
+                c.append(pt)
+                break
+        else:
+            clusters.append([pt])
+    for c in clusters:
+        x0, y0 = c[0][1], c[0][2]
+        for i, (s, _, _) in enumerate(c):
+            ax.annotate(s.upper(), (x0, y0), textcoords='offset points',
+                        xytext=(7, 4 + 12 * i), fontsize=9)
     ax.axhline(1.0, color='0.85', lw=1, zorder=0)
     ax.axvline(1.0, color='0.85', lw=1, zorder=0)
     ax.set_xlabel('worst-case aspect ratio (all cells)')
