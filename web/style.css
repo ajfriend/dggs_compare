@@ -120,8 +120,8 @@ table.stats th, table.stats td { padding: 5px 14px; }
 table.stats thead th { color: var(--muted); font-weight: 600; }
 table.stats thead .grp { text-align: center; border-bottom: 1px solid var(--line); }
 table.stats tbody tr { border-top: 1px solid var(--line); }
-table.stats td.num, table.stats th.num { text-align: right; }
-table.stats td.sys, table.stats th.sys { text-align: left; }
+table.stats .num { text-align: right; }
+table.stats .sys { text-align: left; }
 table.stats td.sys { font-weight: 600; white-space: nowrap; }
 table.stats .swatch { margin-right: 7px; vertical-align: -1px; }
 

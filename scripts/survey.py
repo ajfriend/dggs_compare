@@ -115,12 +115,6 @@ def _wq(vals, q, w):
     return np.quantile(vals, q, weights=w, method='inverted_cdf')
 
 
-def trimmed_ratio(vals, w):
-    """The central-99.9% ratio (#83)."""
-    lo, hi = _wq(vals, [P_LO, P_HI], w)
-    return float(hi / lo)
-
-
 def _save(fig, name, dpi=DPI):
     out = OUT_DIR / name
     fig.savefig(out, dpi=dpi)
@@ -129,36 +123,29 @@ def _save(fig, name, dpi=DPI):
 
 
 # ----- plotting ----------------------------------------------------------
-def plot_histograms(results):
-    """Cross-system AR distributions at each system's working resolution."""
+def plot_histograms(results, rows):
+    """Cross-system AR distributions at each system's working resolution;
+    the stat lines come from the shared summary rows."""
     ars = {s: results[s]['by_res'][RES[s]]['ars'] for s in SYSTEMS}
     ws = {s: results[s]['by_res'][RES[s]]['w_ars'] for s in SYSTEMS}
-    dnc = {s: results[s]['by_res'][RES[s]]['dnc'] for s in SYSTEMS}
-
-    def stat(a, w):
-        med, p9995 = _wq(a, [0.5, P_HI], w)
-        return dict(n=a.size, min=float(a.min()), median=float(med),
-                    p9995=float(p9995), max=float(a.max()))
-
-    st = {s: stat(ars[s], ws[s]) for s in SYSTEMS}
 
     print(f'{"sys":5} {"n_conv":>8} {"n_dnc":>7} {"min":>10} {"median":>10} {"p99.95":>10} {"max":>10}')
-    for s in SYSTEMS:
-        d = st[s]
-        print(f'{s:5} {d["n"]:>8} {dnc[s]:>7} {d["min"]:>10.6f} '
-              f'{d["median"]:>10.6f} {d["p9995"]:>10.6f} {d["max"]:>10.6f}')
+    for r in rows:
+        a = ars[r['sys']]
+        print(f'{r["sys"]:5} {a.size:>8} {r["dnc"]:>7} {a.min():>10.6f} '
+              f'{r["ar_median"]:>10.6f} {r["ar_p9995"]:>10.6f} {r["ar_max"]:>10.6f}')
 
     bins = np.linspace(1.0, max(a.max() for a in ars.values()), N_BINS + 1)
     fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
-    for ax, s in zip(axes, SYSTEMS):
-        d = st[s]
+    for ax, r in zip(axes, rows):
+        s = r['sys']
         ax.hist(ars[s], bins=bins, weights=ws[s], color=SYS_COLOR[s],
                 edgecolor='white', linewidth=0.3)
         ax.set_yscale('log')
         ax.set_ylabel('count (log)')
-        ax.set_title(f'{SYS_LABEL[s]}  (median {d["median"]:.4f}, '
-                     f'p99.95 {d["p9995"]:.4f}, max {d["max"]:.4f}, '
-                     f'DNC {dnc[s]})', fontsize=10)
+        ax.set_title(f'{SYS_LABEL[s]}  (median {r["ar_median"]:.4f}, '
+                     f'p99.95 {r["ar_p9995"]:.4f}, max {r["ar_max"]:.4f}, '
+                     f'DNC {r["dnc"]})', fontsize=10)
         ax.grid(True, alpha=0.3)
     axes[-1].set_xlabel(f'aspect ratio (shared bins, gap_tol = {config.GAP_TOL:g})')
     fig.suptitle('DGGS aspect-ratio distributions (~H3 r9 cell size)', fontsize=12)
@@ -166,42 +153,37 @@ def plot_histograms(results):
     _save(fig, 'histograms.png')
 
 
-def plot_area_histograms(results):
+def plot_area_histograms(results, rows):
     """Cross-system normalized-area distributions at the working
     resolutions — every cell included. The stat line pairs the all-cells
-    max/min with the central-99.9% ratio (#83)."""
-    data = {}
-    for s in SYSTEMS:
-        d = results[s]['by_res'][RES[s]]
-        area, w = d['area'], d['w']
-        lo, med, hi = _wq(area, [P_LO, 0.5, P_HI], w)
-        data[s] = {'area': area, 'w': w, 'med': float(med),
-                   'all_ratio': float(area.max() / area.min()),
-                   'trim_ratio': float(hi / lo)}
+    max/min with the central-99.9% ratio (#83), from the shared summary
+    rows."""
+    areas = {s: results[s]['by_res'][RES[s]]['area'] for s in SYSTEMS}
+    ws = {s: results[s]['by_res'][RES[s]]['w'] for s in SYSTEMS}
 
     print(f'{"sys":5} {"n":>8} {"min":>10} {"median":>10} {"max":>10} '
           f'{"max/min":>9} {"central":>9}')
-    for s in SYSTEMS:
-        v = data[s]
-        print(f'{s:5} {v["area"].size:>8} {v["area"].min():>10.6f} '
-              f'{v["med"]:>10.6f} {v["area"].max():>10.6f} '
-              f'{v["all_ratio"]:>9.6f} {v["trim_ratio"]:>9.6f}')
+    for r in rows:
+        area = areas[r['sys']]
+        print(f'{r["sys"]:5} {area.size:>8} {area.min():>10.6f} '
+              f'{r["area_median"]:>10.6f} {area.max():>10.6f} '
+              f'{r["area_all"]:>9.6f} {r["area_trim"]:>9.6f}')
 
-    lo = min(v['area'].min() for v in data.values())
-    hi = max(v['area'].max() for v in data.values())
+    lo = min(a.min() for a in areas.values())
+    hi = max(a.max() for a in areas.values())
     # Pad so 1.0 stays in frame even when every system is a spike at 1.
     lo, hi = min(lo, 0.98), max(hi, 1.02)
     bins = np.linspace(lo, hi, N_BINS + 1)
     fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
-    for ax, s in zip(axes, SYSTEMS):
-        v = data[s]
-        ax.hist(v['area'], bins=bins, weights=v['w'], color=SYS_COLOR[s],
+    for ax, r in zip(axes, rows):
+        s = r['sys']
+        ax.hist(areas[s], bins=bins, weights=ws[s], color=SYS_COLOR[s],
                 edgecolor='white', linewidth=0.3)
         ax.set_yscale('log')
         ax.set_ylabel('count (log)')
-        ax.set_title(f'{SYS_LABEL[s]}  (median {v["med"]:.4f}, '
-                     f'max/min {v["all_ratio"]:.4f}, '
-                     f'central-99.9% {v["trim_ratio"]:.4f})', fontsize=10)
+        ax.set_title(f'{SYS_LABEL[s]}  (median {r["area_median"]:.4f}, '
+                     f'max/min {r["area_all"]:.4f}, '
+                     f'central-99.9% {r["area_trim"]:.4f})', fontsize=10)
         ax.grid(True, alpha=0.3)
     axes[-1].set_xlabel('cell area / (4π/N) — exact-mean normalized; '
                         'all cells (shared bins)')
@@ -249,11 +231,11 @@ def plot_tradeoff(rows):
     starred."""
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.8),
                              sharex=True, sharey=True)
-    for ax, (kx, ky), sub in zip(axes,
-                                 (('ar_max', 'area_all'),
-                                  ('ar_p9995', 'area_trim')),
-                                 ('all cells:  max(AR)  vs  max/min(area)',
-                                  'central 99.9%:  p99.95(AR)  vs  p99.95/p0.05(area)')):
+    panels = (('ar_max', 'area_all',
+               'all cells:  max(AR)  vs  max/min(area)'),
+              ('ar_p9995', 'area_trim',
+               'central 99.9%:  p99.95(AR)  vs  p99.95/p0.05(area)'))
+    for ax, (kx, ky, sub) in zip(axes, panels):
         _scatter_panel(ax, [(r['sys'], r[kx], r[ky]) for r in rows])
         ax.set_title(sub, fontsize=10)
         ax.set_xlabel('aspect ratio')
@@ -268,24 +250,25 @@ def plot_tradeoff(rows):
 def summary_stats(results):
     """The working-resolution stats, one row per system: for each metric
     the all-cells extreme and its central-99.9% counterpart (#83), plus
-    median AR and the DNC count. The single computation of these numbers —
-    the tradeoff panels and the summary table consume the rows, so they
-    agree by construction. (AR's floor is 1, so its central-99.9%
-    counterpart is just the upper edge p99.95.)"""
+    the medians and the DNC count. The single computation of these
+    numbers — the histogram stat lines, the tradeoff panels, and the
+    summary table all consume the rows, so they agree by construction.
+    (AR's floor is 1, so its central-99.9% counterpart is just the
+    upper edge p99.95.)"""
     rows = []
     for s in SYSTEMS:
         d = results[s]['by_res'][RES[s]]
         a, w = d['ars'], d['w_ars']
         area, wa = d['area'], d['w']
         med, hi = _wq(a, [0.5, P_HI], w)
+        alo, amed, ahi = _wq(area, [P_LO, 0.5, P_HI], wa)
         rows.append({
-            'sys': s, 'label': SYS_LABEL[s],
-            'color': matplotlib.colors.to_hex(SYS_COLOR[s]),   # 'C0' -> web hex
-            'n': area.size, 'dnc': d['dnc'],
+            'sys': s, 'n': area.size, 'dnc': d['dnc'],
             'ar_median': float(med),
             'ar_p9995': float(hi),
             'ar_max': float(a.max()),
-            'area_trim': trimmed_ratio(area, wa),
+            'area_median': float(amed),
+            'area_trim': float(ahi / alo),
             'area_all': float(area.max() / area.min()),
         })
     return rows
@@ -294,22 +277,22 @@ def summary_stats(results):
 def write_summary_table(rows):
     """The summary stats as an HTML fragment, styled by the site's own
     CSS (table.stats in web/style.css)."""
-    def num(v):
-        return f'<td class="num">{v:.4f}</td>'
-
     def sci(n):   # 1000000 -> '1.0e6'
         m, e = f'{n:.1e}'.split('e')
         return f'{m}e{int(e)}'
 
     body = []
     for r in rows:
+        s = r['sys']
+        cells = [sci(r['n']),
+                 *(f'{r[k]:.4f}' for k in ('ar_median', 'ar_p9995', 'ar_max')),
+                 str(r['dnc']),
+                 *(f'{r[k]:.4f}' for k in ('area_trim', 'area_all'))]
         body.append(
             '<tr><td class="sys"><span class="swatch" '
-            f'style="background:{r["color"]}"></span>{r["label"]}</td>'
-            f'<td class="num">{sci(r["n"])}</td>'
-            + num(r['ar_median']) + num(r['ar_p9995']) + num(r['ar_max'])
-            + f'<td class="num">{r["dnc"]}</td>'
-            + num(r['area_trim']) + num(r['area_all']) + '</tr>')
+            f'style="background:{matplotlib.colors.to_hex(SYS_COLOR[s])}">'
+            f'</span>{SYS_LABEL[s]}</td>'
+            + ''.join(f'<td class="num">{c}</td>' for c in cells) + '</tr>')
     html = (
         '<table class="stats">\n<thead>\n'
         '<tr><th rowspan="2" class="sys">system</th>'
@@ -418,9 +401,9 @@ def main():
         print(f'[{s}] {ncells:,} cells over {nres} resolutions '
               f'in {time.perf_counter() - t0:.1f}s')
 
-    plot_histograms(results)
-    plot_area_histograms(results)
     rows = summary_stats(results)
+    plot_histograms(results, rows)
+    plot_area_histograms(results, rows)
     plot_tradeoff(rows)
     write_summary_table(rows)
     plot_extremes(results)
