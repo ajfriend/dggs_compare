@@ -50,9 +50,9 @@ gen key="all":
 metrics:
     uv run scripts/metrics.py
 
-# AR + area survey: reads the ar/area/irregular columns ->
-# out/histograms.png, area_histograms.png, area_ratio_by_res.png,
-# tradeoff.png, extremes.png, by_res_<system>.png. The only csar calls
+# AR + area survey: reads the ar/area columns ->
+# out/histograms.png, area_histograms.png, tradeoff.png,
+# extremes.png, by_res_<system>.png. The only csar calls
 # re-solve each system's two extreme cells to draw their certified
 # ellipses.
 survey:
@@ -97,10 +97,10 @@ web-data:
 # AND the ajglobe globe binaries + manifest. This is the single command the
 # published site runs (pages.yml) after fetching a data release, so every plot
 # on the site is generated from that release's tables — not from anything on
-# disk. Reads the stat columns (ar, area, irregular); nothing is re-measured except the two
+# disk. Reads the stat columns (ar, area); nothing is re-measured except the two
 # extreme cells the survey re-solves (csar) to draw their ellipses.
 site: survey web-data
-    cp out/histograms.png out/area_histograms.png out/area_ratio_by_res.png \
+    cp out/histograms.png out/area_histograms.png \
        out/tradeoff.png out/extremes.png out/by_res_*.png web/out/
 
 # Serve the static site at http://localhost:8000 (builds it first).

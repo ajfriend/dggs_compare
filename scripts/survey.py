@@ -1,26 +1,31 @@
-"""DGGS aspect-ratio + cell-area survey — reads the `ar`, `area`, and
-`irregular` columns of the tables and writes the comparison plots to out/
-(the only csar calls re-solve each system's two extreme cells, to draw
-their certified ellipses):
+"""DGGS aspect-ratio + cell-area survey — reads the `ar` and `area`
+columns of the tables and writes the comparison plots to out/ (the only
+csar calls re-solve each system's two extreme cells, to draw their
+certified ellipses):
 
   histograms.png        cross-system AR distributions at the working resolutions
   area_histograms.png   cross-system cell-area distributions (area / (4π/N),
-                        regular cells; pentagon ratio as a labeled tick)
-  area_ratio_by_res.png worst-case area ratio (max/min, regular cells) vs
-                        resolution — the area twin of the AR curves
-  tradeoff.png          worst-case AR vs worst-case area ratio per system
+                        all cells)
+  tradeoff.png          shape-vs-area scatter, all-cells and central-99.9% panels
   extremes.png          best/worst cell per system, drawn with its ellipse
   by_res_<sys>.png      per-system AR distribution stacked by resolution
 
 Aspect ratio (AR) = major/minor semi-axis ratio (a/b, a>=1) of each cell's
 enclosing-cone ellipse — the discrete, per-cell analogue of Tissot's
-indicatrix. AR == 1 is isotropic; AR > 1 is anisotropic ("squished"). For an
-equal-area DGGS the areal factor a*b is ~fixed by construction, so AR is
-where the unavoidable distortion shows up.
+indicatrix. AR == 1 is isotropic; AR > 1 is anisotropic (elongated).
+
+Two summary statistics per metric (#83): the ALL-CELLS extreme (max, or
+max/min for area — the worst case an application can meet) and the
+CENTRAL-99.9% version (p_9995, or p_9995/p_0005 — one uniform trim,
+identical for every system, no declared cell classes). The 0.05%
+per-side cut sits above the vanishing defect classes (point defects
+~1/N, seam lines ~1/sqrt(N)) and below the bulk, and a 0.05% quantile
+of a 1M-row sample is statistically stable where a sample extreme
+is not.
 
 Every distribution and quantile is PER-CELL UNIFORM: point-draw-sampled
 tables include cells ~proportionally to their area, so they are
-inverse-area weighted back (see sweep_system). Worst-case stats are
+inverse-area weighted back (see sweep_system). All-cells extremes are
 weighting-free.
 
 Run with:  just survey
@@ -49,27 +54,28 @@ SYS_COLOR = config.SYS_COLOR
 OUT_DIR = Path(__file__).resolve().parent.parent / 'out'
 N_BINS = 60
 DPI = 200
+P_LO, P_HI = 0.0005, 0.9995   # the central-99.9% trim (#83)
 # -------------------------------------------------------------------------
 
 
 def sweep_system(name):
-    """Per-resolution AR arrays, DNC counts, and area-ratio scalars from
-    the tables, plus the best/worst cell at the target resolution
+    """Per-resolution AR arrays and DNC counts from the tables, plus
+    the best/worst cell at the target resolution
     (re-solved — two cells — so the extremes plot can draw the certified
     ellipse). Full per-cell area arrays are kept ONLY at the target
-    resolution (the histogram input): retained everywhere they'd cost
-    ~2.5 GB at the full budget for values only ever reduced to scalars.
-    Weights are the exception — the by-resolution histograms consume them
-    at every sampled resolution — kept lean as float32 and None where
-    uniform (~0.6 GB at the full budget)."""
+    resolution (the area-histogram and tradeoff input): retained
+    everywhere they'd cost ~2.5 GB at the full budget when their only
+    remaining job is deriving the sampling weights. Weights are the
+    exception — the by-resolution histograms consume them at every
+    sampled resolution — kept lean as float32 and None where uniform
+    (~0.6 GB at the full budget)."""
     target = RES[name]
     impl = config.PRIMARY_IMPL[name]
     by_res = {}
     for res in cache.available_resolutions(name):
-        cols = cache.load_columns(name, res, ['ar', 'area', 'irregular'])
+        cols = cache.load_columns(name, res, ['ar', 'area'])
         a = cols['ar']
         rel = cols['area'] / config.mean_cell_area(name, res)
-        irr = cols['irregular']
         # Point-draw-sampled tables include a cell with probability
         # ~proportional to its area; inverse-area weights (None = the
         # table is already per-cell uniform; float32 — histogram bars and
@@ -82,14 +88,9 @@ def sweep_system(name):
         w = (1.0 / rel).astype(np.float32) if sampled else None
         bad = np.isnan(a)
         d = {'ars': a[~bad], 'w_ars': None if w is None else w[~bad],
-             'dnc': int(bad.sum()),
-             'ratio': area_ratio(rel, irr),
-             # The pentagons' relative areas, kept only where both cell
-             # classes are present (empty for all-pentagon coarse levels
-             # and for samples that caught none).
-             'pent': rel[irr] if irr.any() and not irr.all() else rel[:0]}
+             'dnc': int(bad.sum())}
         if res == target:
-            d['area'], d['irr'], d['w'] = rel, irr, w
+            d['area'], d['w'] = rel, w
         by_res[res] = d
 
     cols = cache.load_columns(name, target, ['cid', 'verts', 'ar'])
@@ -106,20 +107,23 @@ def sweep_system(name):
             'worst': record(int(np.nanargmax(cols['ar'])))}
 
 
-def regular_mask(irr):
-    """True for the REGULAR cells — the pentagon deficit is a design
-    constant (exactly 5/6 for the ISEA family), not distortion, so the
-    area statistics exclude it. A resolution with no regular cells
-    (ISEA-family r0: all 12 cells ARE the pentagons) keeps every cell.
-    THE selection rule: every area stat and histogram goes through here."""
-    m = ~irr
-    return m if m.any() else np.ones_like(irr)
+def _wq(vals, q, w):
+    """Weighted quantile(s), per-cell uniform (inverted_cdf is the only
+    method numpy allows with weights; w=None on full enumerations)."""
+    return np.quantile(vals, q, weights=w, method='inverted_cdf')
 
 
-def area_ratio(area, irr):
-    """max/min normalized area over regular cells (see regular_mask)."""
-    a = area[regular_mask(irr)]
-    return float(a.max() / a.min())
+def p_hi(vals, w):
+    """The central-99.9% upper edge (#83): one uniform trim, no declared
+    cell classes, stable where a sample extreme is not. AR's floor is 1
+    by construction, so for AR only the upper edge is informative."""
+    return float(_wq(vals, P_HI, w))
+
+
+def trimmed_ratio(vals, w):
+    """The central-99.9% ratio (#83)."""
+    lo, hi = _wq(vals, [P_LO, P_HI], w)
+    return float(hi / lo)
 
 
 def _save(fig, name, dpi=DPI):
@@ -137,18 +141,17 @@ def plot_histograms(results):
     dnc = {s: results[s]['by_res'][RES[s]]['dnc'] for s in SYSTEMS}
 
     def stat(a, w):
-        med, p99 = np.quantile(a, [0.5, 0.99], weights=w,
-                               method='inverted_cdf')
+        med, p9995 = _wq(a, [0.5, P_HI], w)
         return dict(n=a.size, min=float(a.min()), median=float(med),
-                    p99=float(p99), max=float(a.max()))
+                    p9995=float(p9995), max=float(a.max()))
 
     st = {s: stat(ars[s], ws[s]) for s in SYSTEMS}
 
-    print(f'{"sys":5} {"n_conv":>8} {"n_dnc":>7} {"min":>10} {"median":>10} {"p99":>10} {"max":>10}')
+    print(f'{"sys":5} {"n_conv":>8} {"n_dnc":>7} {"min":>10} {"median":>10} {"p99.95":>10} {"max":>10}')
     for s in SYSTEMS:
         d = st[s]
         print(f'{s:5} {d["n"]:>8} {dnc[s]:>7} {d["min"]:>10.6f} '
-              f'{d["median"]:>10.6f} {d["p99"]:>10.6f} {d["max"]:>10.6f}')
+              f'{d["median"]:>10.6f} {d["p9995"]:>10.6f} {d["max"]:>10.6f}')
 
     bins = np.linspace(1.0, max(a.max() for a in ars.values()), N_BINS + 1)
     fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
@@ -158,8 +161,9 @@ def plot_histograms(results):
                 edgecolor='white', linewidth=0.3)
         ax.set_yscale('log')
         ax.set_ylabel('count (log)')
-        ax.set_title(f'{SYS_LABEL[s]}  (median {d["median"]:.4f}, max {d["max"]:.4f}, DNC {dnc[s]})',
-                     fontsize=10)
+        ax.set_title(f'{SYS_LABEL[s]}  (median {d["median"]:.4f}, '
+                     f'p99.95 {d["p9995"]:.4f}, max {d["max"]:.4f}, '
+                     f'DNC {dnc[s]})', fontsize=10)
         ax.grid(True, alpha=0.3)
     axes[-1].set_xlabel(f'aspect ratio (shared bins, gap_tol = {config.GAP_TOL:g})')
     fig.suptitle('DGGS aspect-ratio distributions (~H3 r9 cell size)', fontsize=12)
@@ -169,110 +173,55 @@ def plot_histograms(results):
 
 def plot_area_histograms(results):
     """Cross-system normalized-area distributions at the working
-    resolutions, regular cells only. The pentagon tick is sourced from
-    the deepest resolution that carries pentagons — 12 cells among
-    millions are ~never sampled at the working resolution."""
+    resolutions — every cell included. The stat line pairs the all-cells
+    max/min with the central-99.9% ratio (#83)."""
     data = {}
     for s in SYSTEMS:
-        by_res = results[s]['by_res']
-        d = by_res[RES[s]]
-        m = regular_mask(d['irr'])
-        reg = d['area'][m]
-        wr = None if d['w'] is None else d['w'][m]
-        pent_res = next((r for r in sorted(by_res, reverse=True)
-                         if by_res[r]['pent'].size), None)
-        data[s] = {'reg': reg, 'wr': wr, 'med': float(np.quantile(reg, 0.5, weights=wr,
-                                            method='inverted_cdf')),
-                   'ratio': d['ratio'],
-                   'all_ratio': float(d['area'].max() / d['area'].min()),
-                   'pent_res': pent_res,
-                   'pent': (by_res[pent_res]['pent']
-                            if pent_res is not None else reg[:0])}
+        d = results[s]['by_res'][RES[s]]
+        area, w = d['area'], d['w']
+        lo, med, hi = _wq(area, [P_LO, 0.5, P_HI], w)
+        data[s] = {'area': area, 'w': w, 'med': float(med),
+                   'all_ratio': float(area.max() / area.min()),
+                   'trim_ratio': float(hi / lo)}
 
     print(f'{"sys":5} {"n":>8} {"min":>10} {"median":>10} {"max":>10} '
-          f'{"max/min":>9} {"(all)":>9}')
+          f'{"max/min":>9} {"central":>9}')
     for s in SYSTEMS:
         v = data[s]
-        print(f'{s:5} {v["reg"].size:>8} {v["reg"].min():>10.6f} '
-              f'{v["med"]:>10.6f} {v["reg"].max():>10.6f} '
-              f'{v["ratio"]:>9.6f} {v["all_ratio"]:>9.6f}')
+        print(f'{s:5} {v["area"].size:>8} {v["area"].min():>10.6f} '
+              f'{v["med"]:>10.6f} {v["area"].max():>10.6f} '
+              f'{v["all_ratio"]:>9.6f} {v["trim_ratio"]:>9.6f}')
 
-    lo = min(a.min() for v in data.values()
-             for a in (v['reg'], v['pent']) if a.size)
-    hi = max(v['reg'].max() for v in data.values())
+    lo = min(v['area'].min() for v in data.values())
+    hi = max(v['area'].max() for v in data.values())
     # Pad so 1.0 stays in frame even when every system is a spike at 1.
     lo, hi = min(lo, 0.98), max(hi, 1.02)
     bins = np.linspace(lo, hi, N_BINS + 1)
     fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
     for ax, s in zip(axes, SYSTEMS):
         v = data[s]
-        ax.hist(v['reg'], bins=bins, weights=v['wr'], color=SYS_COLOR[s],
+        ax.hist(v['area'], bins=bins, weights=v['w'], color=SYS_COLOR[s],
                 edgecolor='white', linewidth=0.3)
         ax.set_yscale('log')
         ax.set_ylabel('count (log)')
-        if v['pent'].size:
-            p = float(v['pent'].mean())
-            ax.axvline(p, color='0.25', ls='--', lw=1.2)
-            ax.text(p, 0.92, f' pentagons {p:.4f} (r{v["pent_res"]})',
-                    transform=ax.get_xaxis_transform(),
-                    fontsize=8, color='0.25', va='top')
         ax.set_title(f'{SYS_LABEL[s]}  (median {v["med"]:.4f}, '
-                     f'max/min {v["ratio"]:.4f})', fontsize=10)
+                     f'max/min {v["all_ratio"]:.4f}, '
+                     f'central-99.9% {v["trim_ratio"]:.4f})', fontsize=10)
         ax.grid(True, alpha=0.3)
     axes[-1].set_xlabel('cell area / (4π/N) — exact-mean normalized; '
-                        'regular cells (shared bins)')
+                        'all cells (shared bins)')
     fig.suptitle('DGGS cell-area distributions (~H3 r9 cell size)', fontsize=12)
     fig.tight_layout()
     _save(fig, 'area_histograms.png')
 
 
-def plot_area_ratio_by_res(results):
-    """One figure: worst-case area ratio vs resolution per system — the
-    area twin of the worst-case-AR-by-resolution story. Equal-area
-    systems hold 1.0 to float precision; sampled resolutions use sample
-    extremes (area is a smooth field, so 1M uniform samples reach close
-    to the true range)."""
-    fig, ax = plt.subplots(figsize=(9, 5.5))
-    for s in SYSTEMS:
-        by_res = results[s]['by_res']
-        res_list = sorted(by_res)
-        ax.plot(res_list, [by_res[r]['ratio'] for r in res_list],
-                '-o', ms=3.5, lw=1.4, color=SYS_COLOR[s], label=SYS_LABEL[s])
-    ax.axhline(1.0, color='0.8', lw=1, zorder=0)
-    ax.set_xlabel('resolution')
-    ax.set_ylabel('max/min cell area (regular cells, log)')
-    # Log y: the equal-area family hugs 1.0 while the finest levels of
-    # sub-attosteradian cells can spike on the f64 area floor — log keeps
-    # the 2x band readable either way.
-    ax.set_yscale('log')
-    ax.yaxis.set_major_formatter('{x:g}')
-    ax.set_yticks([1.0, 1.1, 1.25, 1.5, 2.0, 3.0, 4.0])
-    ax.yaxis.set_minor_formatter(NullFormatter())
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-    ax.set_title('Worst-case area ratio by resolution\n'
-                 '(pentagons excluded — their 5/6 deficit is a design '
-                 'constant, not distortion)', fontsize=11)
-    fig.tight_layout()
-    _save(fig, 'area_ratio_by_res.png')
-
-
-def plot_tradeoff(results):
-    """Pareto scatter at the working resolutions: worst-case AR (all
-    cells, matching the published AR stats) against worst-case area
-    ratio (regular cells). The ideal grid sits at (1, 1)."""
-    fig, ax = plt.subplots(figsize=(7.5, 6))
-    pts = []
-    for s in SYSTEMS:
-        d = results[s]['by_res'][RES[s]]
-        x, y = d['ars'].max(), d['ratio']
-        pts.append((s, x, y))
+def _scatter_panel(ax, pts):
+    """One tradeoff panel: colored points, stacked labels for
+    near-coincident points (within 3% of the axis range of a cluster's
+    first point; the stack anchors there so near-misses can't smear it),
+    and the ideal star at (1, 1)."""
+    for s, x, y in pts:
         ax.plot(x, y, 'o', ms=9, color=SYS_COLOR[s], label=SYS_LABEL[s])
-    # Near-coincident points (the equal-area systems collide at y=1, and
-    # the ISEA/IVEA n-hedge pairs coincide in both axes) get their labels
-    # STACKED instead of overprinted: points within 3% of the axis range
-    # of a cluster's first point join it, and the whole stack anchors on
-    # that first point so near-misses can't smear the stack apart.
     xs, ys = [p[1] for p in pts], [p[2] for p in pts]
     ex = 0.03 * ((max(xs) - min(xs)) or 1)
     ey = 0.03 * ((max(ys) - min(ys)) or 1)
@@ -289,15 +238,38 @@ def plot_tradeoff(results):
         for i, (s, _, _) in enumerate(c):
             ax.annotate(s.upper(), (x0, y0), textcoords='offset points',
                         xytext=(7, 4 + 12 * i), fontsize=9)
+    ax.plot(1, 1, marker='*', ms=15, color='0.25', zorder=3)
+    ax.annotate('ideal', (1, 1), textcoords='offset points',
+                xytext=(8, -4), fontsize=9, color='0.25')
     ax.axhline(1.0, color='0.85', lw=1, zorder=0)
     ax.axvline(1.0, color='0.85', lw=1, zorder=0)
-    ax.set_xlabel('worst-case aspect ratio (all cells)')
-    ax.set_ylabel('worst-case area ratio, max/min (regular cells)')
     ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=8, ncols=2, framealpha=0.9)   # system -> working res
-    ax.set_title('Shape vs area: worst case at the working resolutions\n'
-                 '(ideal = (1, 1); AR keeps pentagons, area excludes them)',
-                 fontsize=11)
+
+
+def plot_tradeoff(results):
+    """Pareto scatter at the working resolutions, shown both ways side
+    by side (#83): all-cells extremes and the central-99.9% quantile
+    statistics — the same construction in each panel, neither favored.
+    The ideal grid sits at (1, 1), starred."""
+    stats = {}
+    for s in SYSTEMS:
+        d = results[s]['by_res'][RES[s]]
+        stats[s] = {'all': (float(d['ars'].max()),
+                            float(d['area'].max() / d['area'].min())),
+                    'trim': (p_hi(d['ars'], d['w_ars']),
+                             trimmed_ratio(d['area'], d['w']))}
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.8),
+                             sharex=True, sharey=True)
+    for ax, key, sub in zip(axes, ('all', 'trim'),
+                            ('all cells:  max(AR)  vs  max/min(area)',
+                             'central 99.9%:  p99.95(AR)  vs  p99.95/p0.05(area)')):
+        _scatter_panel(ax, [(s, *stats[s][key]) for s in SYSTEMS])
+        ax.set_title(sub, fontsize=10)
+        ax.set_xlabel('aspect ratio')
+    axes[0].set_ylabel('cell-area ratio')
+    axes[0].legend(fontsize=8, ncols=2, framealpha=0.9)   # system -> working res
+    fig.suptitle('Shape vs area at the working resolutions (★ = the ideal grid)',
+                 fontsize=12)
     fig.tight_layout()
     _save(fig, 'tradeoff.png')
 
@@ -397,7 +369,6 @@ def main():
 
     plot_histograms(results)
     plot_area_histograms(results)
-    plot_area_ratio_by_res(results)
     plot_tradeoff(results)
     plot_extremes(results)
     for s in SYSTEMS:
