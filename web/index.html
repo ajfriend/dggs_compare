@@ -124,28 +124,22 @@
       <section>
         <h2>Cell-area distributions</h2>
         <p class="caption">Cell area of each system at its working
-          (~H3&nbsp;r9-sized) resolution. A hexagonal system's 12 pentagons
-          are left out of the histogram and marked by the dashed tick.</p>
+          (~H3&nbsp;r9-sized) resolution — every cell included. Each stat
+          line pairs the all-cells max/min with the central-99.9% ratio
+          (p99.95/p0.05): one uniform trim, identical for every system,
+          no excluded cell classes.</p>
         <img class="plot" loading="lazy" src="out/area_histograms.png"
              alt="Cell-area distributions per system">
-      </section>
-
-      <section>
-        <h2>Area ratio by resolution</h2>
-        <p class="caption">Worst-case spread — the largest cell over the
-          smallest, pentagons excluded — at every resolution; equal-area
-          systems hold 1.0 to float precision.</p>
-        <img class="plot" loading="lazy" src="out/area_ratio_by_res.png"
-             alt="Worst-case area ratio by resolution">
       </section>
     </div>
 
     <div class="tab-panel" id="panel-tradeoff">
       <section>
         <h2>Shape vs area</h2>
-        <p class="caption">Worst-case aspect ratio against worst-case area ratio
-          at the working resolutions; equal-area systems lie on the bottom
-          edge. Down and to the left is better — no system wins both axes.</p>
+        <p class="caption">Aspect ratio against cell-area ratio at the working
+          resolutions, shown both ways: all-cells extremes on the left,
+          central-99.9% statistics on the right. Down and to the left is
+          better; the star marks the ideal grid.</p>
         <img class="plot" loading="lazy" src="out/tradeoff.png"
              alt="Worst-case AR vs worst-case area ratio per system">
       </section>
