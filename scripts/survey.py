@@ -19,7 +19,7 @@ indicatrix. AR == 1 is isotropic; AR > 1 is anisotropic (elongated).
 Two summary statistics per metric (#83): the ALL-CELLS extreme (max, or
 max/min for area — the worst case an application can meet) and the
 CENTRAL-99.9% version (p_9995, or p_9995/p_0005 — one uniform trim,
-identical for every system, no declared cell classes). The 0.05%
+identical for every system, no per-system special-casing). The 0.05%
 per-side cut sits above the vanishing defect classes (point defects
 ~1/N, seam lines ~1/sqrt(N)) and below the bulk, and a 0.05% quantile
 of a 1M-row sample is statistically stable where a sample extreme

@@ -87,7 +87,8 @@ def build(key, res, extra_meta=None, out_dir=None):
     n = 0
     t_measure = 0.0
     try:
-        for batch in raw.iter_batches(batch_size=BATCH):
+        for batch in raw.iter_batches(batch_size=BATCH,
+                                      columns=['cid', 'verts']):
             ts = time.perf_counter()
             ars, areas = [], []
             for vlist in batch['verts'].to_pylist():
@@ -98,9 +99,9 @@ def build(key, res, extra_meta=None, out_dir=None):
             dnc += int(np.isnan(ars).sum())
             rows = len(batch)
             n += rows
-            # cid/verts pass through untouched (the contract
-            # guarantees open vertex lists, so what was measured above IS
-            # the stored geometry); only the metric columns are new.
+            # cid/verts pass through untouched (the contract guarantees
+            # open vertex lists, so what was measured above IS the
+            # stored geometry); only the metric columns are new.
             writer.write_table(pa.table({
                 'dggs': pa.array([grid] * rows, pa.string()),
                 'res': pa.array([res] * rows, pa.int32()),

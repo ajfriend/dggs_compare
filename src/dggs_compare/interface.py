@@ -11,9 +11,8 @@ DENSITY: how many extra vertices are sampled along each native edge.
 Density 0 is the minimal vertex set. Bringing cells to the sphere is the
 implementation's job, done however it thinks best (the closed-form
 authalic map is available for implementations that address WGS84 geodetic
-coordinates: `stats.authalic_rings` for a `boundaries()` return value,
-`stats.authalic_lat` for bare latitudes); the script is the record of how
-its system got to the sphere.
+coordinates: `stats.authalic_rings` for a `boundaries()` return value);
+the script is the record of how its system got to the sphere.
 
 Cell handles are plain hashables whose meaning may be scoped to a
 resolution (DGGRID seqnums), so every geometry call carries `res`.
