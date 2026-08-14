@@ -53,17 +53,6 @@ TARGET_RES = {'h3': 9, 's2': 15, 'a5': 14, 'isea7h': 10, 'ivea7h': 10,
 PRIMARY_IMPL = {'h3': 'h3', 's2': 's2', 'a5': 'a5', 'isea7h': 'dggal',
                 'ivea7h': 'dggal', 'rhealpix': 'dggal', 'isea3h': 'dggal',
                 'ivea3h': 'dggal', 'isea4t': 'dggrid', 'hex9': 'hex9'}
-# Expected `irregular` count per resolution, per grid — the check against
-# each implementation's DECLARED exceptional cells (the tables' irregular
-# column; interface.py). 12 = a hexagonal grid's pentagons; 0 = no
-# exceptional class (a5's pentagons are its regular cell; hex9's lattice
-# defects are tiling vertices, not cells). The dnc-check gate asserts the
-# count exactly at full-enumeration resolutions, so a new hex script that
-# forgets its declaration fails loudly instead of publishing an all-False
-# column indistinguishable from a legitimate declares-none grid.
-EXPECTED_IRREGULAR = {'h3': 12, 's2': 0, 'a5': 0, 'isea7h': 12,
-                      'ivea7h': 12, 'rhealpix': 0, 'isea3h': 12,
-                      'ivea3h': 12, 'isea4t': 0, 'hex9': 0}
 # Plot color (matplotlib cycle index) per system.
 SYS_COLOR = {'h3': 'C0', 's2': 'C1', 'a5': 'C2', 'isea7h': 'C3',
              'ivea7h': 'C4', 'rhealpix': 'C5', 'isea3h': 'C6',
@@ -129,8 +118,7 @@ def sampling_regime(sys, res, n_cells=None):
 # a dict here extends the gate for free (FULL_RES stays optional;
 # RES_PREFIX is derived).
 PER_SYSTEM = {'TARGET_RES': TARGET_RES, 'SYS_COLOR': SYS_COLOR,
-              'CELLS_PER_RES': CELLS_PER_RES, 'PRIMARY_IMPL': PRIMARY_IMPL,
-              'EXPECTED_IRREGULAR': EXPECTED_IRREGULAR}
+              'CELLS_PER_RES': CELLS_PER_RES, 'PRIMARY_IMPL': PRIMARY_IMPL}
 # The globe view offers a Resolution menu of H3 anchor levels 0..this, every
 # system drawing at the resolution whose cell count is closest to the selected
 # anchor's. This sets the FINEST anchor, which is also the menu default

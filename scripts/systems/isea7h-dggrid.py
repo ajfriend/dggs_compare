@@ -34,4 +34,4 @@ from dggs_compare import runner
 if __name__ == '__main__':
     runner.generate(Adapter('ISEA7H', max_res=19,
                             num_cells=lambda r: 10 * 7 ** r + 2,
-                            params=DGGAL_ORIENTATION, pentagons=True))
+                            params=DGGAL_ORIENTATION))

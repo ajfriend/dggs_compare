@@ -19,5 +19,4 @@ from _dggal_engine import Adapter
 from dggs_compare import runner, stats
 
 if __name__ == '__main__':
-    runner.generate(Adapter('IVEA3H', to_sphere=stats.authalic_rings,
-                            pentagons=True))
+    runner.generate(Adapter('IVEA3H', to_sphere=stats.authalic_rings))

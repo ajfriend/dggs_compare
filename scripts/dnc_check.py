@@ -81,13 +81,6 @@ def main():
         print(f'FAIL — config.TARGET_RES problems: {bad_targets} '
               '(run `just calibrate`)')
         sys.exit(1)
-    bad_irregular = checks.irregular_problems()
-    if bad_irregular:
-        print('FAIL — irregular declarations vs config.EXPECTED_IRREGULAR:')
-        for p in bad_irregular:
-            print(f'  {p}')
-        sys.exit(1)
-
     print(f'{"implementation":16} {"onset":>6} {"finest %DNC":>12} {"result":>8}')
     all_failures = []
     per_system = {}

@@ -112,37 +112,6 @@ def coverage_problems():
     return problems
 
 
-def irregular_problems():
-    """Each table's `irregular` count vs config.EXPECTED_IRREGULAR: exact
-    at full-enumeration resolutions (the table holds every cell), an
-    upper bound at sampled ones. Catches an implementation that silently
-    forgets its declaration — an all-False column is otherwise
-    indistinguishable from a legitimate declares-none grid."""
-    problems = []
-    for (grid, impl), res_list in sorted(cache.available_tables().items()):
-        expect = config.EXPECTED_IRREGULAR[grid]
-        key = cache.key(grid, impl)
-        for res in res_list:
-            try:
-                flags = cache.load_columns(grid, res, ['irregular'],
-                                           impl)['irregular']
-            except Exception:
-                problems.append(f'{key}_r{res}: no irregular column '
-                                f'(pre-schema table)')
-                continue
-            n = int(flags.sum())
-            n_full = config.CELLS_PER_RES[grid](res)
-            if len(flags) == n_full:
-                want = min(expect, n_full)
-                if n != want:
-                    problems.append(f'{key}_r{res}: {n} irregular, expected '
-                                    f'{want} (full enumeration)')
-            elif n > expect:
-                problems.append(f'{key}_r{res}: {n} irregular > expected '
-                                f'{expect} (sampled)')
-    return problems
-
-
 def target_res_problems():
     """TARGET_RES entries that are drifted or untabled.
 

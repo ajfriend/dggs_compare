@@ -63,13 +63,3 @@ class GridImpl(Protocol):
     def enumerate_cells(self, res: int) -> Iterator:
         """Every cell at `res`."""
         ...
-
-    # OPTIONAL method — absent means every cell is regular:
-    #
-    # def irregular(self, res: int, cells) -> list[bool]:
-    #     """Flags the grid's finitely-many combinatorially exceptional
-    #     cells (e.g. a hexagonal grid's 12 pentagons), aligned with
-    #     `cells`. A DECLARATION recorded into the tables' `irregular`
-    #     column — consumers must never infer it from the stored
-    #     geometry (stored vertex lists may gain densification points).
-    #     Note a5 declares none: pentagons are its regular class."""

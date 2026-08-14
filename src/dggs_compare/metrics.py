@@ -98,7 +98,7 @@ def build(key, res, extra_meta=None, out_dir=None):
             dnc += int(np.isnan(ars).sum())
             rows = len(batch)
             n += rows
-            # cid/verts/irregular pass through untouched (the contract
+            # cid/verts pass through untouched (the contract
             # guarantees open vertex lists, so what was measured above IS
             # the stored geometry); only the metric columns are new.
             writer.write_table(pa.table({
@@ -108,7 +108,6 @@ def build(key, res, extra_meta=None, out_dir=None):
                 'verts': batch['verts'],
                 'ar': pa.array(ars, pa.float64()),
                 'area': pa.array(areas, pa.float64()),
-                'irregular': batch['irregular'],
             }, schema=SCHEMA))
     finally:
         writer.close()
