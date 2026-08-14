@@ -57,6 +57,12 @@ OUT_DIR = Path(__file__).resolve().parent.parent / 'out'
 N_BINS = 60
 DPI = 200
 P_LO, P_HI = 0.0005, 0.9995   # the central-99.9% trim (#83)
+# Display labels derived from the trim, so re-tuning it can't desync the
+# text on the generated outputs. (The prose in web/index.html and the
+# module docstring stays hand-written.)
+CENTRAL = f'{100 * (P_HI - P_LO):g}'   # '99.9'
+Q_HI = f'p{100 * P_HI:g}'              # 'p99.95'
+Q_LO = f'p{100 * P_LO:g}'              # 'p0.05'
 # -------------------------------------------------------------------------
 
 
@@ -129,11 +135,11 @@ def plot_histograms(results, rows):
     ars = {s: results[s]['by_res'][RES[s]]['ars'] for s in SYSTEMS}
     ws = {s: results[s]['by_res'][RES[s]]['w_ars'] for s in SYSTEMS}
 
-    print(f'{"sys":5} {"n_conv":>8} {"n_dnc":>7} {"min":>10} {"median":>10} {"p99.95":>10} {"max":>10}')
+    print(f'{"sys":5} {"n_conv":>8} {"n_dnc":>7} {"min":>10} {"median":>10} {Q_HI:>10} {"max":>10}')
     for r in rows:
         a = ars[r['sys']]
         print(f'{r["sys"]:5} {a.size:>8} {r["dnc"]:>7} {a.min():>10.6f} '
-              f'{r["ar_median"]:>10.6f} {r["ar_p9995"]:>10.6f} {r["ar_max"]:>10.6f}')
+              f'{r["ar_median"]:>10.6f} {r["ar_trim"]:>10.6f} {r["ar_max"]:>10.6f}')
 
     bins = np.linspace(1.0, max(a.max() for a in ars.values()), N_BINS + 1)
     fig, axes = plt.subplots(len(SYSTEMS), 1, figsize=(8, 9), sharex=True)
@@ -144,7 +150,7 @@ def plot_histograms(results, rows):
         ax.set_yscale('log')
         ax.set_ylabel('count (log)')
         ax.set_title(f'{SYS_LABEL[s]}  (median {r["ar_median"]:.4f}, '
-                     f'p99.95 {r["ar_p9995"]:.4f}, max {r["ar_max"]:.4f}, '
+                     f'{Q_HI} {r["ar_trim"]:.4f}, max {r["ar_max"]:.4f}, '
                      f'DNC {r["dnc"]})', fontsize=10)
         ax.grid(True, alpha=0.3)
     axes[-1].set_xlabel(f'aspect ratio (shared bins, gap_tol = {config.GAP_TOL:g})')
@@ -183,7 +189,7 @@ def plot_area_histograms(results, rows):
         ax.set_ylabel('count (log)')
         ax.set_title(f'{SYS_LABEL[s]}  (median {r["area_median"]:.4f}, '
                      f'max/min {r["area_all"]:.4f}, '
-                     f'central-99.9% {r["area_trim"]:.4f})', fontsize=10)
+                     f'central-{CENTRAL}% {r["area_trim"]:.4f})', fontsize=10)
         ax.grid(True, alpha=0.3)
     axes[-1].set_xlabel('cell area / (4π/N) — exact-mean normalized; '
                         'all cells (shared bins)')
@@ -233,8 +239,8 @@ def plot_tradeoff(rows):
                              sharex=True, sharey=True)
     panels = (('ar_max', 'area_all',
                'all cells:  max(AR)  vs  max/min(area)'),
-              ('ar_p9995', 'area_trim',
-               'central 99.9%:  p99.95(AR)  vs  p99.95/p0.05(area)'))
+              ('ar_trim', 'area_trim',
+               f'central {CENTRAL}%:  {Q_HI}(AR)  vs  {Q_HI}/{Q_LO}(area)'))
     for ax, (kx, ky, sub) in zip(axes, panels):
         _scatter_panel(ax, [(r['sys'], r[kx], r[ky]) for r in rows])
         ax.set_title(sub, fontsize=10)
@@ -253,8 +259,8 @@ def summary_stats(results):
     the medians and the DNC count. The single computation of these
     numbers — the histogram stat lines, the tradeoff panels, and the
     summary table all consume the rows, so they agree by construction.
-    (AR's floor is 1, so its central-99.9% counterpart is just the
-    upper edge p99.95.)"""
+    (AR's floor is 1, so its trimmed counterpart is just the upper
+    edge.)"""
     rows = []
     for s in SYSTEMS:
         d = results[s]['by_res'][RES[s]]
@@ -265,7 +271,7 @@ def summary_stats(results):
         rows.append({
             'sys': s, 'n': area.size, 'dnc': d['dnc'],
             'ar_median': float(med),
-            'ar_p9995': float(hi),
+            'ar_trim': float(hi),
             'ar_max': float(a.max()),
             'area_median': float(amed),
             'area_trim': float(ahi / alo),
@@ -285,7 +291,7 @@ def write_summary_table(rows):
     for r in rows:
         s = r['sys']
         cells = [sci(r['n']),
-                 *(f'{r[k]:.4f}' for k in ('ar_median', 'ar_p9995', 'ar_max')),
+                 *(f'{r[k]:.4f}' for k in ('ar_median', 'ar_trim', 'ar_max')),
                  str(r['dnc']),
                  *(f'{r[k]:.4f}' for k in ('area_trim', 'area_all'))]
         body.append(
@@ -299,9 +305,9 @@ def write_summary_table(rows):
         '<th rowspan="2" class="num">cells</th>'
         '<th colspan="4" class="grp">aspect ratio</th>'
         '<th colspan="2" class="grp">area ratio</th></tr>\n'
-        '<tr><th class="num">median</th><th class="num">p99.95</th>'
+        f'<tr><th class="num">median</th><th class="num">{Q_HI}</th>'
         '<th class="num">max</th><th class="num">DNC</th>'
-        '<th class="num">central&#8209;99.9%</th><th class="num">max/min</th></tr>\n'
+        f'<th class="num">central&#8209;{CENTRAL}%</th><th class="num">max/min</th></tr>\n'
         '</thead>\n<tbody>\n' + '\n'.join(body) + '\n</tbody>\n</table>\n')
     out = OUT_DIR / 'summary_table.html'
     out.write_text(html)
