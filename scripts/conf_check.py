@@ -223,6 +223,8 @@ def main():
                                    min(DISPLAY_N, len(data[s])),
                                    replace=False)]
              for s in SYSTEMS}
+    label = {s: f'{s.upper()} {config.RES_PREFIX[s]}{config.TARGET_RES[s]}'
+             for s in SYSTEMS}
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.6))
     latdeg = np.degrees(phi)
     ax1.plot(latdeg, sigma, color='0.2', lw=1.5, zorder=3,
@@ -231,7 +233,8 @@ def main():
         d = shown[s]
         r = np.maximum(d[:, 2] / d[:, 1], d[:, 1] / d[:, 2])
         ax1.plot(d[:, 0], r, '.', ms=2, alpha=0.25,
-                 color=matplotlib.colors.to_hex(config.SYS_COLOR[s]), label=s)
+                 color=matplotlib.colors.to_hex(config.SYS_COLOR[s]),
+                 label=label[s])
     ax1.annotate(f'max σ = {sigma.max():.6f} (equator)',
                  (0.03, 0.03), xycoords='axes fraction', fontsize=9)
     ax1.set_xlabel('|latitude| (deg)')
@@ -246,7 +249,8 @@ def main():
     for s in SYSTEMS:
         d = shown[s]
         ax2.plot(d[:, 0], d[:, 4] / d[:, 3], '.', ms=2, alpha=0.25,
-                 color=matplotlib.colors.to_hex(config.SYS_COLOR[s]), label=s)
+                 color=matplotlib.colors.to_hex(config.SYS_COLOR[s]),
+                 label=label[s])
     ax2.annotate(f'max/min J = {J.max() / J.min():.6f}',
                  (0.03, 0.93), xycoords='axes fraction', fontsize=9)
     ax2.set_xlabel('|latitude| (deg)')
