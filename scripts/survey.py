@@ -291,9 +291,8 @@ def write_summary_table(rows):
     for r in rows:
         s = r['sys']
         cells = [sci(r['n']),
-                 *(f'{r[k]:.4f}' for k in ('ar_median', 'ar_trim', 'ar_max')),
-                 str(r['dnc']),
-                 *(f'{r[k]:.4f}' for k in ('area_trim', 'area_all'))]
+                 *(f'{r[k]:.4f}' for k in ('ar_median', 'ar_trim', 'ar_max',
+                                           'area_trim', 'area_all'))]
         body.append(
             '<tr><td class="sys"><span class="swatch" '
             f'style="background:{matplotlib.colors.to_hex(SYS_COLOR[s])}">'
@@ -303,10 +302,10 @@ def write_summary_table(rows):
         '<table class="stats">\n<thead>\n'
         '<tr><th rowspan="2" class="sys">system</th>'
         '<th rowspan="2" class="num">cells</th>'
-        '<th colspan="4" class="grp">aspect ratio</th>'
+        '<th colspan="3" class="grp">aspect ratio</th>'
         '<th colspan="2" class="grp">area ratio</th></tr>\n'
         f'<tr><th class="num">median</th><th class="num">{Q_HI}</th>'
-        '<th class="num">max</th><th class="num">DNC</th>'
+        '<th class="num">max</th>'
         f'<th class="num">central&#8209;{CENTRAL}%</th><th class="num">max/min</th></tr>\n'
         '</thead>\n<tbody>\n' + '\n'.join(body) + '\n</tbody>\n</table>\n')
     out = OUT_DIR / 'summary_table.html'
