@@ -54,9 +54,6 @@ class H3:
             else:
                 yield from h3.cell_to_children(c0, res)
 
-    def irregular(self, res, cells):
-        return [h3.is_pentagon(c) for c in cells]
-
 
 if __name__ == '__main__':
     runner.generate(H3())
