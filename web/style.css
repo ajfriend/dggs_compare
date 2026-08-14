@@ -109,6 +109,22 @@ h2 {
 }
 .caption b { color: var(--ink); font-weight: 600; }
 
+/* ---- summary stats table (fragment written by survey.py) ---- */
+.stats-wrap { overflow-x: auto; }
+table.stats {
+  border-collapse: collapse;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+table.stats th, table.stats td { padding: 5px 14px; }
+table.stats thead th { color: var(--muted); font-weight: 600; }
+table.stats thead .grp { text-align: center; border-bottom: 1px solid var(--line); }
+table.stats tbody tr { border-top: 1px solid var(--line); }
+table.stats .num { text-align: right; }
+table.stats .sys { text-align: left; }
+table.stats td.sys { font-weight: 600; white-space: nowrap; }
+table.stats .swatch { margin-right: 7px; vertical-align: -1px; }
+
 /* ---- pre-rendered matplotlib plots ---- */
 .plot {
   display: block;

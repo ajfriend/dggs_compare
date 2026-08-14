@@ -101,7 +101,8 @@ web-data:
 # extreme cells the survey re-solves (csar) to draw their ellipses.
 site: survey web-data
     cp out/histograms.png out/area_histograms.png \
-       out/tradeoff.png out/extremes.png out/by_res_*.png web/out/
+       out/tradeoff.png out/extremes.png out/by_res_*.png \
+       out/summary_table.html web/out/
 
 # Serve the static site at http://localhost:8000 (builds it first).
 web: site

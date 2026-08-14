@@ -218,6 +218,15 @@ function byResGrid(M) {
   }
 }
 
+function summaryTable() {
+  // The working-resolution summary stats (a fragment written by
+  // survey.py); a missing file (an older cached build) just leaves the
+  // section empty.
+  fetch('out/summary_table.html')
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((html) => { $('#statsTable').innerHTML = html; });
+}
+
 function buildGlobe(M, sys) {   // card + Orb + hover wiring; data comes via loadAnchor
   const card = document.createElement('div');
   card.className = 'globe-card';
@@ -336,6 +345,9 @@ function initTabs(onShow) {
 }
 
 async function main() {
+  // Manifest-independent init first, so nothing waits on the fetch.
+  summaryTable();
+  initLightbox();
   const M = await fetch('out/manifest.json').then((r) => r.json());
   $('#subtitle').textContent =
     `${M.systems.length} systems · shape via csar's enclosing-cone solver, area via sparea`;
@@ -343,7 +355,6 @@ async function main() {
   if (M.gap_tol) $('#gap').textContent = M.gap_tol.toExponential();
 
   byResGrid(M);
-  initLightbox();
 
   // Everything globe-panel runs lazily and RESUMABLY, driven by showings
   // of the globes tab: canvases (the histogram's and each Orb's) size
