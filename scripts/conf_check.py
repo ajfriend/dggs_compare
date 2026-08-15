@@ -238,8 +238,9 @@ def main():
     ax1.annotate(f'max σ = {sigma.max():.6f} (equator)',
                  (0.03, 0.03), xycoords='axes fraction', fontsize=9)
     ax1.set_xlabel('|latitude| (deg)')
-    ax1.set_ylabel('per-cell max(ARc/ARa, ARa/ARc)')
-    ax1.set_title('shape: per-cell AR change vs the Tissot envelope',
+    ax1.set_ylabel(r'per-cell  $\max(\mathrm{AR}_\chi/\mathrm{AR}_\xi,'
+                   r'\ \mathrm{AR}_\xi/\mathrm{AR}_\chi)$')
+    ax1.set_title('shape: the per-cell AR ratio is bounded by σ(φ)',
                   fontsize=10)
     ax1.legend(fontsize=8)
     ax1.grid(True, alpha=0.3)
@@ -254,15 +255,15 @@ def main():
     ax2.annotate(f'max/min J = {J.max() / J.min():.6f}',
                  (0.03, 0.93), xycoords='axes fraction', fontsize=9)
     ax2.set_xlabel('|latitude| (deg)')
-    ax2.set_ylabel('per-cell area_conf / area_auth')
-    ax2.set_title('area: the paired ratio IS the analytic area scale',
+    ax2.set_ylabel(r'per-cell  $\mathrm{area}_\chi \,/\, \mathrm{area}_\xi$')
+    ax2.set_title('area: the per-cell ratio equals J(φ) exactly',
                   fontsize=10)
     ax2.legend(fontsize=8)
     ax2.grid(True, alpha=0.3)
 
-    fig.suptitle('Authalic vs conformal spherization: analytic Tissot '
-                 'curves + paired samples at the working resolutions',
-                 fontsize=12)
+    fig.suptitle('Authalic (ξ) vs conformal (χ) spherization: the Tissot '
+                 'curves of T = χ∘ξ⁻¹, with paired samples at the working '
+                 'resolutions', fontsize=12)
     fig.tight_layout()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(OUT, dpi=200)
