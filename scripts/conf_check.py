@@ -34,7 +34,8 @@ SAMPLING. For each system, point-drawn cells at its working resolution;
 each cell's RAW GEODETIC boundary is mapped through BOTH transforms and
 measured identically (stats.cell_stats). Paired per-cell ratios overlay
 the curves: AR ratios must fall inside the sigma envelope, and the
-equal-area systems' conformal areas must trace J.
+paired area ratios must trace J — for every system, since pairing
+cancels each grid's intrinsic area spread.
 
 One-off analysis for issue #82 — not part of the pipeline. Bindings are
 deliberately co-resolved here (a one-env exception to the per-script-env
