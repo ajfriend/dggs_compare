@@ -94,14 +94,16 @@ def tissot(phi, dphi=1e-7):
     return np.maximum(h / k, k / h), h * k
 
 
-def conformal_rings(rings):
-    """authalic_rings' twin: every vertex latitude through chi."""
-    out = []
-    for ring in rings:
-        r = np.asarray(ring, dtype=float)
-        lat = np.degrees(chi(np.radians(r[:, 0])))
-        out.append(list(zip(lat.tolist(), r[:, 1].tolist())))
-    return out
+def chi_deg(lat_deg):
+    """chi in degrees — authalic_lat's conformal twin."""
+    return np.degrees(chi(np.radians(lat_deg)))
+
+
+def map_ring(r, lat_map):
+    """(n, 2) geodetic (lat, lng) array -> [(lat, lng), ...] with every
+    latitude through `lat_map` (stats.authalic_lat or chi_deg) — the two
+    spherizations, applied identically."""
+    return list(zip(lat_map(r[:, 0]).tolist(), r[:, 1].tolist()))
 
 
 # ----- per-system raw-geodetic cell sources ------------------------------
@@ -171,23 +173,21 @@ def sample_system(name):
     """N_CELLS distinct point-drawn cells: per-cell (centroid |lat| deg,
     ar_auth, ar_conf, area_auth_norm, area_conf_norm)."""
     res, cells_at, ring_of = SOURCES[name]()
-    mean_area = 4.0 * np.pi / config.CELLS_PER_RES[name](res)
+    mean_area = config.mean_cell_area(name, res)
     rng = np.random.default_rng(SEED)
-    seen, picked = set(), []
-    while len(picked) < N_CELLS:
-        pts = stats.sample_uniform_latlng(2 * (N_CELLS - len(picked)), rng)
-        for c in cells_at(pts):
-            if c not in seen:
-                seen.add(c)
-                picked.append(c)
-                if len(picked) == N_CELLS:
-                    break
+    # Collisions among N_CELLS draws are ~1-in-10^4 at these cell counts,
+    # so draw just the shortfall (+margin) per round; dict = ordered set.
+    # None-skip: dggal's point lookup can miss at singular points.
+    seen = {}
+    while len(seen) < N_CELLS:
+        pts = stats.sample_uniform_latlng(N_CELLS - len(seen) + 100, rng)
+        seen.update((c, None) for c in cells_at(pts) if c is not None)
     rows = []
-    for c in picked:
-        ring = [(float(la), float(ln)) for la, ln in ring_of(c)]
-        ar_a, area_a = stats.cell_stats(stats.authalic_rings([ring])[0])
-        ar_c, area_c = stats.cell_stats(conformal_rings([ring])[0])
-        lat = abs(np.mean([la for la, _ in ring]))
+    for c in list(seen)[:N_CELLS]:
+        r = np.asarray(ring_of(c), dtype=float)
+        ar_a, area_a = stats.cell_stats(map_ring(r, stats.authalic_lat))
+        ar_c, area_c = stats.cell_stats(map_ring(r, chi_deg))
+        lat = abs(float(r[:, 0].mean()))
         rows.append((lat, ar_a, ar_c, area_a / mean_area, area_c / mean_area))
     return np.array(rows)
 
@@ -195,6 +195,7 @@ def sample_system(name):
 def main():
     # ----- the curves ----------------------------------------------------
     phi = np.radians(np.linspace(0.0, 89.99, 20_000))
+    latdeg = np.degrees(phi)
     sigma, J = tissot(phi)
     i = int(np.argmax(sigma))
     print(f'analytic: max sigma = {sigma[i]:.6f} at |lat| '
@@ -208,7 +209,7 @@ def main():
         data[s] = d = sample_system(s)
         lat, ar_a, ar_c, na, nc = d.T
         r = np.maximum(ar_c / ar_a, ar_a / ar_c)
-        env = np.interp(lat, np.degrees(phi), sigma)
+        env = np.interp(lat, latdeg, sigma)
         print(f'{s:7} n {len(d):>7}  AR ratio: median {np.median(r):.6f} '
               f'max {r.max():.6f} (bound {env.max():.6f}, '
               f'violations {(r > env * (1 + 1e-6)).sum()})  '
@@ -217,50 +218,41 @@ def main():
 
     # ----- the figure ----------------------------------------------------
     # Scatter shows a DISPLAY_N subsample per system (stats above use every
-    # cell); the paired area ratio cancels each grid's intrinsic spread, so
-    # panel 2's dots should collapse onto J for every system.
+    # cell). The two panels are the same construction; `panel` keeps them
+    # identical in everything but the six named slots.
     rng = np.random.default_rng(SEED)
-    shown = {s: data[s][rng.choice(len(data[s]),
-                                   min(DISPLAY_N, len(data[s])),
-                                   replace=False)]
+    shown = {s: data[s][rng.choice(N_CELLS, DISPLAY_N, replace=False)]
              for s in SYSTEMS}
-    label = {s: f'{s.upper()} {config.RES_PREFIX[s]}{config.TARGET_RES[s]}'
-             for s in SYSTEMS}
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.6))
-    latdeg = np.degrees(phi)
-    ax1.plot(latdeg, sigma, color='0.2', lw=1.5, zorder=3,
-             label='σ(φ) — analytic envelope')
-    for s in SYSTEMS:
-        d = shown[s]
-        r = np.maximum(d[:, 2] / d[:, 1], d[:, 1] / d[:, 2])
-        ax1.plot(d[:, 0], r, '.', ms=2, alpha=0.25,
-                 color=matplotlib.colors.to_hex(config.SYS_COLOR[s]),
-                 label=label[s])
-    ax1.annotate(f'max σ = {sigma.max():.6f} (equator)',
-                 (0.03, 0.03), xycoords='axes fraction', fontsize=9)
-    ax1.set_xlabel('|latitude| (deg)')
-    ax1.set_ylabel(r'per-cell  $\max(\mathrm{AR}_\chi/\mathrm{AR}_\xi,'
-                   r'\ \mathrm{AR}_\xi/\mathrm{AR}_\chi)$')
-    ax1.set_title('shape: the per-cell AR ratio is bounded by σ(φ)',
-                  fontsize=10)
-    ax1.legend(fontsize=8)
-    ax1.grid(True, alpha=0.3)
 
-    ax2.plot(latdeg, J, color='0.2', lw=1.5, zorder=3,
-             label='J(φ) — analytic area scale')
-    for s in SYSTEMS:
-        d = shown[s]
-        ax2.plot(d[:, 0], d[:, 4] / d[:, 3], '.', ms=2, alpha=0.25,
-                 color=matplotlib.colors.to_hex(config.SYS_COLOR[s]),
-                 label=label[s])
-    ax2.annotate(f'max/min J = {J.max() / J.min():.6f}',
-                 (0.03, 0.93), xycoords='axes fraction', fontsize=9)
-    ax2.set_xlabel('|latitude| (deg)')
-    ax2.set_ylabel(r'per-cell  $\mathrm{area}_\chi \,/\, \mathrm{area}_\xi$')
-    ax2.set_title('area: the per-cell ratio equals J(φ) exactly',
-                  fontsize=10)
-    ax2.legend(fontsize=8)
-    ax2.grid(True, alpha=0.3)
+    def panel(ax, curve, curve_label, per_cell, note, note_y, ylabel, title):
+        ax.plot(latdeg, curve, color='0.2', lw=1.5, zorder=3,
+                label=curve_label)
+        for s in SYSTEMS:
+            d = shown[s]
+            ax.plot(d[:, 0], per_cell(d), '.', ms=2, alpha=0.25,
+                    color=config.SYS_COLOR[s],
+                    label=f'{s.upper()} '
+                          f'{config.RES_PREFIX[s]}{config.TARGET_RES[s]}')
+        ax.annotate(note, (0.03, note_y), xycoords='axes fraction',
+                    fontsize=9)
+        ax.set_xlabel('|latitude| (deg)')
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, fontsize=10)
+        ax.legend(fontsize=8)
+        ax.grid(True, alpha=0.3)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.6))
+    panel(ax1, sigma, 'σ(φ) — analytic envelope',
+          lambda d: np.maximum(d[:, 2] / d[:, 1], d[:, 1] / d[:, 2]),
+          f'max σ = {sigma.max():.6f} (equator)', 0.03,
+          r'per-cell  $\max(\mathrm{AR}_\chi/\mathrm{AR}_\xi,'
+          r'\ \mathrm{AR}_\xi/\mathrm{AR}_\chi)$',
+          'shape: the per-cell AR ratio is bounded by σ(φ)')
+    panel(ax2, J, 'J(φ) — analytic area scale',
+          lambda d: d[:, 4] / d[:, 3],
+          f'max/min J = {J.max() / J.min():.6f}', 0.93,
+          r'per-cell  $\mathrm{area}_\chi \,/\, \mathrm{area}_\xi$',
+          'area: the per-cell ratio equals J(φ) exactly')
 
     fig.suptitle('Authalic (ξ) vs conformal (χ) spherization: the Tissot '
                  'curves of T = χ∘ξ⁻¹, with paired samples at the working '
